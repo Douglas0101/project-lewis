@@ -1,0 +1,18 @@
+preprocess_v1.0:
+  version: "1.0.0"
+  resample:
+    target_fs: 500.0
+    method: "resample_poly"
+    padtype: "line"
+  filter:
+    type: "butterworth"
+    order: 4
+    lowcut: 0.5
+    highcut: 40.0
+    implementation: "filtfilt"
+  detrend:
+    type: "linear"
+  normalization:
+    type: "zscore_global"
+    eps: 1.0e-12
+    per_record: false

@@ -1,0 +1,41 @@
+# Project-Lewis DVC ignore — não rastrear artefatos gerados pelo pipeline.
+# Apenas datasets brutos (data/raw_*/) devem ser versionados via DVC.
+
+# Processados / features / linhagem gerados pelo pipeline
+data/processed/
+data/features/
+data/lineage/
+
+# Caches e filas temporárias
+data/.cache/
+data/.dlq/
+data/.ci_cache/
+data/mirrors/
+
+# Modelos e entregáveis de firmware (versionados via CI artifacts ou outro remote)
+models/
+firmware/src/ml/*.h
+firmware/src/ml/*.tflite
+
+# Relatórios temporários
+reports/*.xml
+reports/*.html
+htmlcov/
+.coverage
+.pytest_cache/
+
+# Ambientes e caches Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# IDEs e OS
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

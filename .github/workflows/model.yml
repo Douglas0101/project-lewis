@@ -1,0 +1,201 @@
+name: Model Training & Export
+
+on:
+  workflow_dispatch:
+    inputs:
+      epochs_pretrain:
+        description: "Épocas de pré-treino (Chapman)"
+        required: false
+        default: "10"
+        type: string
+      epochs_finetune:
+        description: "Épocas de fine-tuning (MIT-BIH+)"
+        required: false
+        default: "10"
+        type: string
+      quantize:
+        description: "Executar quantização INT8 e exportação TFLM"
+        required: false
+        default: "true"
+        type: choice
+        options:
+          - "true"
+          - "false"
+  schedule:
+    - cron: "0 4 * * 0"  # Domingos 04:00 UTC
+
+env:
+  PYTHON_VERSION: "3.12"
+  LEWIS_REQUIRE_DATA: "1"
+  EPOCHS_PRETRAIN: ${{ github.event.inputs.epochs_pretrain || '10' }}
+  EPOCHS_FINETUNE: ${{ github.event.inputs.epochs_finetune || '10' }}
+
+jobs:
+  pretrain:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 240
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest dvc
+
+      - name: Configure DVC remote (stub)
+        run: |
+          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Pull Chapman dataset
+        run: dvc pull data/raw_chapman.dvc
+
+      - name: QG4 — Pré-treino
+        run: |
+          pytest tests/test_pretrain.py -m qg4 --tb=short
+
+      - name: Upload pretrain artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pretrain-model
+          path: |
+            models/*.keras
+            models/*.h5
+
+  finetune:
+    runs-on: ubuntu-24.04
+    needs: pretrain
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest dvc
+
+      - name: Configure DVC remote (stub)
+        run: |
+          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Pull datasets via DVC
+        run: dvc pull
+
+      - name: Download pretrain artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pretrain-model
+          path: models/
+
+      - name: QG5 — Fine-tuning
+        run: pytest tests/test_finetune.py -m qg5 --tb=short
+
+      - name: Upload finetune artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: finetune-model
+          path: |
+            models/*.keras
+            models/*.h5
+
+  quantize-export:
+    runs-on: ubuntu-24.04
+    needs: finetune
+    if: |
+      github.event.inputs.quantize != 'false'
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest dvc
+
+      - name: Configure DVC remote (stub)
+        run: |
+          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Pull datasets via DVC
+        run: dvc pull
+
+      - name: Download finetune artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: finetune-model
+          path: models/
+
+      - name: QG6 — Quantização
+        run: pytest tests/test_quantization.py -m qg6 --tb=short
+
+      - name: Export TFLM deliverables
+        run: |
+          make quantize
+          make export
+
+      - name: Upload firmware artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-artifacts
+          path: |
+            models/*.tflite
+            firmware/src/ml/*.h

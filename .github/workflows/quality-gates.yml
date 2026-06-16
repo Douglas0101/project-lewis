@@ -1,0 +1,229 @@
+name: Quality Gates
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: "0 3 * * 1"  # Segunda-feiras 03:00 UTC
+  workflow_dispatch:
+    inputs:
+      run_qg4_qg5:
+        description: "Incluir gates lentos de treinamento (qg4/qg5)"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+env:
+  PYTHON_VERSION: "3.12"
+  LEWIS_REQUIRE_DATA: "1"
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install lint tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install black==24.4.2 isort==5.13.2 flake8==7.1.0 mypy==1.10.0 bandit==1.7.8
+
+      # Os comandos abaixo usam `|| true` enquanto o repo não passa por formatação
+      # completa; assim o job reporta problemas sem bloquear o CI.
+      - name: black
+        run: black --check src tests scripts || true
+
+      - name: isort
+        run: isort --check-only --profile black src tests scripts || true
+
+      - name: flake8
+        run: flake8 src tests scripts || true
+
+      - name: mypy
+        run: mypy src || true
+
+      - name: bandit
+        run: bandit -r src || true
+
+  unit-tests:
+    runs-on: ubuntu-24.04
+    needs: lint
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Run unit tests (fast, no real datasets)
+        run: |
+          pytest tests/ \
+            -m "not slow and not qg4 and not qg5 and not qg6" \
+            --tb=short
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-unit
+          path: .coverage
+
+  quality-gates:
+    runs-on: ubuntu-24.04
+    needs: unit-tests
+    if: |
+      github.ref == 'refs/heads/main'
+      || github.event_name == 'schedule'
+      || github.event_name == 'workflow_dispatch'
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest dvc
+
+      - name: Configure DVC remote (stub)
+        run: |
+          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Pull datasets via DVC
+        run: dvc pull
+
+      - name: QG0 — Download & catalog
+        run: pytest tests/test_download.py -m qg0 --tb=short
+
+      - name: QG1 — Resample + Preprocessing
+        run: |
+          pytest tests/test_loader.py tests/test_resampler.py tests/test_preprocessing.py \
+            -m qg1 --tb=short
+
+      - name: QG2 — AMPT
+        run: pytest tests/test_ampt.py -m qg2 --tb=short
+
+      - name: QG3 — Features & Segmentation
+        run: |
+          pytest tests/test_features.py tests/test_segmenter.py \
+            -m qg3 --tb=short
+
+      - name: QG6 — Quantization (light)
+        run: pytest tests/test_quantization.py -m qg6 --tb=short
+
+      - name: Generate quality report
+        run: python scripts/generate_quality_report.py --output reports/quality_report.md
+
+      - name: Upload quality report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-report
+          path: reports/quality_report.md
+
+  quality-gates-slow:
+    runs-on: ubuntu-24.04
+    needs: quality-gates
+    if: |
+      (github.ref == 'refs/heads/main'
+       || github.event_name == 'schedule'
+       || github.event_name == 'workflow_dispatch')
+      && github.event.inputs.run_qg4_qg5 == 'true'
+    timeout-minutes: 360
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            pip-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest dvc
+
+      - name: Configure DVC remote (stub)
+        run: |
+          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+
+      - name: Pull datasets via DVC
+        run: dvc pull
+
+      - name: QG4 — Pretrain
+        run: pytest tests/test_pretrain.py -m qg4 --tb=short
+        timeout-minutes: 240
+
+      - name: QG5 — Finetune
+        run: pytest tests/test_finetune.py -m qg5 --tb=short
+        timeout-minutes: 180
+
+      - name: Upload models
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: models-qg4-qg5
+          path: |
+            models/*.keras
+            models/*.h5

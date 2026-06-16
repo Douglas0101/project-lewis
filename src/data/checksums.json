@@ -1,0 +1,46 @@
+{
+  "version": "1.0",
+  "generated_at": "2026-06-13T04:00:00+00:00",
+  "datasets": {
+    "chapman_shaoxing": {
+      "sha256": "2ac8e91a0830f8b1a7c3d06a698c0b27981adc4b6fc301149876d8dd126c3a83",
+      "size_bytes": 2458352898,
+      "source": "physionet",
+      "url": "https://physionet.org/files/challenge-2021/1.0.3/training/chapman_shaoxing/",
+      "verified_at": "2026-06-13T04:00:00+00:00",
+      "verified_by": "douglas-souza"
+    },
+    "mitdb": {
+      "sha256": "47b26926927c11bd9174154d367c811afc1b186f650f8a205931ca8c520f0a87",
+      "size_bytes": 77030320,
+      "source": "physionet",
+      "url": "https://physionet.org/static/published-projects/mitdb/mit-bih-arrhythmia-database-1.0.0.zip",
+      "verified_at": "2026-06-12T04:00:00+00:00",
+      "verified_by": "douglas-souza"
+    },
+    "svdb": {
+      "sha256": "ef0cf2aae45234107f5239f31662b64afba2067d707bf52f3a3adbf2de9fd25b",
+      "size_bytes": 54576759,
+      "source": "physionet",
+      "url": "https://physionet.org/static/published-projects/svdb/mit-bih-supraventricular-arrhythmia-database-1.0.0.zip",
+      "verified_at": "2026-06-12T04:00:00+00:00",
+      "verified_by": "douglas-souza"
+    },
+    "afdb": {
+      "sha256": "1f19cb2ac53b6d847f304cbd4bd11e7db32978c529213f88407e09053d8c817b",
+      "size_bytes": 461033254,
+      "source": "physionet",
+      "url": "https://physionet.org/static/published-projects/afdb/mit-bih-atrial-fibrillation-database-1.0.0.zip",
+      "verified_at": "2026-06-12T04:00:00+00:00",
+      "verified_by": "douglas-souza"
+    },
+    "incartdb": {
+      "sha256": "7be630362db0d593d26cb2b18a1c765078ba5281b956758ae6d78cb8c8c89a05",
+      "size_bytes": 590842939,
+      "source": "physionet",
+      "url": "https://physionet.org/static/published-projects/incartdb/st-petersburg-incart-12-lead-arrhythmia-database-1.0.0.zip",
+      "verified_at": "2026-06-12T04:00:00+00:00",
+      "verified_by": "douglas-souza"
+    }
+  }
+}

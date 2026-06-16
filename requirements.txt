@@ -1,0 +1,195 @@
+# =============================================================================
+# Project-Lewis — Requirements.txt
+# Sistema Cardíaco Autônomo de Borda — Fase 1: Pipeline de Dados + Ciência de Dados
+# =============================================================================
+# Arquiteto: Douglas Souza
+# Hardware Dev: Lenovo IdeaPad 3 15ITL6 | Zorin OS 18.1 (Ubuntu 24.04.3 LTS)
+# Python: 3.12.x (system Python do Ubuntu 24.04 LTS — NÃO usar 3.13+)
+# Data: 2026-06-09
+# =============================================================================
+# INSTRUÇÕES DE INSTALAÇÃO:
+#   python3 -m venv .venv
+#   source .venv/bin/activate
+#   pip install --upgrade pip setuptools wheel
+#   pip install -r requirements.txt
+# =============================================================================
+# POLÍTICA DE VERSIONAMENTO:
+# - Todas as versões são FIXAS (pinned) para garantir reprodutibilidade.
+# - Não usar >=, ~= ou ^. Apenas ==.
+# - Ubuntu 24.04 LTS shipa Python 3.12 nativamente. Não instalar 3.13+.
+# - Antes de atualizar qualquer versão, validar compatibilidade com TFLite
+#   e wfdb em ambiente isolado.
+# =============================================================================
+
+# =============================================================================
+# 1. INFRAESTRUTURA DE PACOTES (instalar primeiro)
+# =============================================================================
+# setuptools e wheel são pré-requisitos para compilação de pacotes com extensões C.
+# pip >= 23.0 é necessário para resolução de dependências moderna (resolver 2.0).
+# =============================================================================
+setuptools==70.0.0          # Build backend padrão. Ubuntu 24.04 shipa 68.1.2+
+wheel==0.43.0               # Formato de distribuição binária (wheels). Evita recompilação.
+
+# =============================================================================
+# 2. LEITURA DE DADOS BIOMÉDICOS (WFDB — PhysioNet)
+# =============================================================================
+# wfdb é a biblioteca oficial do MIT Lab for Computational Physiology para
+# leitura de registros de ECG no formato WFDB (Waveform Database).
+# Usada para: download MIT-BIH, SVDB, AFDB, INCART; leitura .dat/.hea/.atr.
+# 
+# Versão 4.1.2 (2024-03): última estável com suporte completo a Python 3.12.
+# Não usar 4.2.x sem validar que dl_database() não quebrou (API mudou em 4.2).
+# =============================================================================
+wfdb==4.1.2                 # MIT-BIH Arrhythmia Database reader + downloader
+
+# =============================================================================
+# 3. COMPUTAÇÃO NUMÉRICA (NumPy + SciPy)
+# =============================================================================
+# NumPy é a base de toda a computação científica em Python. SciPy fornece
+# filtros digitais (Butterworth), resample (resample_poly), detrend, FFT.
+#
+# NumPy 1.26.4: última versão da série 1.x, compatível com TensorFlow 2.16.1.
+# NumPy 2.0+ QUEBRA compatibilidade com TensorFlow < 2.17. NÃO usar.
+# SciPy 1.11.4: compatível com NumPy 1.26.x. Fornece signal.filtfilt, resample_poly.
+# =============================================================================
+numpy==1.26.4               # Arrays, FFT, operações vetorizadas. DEP: NÃO usar 2.0+
+scipy==1.11.4               # Filtros IIR, resample_poly, detrend, find_peaks
+
+# =============================================================================
+# 4. MANIPULAÇÃO DE DADOS (Pandas + PyArrow)
+# =============================================================================
+# Pandas: DataFrames para features, anotações, metadados de pacientes.
+# PyArrow: backend de leitura Parquet (opcional, mas acelera I/O em grandes datasets).
+#
+# Pandas 2.1.4: última estável da série 2.1, compatível com NumPy 1.26.
+# PyArrow 14.0.1: última estável antes da série 15 (que mudou API de tipos).
+# =============================================================================
+pandas==2.1.4               # DataFrames para features e anotações AAMI
+pyarrow==14.0.1             # Backend Parquet para cache de datasets (opcional)
+
+# =============================================================================
+# 5. VISUALIZAÇÃO E EDA (Matplotlib + Seaborn)
+# =============================================================================
+# Usados APENAS em notebooks EDA e debug. Não entram no pipeline de produção.
+# Matplotlib 3.8.2: compatível com NumPy 1.26. Usado para plotar traçados ECG.
+# Seaborn 0.13.0: estatísticas visuais (distribuições de RR-interval, etc.).
+# =============================================================================
+matplotlib==3.8.2           # Plotagem de sinais ECG e espectros (EDA apenas)
+seaborn==0.13.0             # Visualização estatística de features (EDA apenas)
+
+# =============================================================================
+# 6. MACHINE LEARNING (TensorFlow + Keras)
+# =============================================================================
+# TensorFlow 2.16.1: última estável com Keras 3 integrado e TFLite robusto.
+# Fornece: 1D-CNN, treinamento, conversão TFLite, quantização PTQ (INT8).
+#
+# RESTRIÇÕES CRÍTICAS:
+# - NÃO usar TensorFlow 2.17+ sem validar TFLM compatibilidade (tflite-micro).
+# - NÃO usar TensorFlow 2.15.x (Keras 2, API diferente de Keras 3).
+# - Keras 3 vem embutido no TF 2.16 (keras.src.*).
+# - TFLite converter em TF 2.16 suporta INT8 PTQ com representative_dataset.
+#
+# Dependências transitivas importantes:
+#   - h5py: salvar/ler modelos .h5
+#   - protobuf: serialização de grafos TF
+#   - wrapt: decorators usados internamente pelo TF
+# =============================================================================
+tensorflow==2.16.1          # Framework de ML: CNN 1D, TFLite converter, PTQ
+
+# =============================================================================
+# 7. MACHINE LEARNING AUXILIAR (scikit-learn + imbalanced-learn)
+# =============================================================================
+# scikit-learn 1.4.0: GroupKFold (obrigatório para evitar data leakage por paciente),
+# métricas (classification_report, confusion_matrix), SMOTE via imbalanced-learn.
+# 
+# imbalanced-learn 0.12.0: SMOTE para oversampling de classes minoritárias (V, S, F, Q).
+# Compatível com scikit-learn 1.4.x e NumPy 1.26.x.
+# =============================================================================
+scikit-learn==1.4.0         # GroupKFold, métricas, pipelines
+imbalanced-learn==0.12.0    # SMOTE para classes minoritárias AAMI
+
+# =============================================================================
+# 8. DOWNLOAD DE DATASETS (KaggleHub)
+# =============================================================================
+# kagglehub: download do dataset Chapman-Shaoxing via API Kaggle.
+# Requer autenticação: ~/.kaggle/kaggle.json (token da conta Kaggle).
+# Não é versionado (latest stable) porque a API Kaggle muda frequentemente.
+# =============================================================================
+kagglehub                   # Download Chapman-Shaoxing (45k registros, ~8.2 GB)
+
+# =============================================================================
+# 9. TESTES E QUALIDADE (pytest)
+# =============================================================================
+# pytest 8.0.0: framework de testes para os 7 Quality Gates (QG0–QG6).
+# Plugins opcionais (não incluídos para manter leveza):
+#   - pytest-cov (cobertura) — adicionar se necessário
+#   - pytest-xdist (paralelismo) — adicionar se CI lento
+# =============================================================================
+pytest==8.0.0               # Framework de testes para Quality Gates
+
+# =============================================================================
+# 10. UTILITÁRIOS (joblib)
+# =============================================================================
+# joblib 1.3.2: paralelismo (Parallel, delayed), cache de resultados intermediários.
+# Usado para: processamento paralelo de features, cache de datasets resampleados.
+# =============================================================================
+joblib==1.3.2               # Paralelismo e cache de pipelines
+
+# =============================================================================
+# 11. DEPENDÊNCIAS TRANSITIVAS CRÍTICAS (não remover)
+# =============================================================================
+# As seguintes dependências são instaladas automaticamente pelos pacotes acima,
+# mas listamos explicitamente para evitar conflitos de versão:
+#
+# h5py==3.11.0              # Salvar modelos Keras (.h5). Instalado por tensorflow.
+# protobuf==4.25.3            # Serialização de grafos TF. Instalado por tensorflow.
+# typing-extensions==4.12.2   # Tipos genéricos. Instalado por tensorflow + pandas.
+# pillow==10.3.0              # Backend de imagem do matplotlib. Instalado por matplotlib.
+# pyparsing==3.1.2            # Parser de expressões matplotlib. Instalado por matplotlib.
+# packaging==24.1             # Version parsing. Instalado por multiple packages.
+# =============================================================================
+
+# =============================================================================
+# 12. PACOTES EXPLICITAMENTE REJEITADOS (não adicionar)
+# =============================================================================
+# torch / pytorch           # Overkill para 1D-CNN simples. Não suporta TFLite nativo.
+# tensorflow-gpu            # Deprecated. TF 2.16 usa GPU automaticamente se disponível.
+# keras                     # Standalone Keras 3 conflita com Keras embutido no TF 2.16.
+# neurokit2 / biosppy       # Abstraem detecção QRS. Impedem validação cruzada com firmware C.
+# heartpy                   # Mesmo problema — oculta lógica AMPT.
+# tensorflow-model-optimization # QAT (Quantization Aware Training) — overkill para TCC.
+# mlflow / wandb            # Experiment tracking — não necessário para TCC offline.
+# dask / ray                # Distributed computing — overkill para 20GB RAM.
+# opencv-python             # Não usamos visão computacional.
+# =============================================================================
+
+# =============================================================================
+# 13. NOTAS DE COMPATIBILIDADE COM UBUNTU 24.04 LTS
+# =============================================================================
+# Ubuntu 24.04 shipa:
+#   - Python 3.12.3
+#   - pip 24.0
+#   - setuptools 68.1.2
+#   - wheel 0.42.0
+#
+# Após `pip install -r requirements.txt`, rodar:
+#   pip freeze > requirements.lock
+# Este lockfile deve ser versionado no git (junto com requirements.txt).
+#
+# Para CI (GitHub Actions ubuntu-24.04 runner):
+#   - Usar actions/setup-python@v5 com python-version: '3.12'
+#   - Cache de pip: actions/cache@v4 com key baseada no hash deste arquivo
+# =============================================================================
+
+# =============================================================================
+# 14. VERIFICAÇÃO PÓS-INSTALAÇÃO
+# =============================================================================
+# Após instalar, executar:
+#   python -c "import tensorflow; print(tf.__version__)"   # Deve imprimir 2.16.1
+#   python -c "import wfdb; print(wfdb.__version__)"         # Deve imprimir 4.1.2
+#   python -c "import numpy; print(np.__version__)"          # Deve imprimir 1.26.4
+#   python -c "import scipy; print(scipy.__version__)"       # Deve imprimir 1.11.4
+#   python -m pytest --version                               # Deve imprimir 8.0.0
+#
+# Se qualquer versão divergir, deletar .venv/ e reinstalar do zero.
+# =============================================================================

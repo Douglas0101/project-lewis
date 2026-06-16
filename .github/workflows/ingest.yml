@@ -1,0 +1,69 @@
+name: Camada 1 Ingest (QG0 + Catalog)
+
+on:
+  push:
+    paths:
+      - "src/data/**"
+      - "tests/test_download.py"
+      - "src/data/checksums.json"
+      - ".github/workflows/ingest.yml"
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+jobs:
+  qg0:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Cache datasets
+        uses: actions/cache@v4
+        with:
+          path: |
+            data/.cache/zips
+            data/raw_chapman
+            data/raw_mitbih
+            data/raw_svdb
+            data/raw_afdb
+            data/raw_incart
+          key: datasets-${{ hashFiles('src/data/checksums.json') }}
+          restore-keys: |
+            datasets-
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest
+
+      - name: Restore from mirror (offline-safe)
+        run: |
+          if [ ! -d data/raw_mitbih ] || [ -z "$(ls -A data/raw_mitbih 2>/dev/null)" ]; then
+            echo "::warning::Cache miss — restore from mirror or run download-all"
+          fi
+
+      - name: Build catalog
+        run: python -c "from src.data._catalog import build_catalog; build_catalog()"
+
+      - name: Quality Gate QG0
+        env:
+          LEWIS_REQUIRE_DATA: "1"
+          KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
+          KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
+        run: make qg0
+
+      - name: Upload QG0 artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qg0-report
+          path: |
+            data/catalog/dataset_catalog.jsonl
+            data/audit/ingestion.jsonl
+            data/.dlq/

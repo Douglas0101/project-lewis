@@ -1,0 +1,39 @@
+# Renode script para teste de limite de arena com 48 KB de RAM.
+# Substitui a SRAM padrao do STM32F4Discovery por uma regiao de 48 KB,
+# o que deve impedir a alocacao da arena do TensorFlow Lite for Microcontrollers.
+
+using sysbus
+mach create "stm32f4discovery-lewis-48k"
+
+# Carrega a plataforma padrao STM32F4Discovery.
+machine LoadPlatformDescription @platforms/boards/stm32f4_discovery-kit.repl
+
+# Remove a SRAM original e reinsere com 48 KB.
+sysbus Unregister sysbus.sram
+set sram_desc """
+sram: Memory.MappedMemory @ sysbus 0x20000000
+    size: 0xC000
+"""
+machine LoadPlatformDescriptionFromString $sram_desc
+
+# Configura a performance do CPU (mesmo valor da plataforma padrao).
+cpu PerformanceInMips 125
+
+# Carrega o firmware compilado.
+# O caminho padrao eh absoluto para funcionar independentemente do CWD.
+$lewis_bin=@/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/build/stm32f4/lewis_48k.bin
+sysbus LoadBinary $lewis_bin 0x08000000
+
+# Configura o vetor de reset para o inicio da Flash.
+cpu VectorTableOffset 0x08000000
+
+# Ajusta o SP inicial para o topo dos 48 KB de RAM disponiveis,
+# evitando falha imediata de stack antes de chegar a lewis_inference_init().
+sysbus WriteDoubleWord 0x08000000 0x2000C000
+
+# Captura UART4 para arquivo de log.
+$uart_log?="/tmp/renode_lewis_uart.log"
+sysbus.uart4 CreateFileBackend $uart_log true
+
+# Inicia a emulacao.
+start

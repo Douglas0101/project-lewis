@@ -1,0 +1,63 @@
+# ============================================
+# Project-Lewis v1.2 — .gitignore
+# ============================================
+
+# --- Build artifacts (gerados, não versionáveis) ---
+firmware/build/
+*.elf
+*.map
+*.hex
+*.bin
+*.lst
+*.o
+*.d
+*.a
+
+# Exceções: dados de referência versionados
+!tests/ground_truth/*.bin
+
+# --- Renode artifacts ---
+*.robot.html
+*.robot.xml
+/tmp/renode_*
+firmware/snapshots/
+reports/renode_*/
+*.save
+
+# --- Logs e relatórios gerados ---
+*.log
+log.html
+report.html
+robot_output.xml
+reports/*.html
+reports/*.json
+!reports/.gitkeep
+
+# --- Python / venv ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.env
+
+# --- IDEs ---
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Ferramentas instaladas localmente ---
+firmware/tools/renode_*/
+
+# --- Cache ---
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# --- UV lock (gerado) ---
+uv.lock
