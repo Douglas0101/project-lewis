@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Executa os hard gates HG-01..HG-06 do Project-Lewis v1.2.
 
-Roda cada marker de qualidade individualmente (qg7, qg9-qg12), verifica a
+Roda cada marker de qualidade individualmente (qg7, qg9-qg13), verifica a
 configuracao --strict-markers do pyproject.toml, e garante que o ELF STM32F4
 nao contenha o marcador de stub STUB_TFLM.
 
@@ -32,6 +32,7 @@ GATES = [
     "qg10",
     "qg11",
     "qg12",
+    "qg13",
 ]
 
 

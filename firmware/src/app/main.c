@@ -188,6 +188,14 @@ static void command_loop(void)
             lewis_debug_print("=== Fim ===\n");
             lewis_hal_shutdown();
             break;
+        case LEWIS_CMD_WATCHDOG:
+            lewis_debug_print("[WATCHDOG TEST]\n");
+            lewis_hal_watchdog_start(LEWIS_WATCHDOG_TIMEOUT_MS);
+            while (1) {
+                /* Simula travamento: loop infinito ate o watchdog reiniciar. */
+                __asm__ volatile("wfi");
+            }
+            break;
         default:
             break;
         }

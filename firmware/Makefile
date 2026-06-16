@@ -9,7 +9,7 @@ PROJECT_ROOT := $(PROJECT_ROOT:%/=%)
 # ---------------------------------------------------------------------------
 TOOLS_DIR := $(PROJECT_ROOT)/tools
 ARM_DIR   := $(TOOLS_DIR)/xpack-arm-none-eabi-gcc-13.3.1-1.1
-RENOD_DIR := $(TOOLS_DIR)/renode_1.15.3_portable
+RENOD_DIR := $(TOOLS_DIR)/renode-1.15.3
 
 CC_ARM    := $(ARM_DIR)/bin/arm-none-eabi-gcc
 CXX_ARM   := $(ARM_DIR)/bin/arm-none-eabi-g++

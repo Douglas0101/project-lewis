@@ -1,6 +1,7 @@
 #include "ml/inference.h"
 #include "ml/model_data.h"
 #include "utils/debug.h"
+#include "hal/hal.h"
 
 #include <string.h>
 
@@ -100,7 +101,14 @@ bool lewis_inference_run(const int8_t input[LEWIS_INPUT_LEN],
     }
 
     memcpy(s_input->data.int8, input, LEWIS_INPUT_LEN);
-    if (s_interpreter->Invoke() != kTfLiteOk) {
+
+    /* Protecao contra travamento da inferencia: watchdog software dispara
+     * se Invoke() nao retornar dentro do timeout. */
+    lewis_hal_watchdog_start(LEWIS_WATCHDOG_TIMEOUT_MS);
+    TfLiteStatus status = s_interpreter->Invoke();
+    lewis_hal_watchdog_stop();
+
+    if (status != kTfLiteOk) {
         lewis_debug_print("[inference] ERRO: Invoke falhou\n");
         return false;
     }

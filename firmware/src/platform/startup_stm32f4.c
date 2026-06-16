@@ -68,23 +68,21 @@ void SVC_Handler(void) __attribute__((weak, alias("Default_Handler")));
 void DebugMon_Handler(void) __attribute__((weak, alias("Default_Handler")));
 void PendSV_Handler(void) __attribute__((weak, alias("Default_Handler")));
 void SysTick_Handler(void) __attribute__((weak, alias("Default_Handler")));
+void TIM2_IRQHandler(void) __attribute__((weak, alias("Default_Handler")));
 
-/* Vetor de interrupcoes. */
-__attribute__((section(".isr_vector"))) const void* g_pfnVectors[] = {
-    (void*)&__stack_top,
-    (void*)Reset_Handler,
-    NMI_Handler,
-    HardFault_Handler,
-    MemManage_Handler,
-    BusFault_Handler,
-    UsageFault_Handler,
-    0,
-    0,
-    0,
-    0,
-    SVC_Handler,
-    DebugMon_Handler,
-    0,
-    PendSV_Handler,
-    SysTick_Handler,
+/* Vetor de interrupcoes. Inclui TIM2 (posicao 44) usado como tick de
+ * sistema para delays e watchdog software. */
+__attribute__((section(".isr_vector"))) const void* g_pfnVectors[45] = {
+    [0]  = (void*)&__stack_top,
+    [1]  = (void*)Reset_Handler,
+    [2]  = NMI_Handler,
+    [3]  = HardFault_Handler,
+    [4]  = MemManage_Handler,
+    [5]  = BusFault_Handler,
+    [6]  = UsageFault_Handler,
+    [11] = SVC_Handler,
+    [12] = DebugMon_Handler,
+    [14] = PendSV_Handler,
+    [15] = SysTick_Handler,
+    [44] = TIM2_IRQHandler, /* TIM2 global interrupt (IRQ 28 + 16) */
 };

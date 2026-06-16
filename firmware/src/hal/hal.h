@@ -28,9 +28,36 @@ void lewis_hal_init(void);
 uint32_t lewis_hal_millis(void);
 
 /**
- * @brief Aguarda spin-loop por ms milissegundos (bloqueante).
+ * @brief Aguarda por ms milissegundos (bloqueante).
+ *
+ * No alvo/emulador ARM utiliza timer de proposito geral (TIM2) com
+ * interrupcao, colocando a CPU em espera de baixo consumo (__WFI) ate o ISR
+ * acordar. No host nativo usa usleep.
  */
 void lewis_hal_delay_ms(uint32_t ms);
+
+/**
+ * @brief Inicia watchdog software com timeout em milissegundos.
+ *
+ * Se o watchdog nao for parado antes do timeout, o sistema loga
+ * WATCHDOG_TIMEOUT e reinicia (alvo) ou encerra (host nativo).
+ */
+void lewis_hal_watchdog_start(uint32_t timeout_ms);
+
+/**
+ * @brief Para o watchdog software.
+ */
+void lewis_hal_watchdog_stop(void);
+
+/**
+ * @brief Retorna true se o watchdog software expirou.
+ */
+bool lewis_hal_watchdog_expired(void);
+
+/**
+ * @brief Timeout padrao para protecao da inferencia TFLM.
+ */
+#define LEWIS_WATCHDOG_TIMEOUT_MS 1000U
 
 /**
  * @brief Envia um byte pela UART de debug.

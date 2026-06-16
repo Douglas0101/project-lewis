@@ -114,7 +114,7 @@ quality-report:
 # ---------------------------------------------------------------------------
 # Firmware / Simulacao (Fase 2)
 # ---------------------------------------------------------------------------
-RENOD_DIR := firmware/tools/renode_1.15.3_portable
+RENOD_DIR := firmware/tools/renode-1.15.3
 RENODE_BIN := $(RENOD_DIR)/renode
 
 verify-renode:

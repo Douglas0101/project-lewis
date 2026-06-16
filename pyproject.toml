@@ -126,5 +126,6 @@ markers = [
     "qg10: Quality Gate 10 — fidelidade numérica vs ground-truth",
     "qg11: Quality Gate 11 — fault injection SPI/UART",
     "qg12: Quality Gate 12 — limites de arena RAM",
+    "qg13: Quality Gate 13 — watchdog software de inferencia",
     "slow: Testes lentos (CI condicional)",
 ]

@@ -26,6 +26,8 @@ lewis_cmd_t lewis_command_feed(uint8_t byte)
             result = LEWIS_CMD_RUN;
         } else if (cmd_is("ECHO")) {
             result = LEWIS_CMD_ECHO;
+        } else if (cmd_is("WATCHDOG")) {
+            result = LEWIS_CMD_WATCHDOG;
         }
         s_len = 0;
         return result;
