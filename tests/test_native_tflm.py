@@ -16,7 +16,8 @@ import pytest
 import tensorflow as tf
 
 from tests.fixtures.adc_stub import adc_stub_get_beat
-
+from tests.fixtures.dsp_filters import filter_chain
+from tests.fixtures.normalizer import zscore_normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_DIR = PROJECT_ROOT / "firmware"
@@ -86,13 +87,29 @@ def _run_python_reference(num_beats: int) -> list[np.ndarray]:
     output_details = interpreter.get_output_details()[0]
 
     qparams = _read_quantization_params()
+    in_scale = qparams["input"]["scale"]
+    in_zero_point = qparams["input"]["zero_point"]
     out_scale = qparams["output"]["scale"]
     out_zero_point = qparams["output"]["zero_point"]
 
     outputs = []
     for idx in range(num_beats):
         beat = adc_stub_get_beat(idx)
-        tensor = beat.reshape(input_details["shape"]).astype(np.int8)
+        # Reproduz o pipeline DSP do firmware: dequantiza -> filtra -> zscore -> quantiza.
+        beat_float = (beat.astype(np.float32) - in_zero_point) * in_scale
+        beat_filtered, _, _ = filter_chain(beat_float)
+        normalized = zscore_normalize(beat_filtered)
+        rounded = np.where(
+            normalized / in_scale >= 0.0,
+            np.floor(normalized / in_scale + 0.5),
+            np.ceil(normalized / in_scale - 0.5),
+        )
+        beat_quantized = np.clip(
+            rounded.astype(np.int32) + in_zero_point,
+            -128,
+            127,
+        ).astype(np.int8)
+        tensor = beat_quantized.reshape(input_details["shape"]).astype(np.int8)
         interpreter.set_tensor(input_details["index"], tensor)
         interpreter.invoke()
         out = interpreter.get_tensor(output_details["index"])[0].copy()
@@ -122,9 +139,7 @@ class TestNativeTflm:
     def test_outputs_match_python_reference(self) -> None:
         stdout = _run_native()
         fw_outputs = _parse_native_outputs(stdout)
-        assert len(fw_outputs) == NUM_BEATS, (
-            f"esperava {NUM_BEATS} beats, obteve {len(fw_outputs)}"
-        )
+        assert len(fw_outputs) == NUM_BEATS, f"esperava {NUM_BEATS} beats, obteve {len(fw_outputs)}"
 
         qparams = _read_quantization_params()
         out_scale = qparams["output"]["scale"]

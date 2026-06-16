@@ -21,6 +21,7 @@ import pytest
 
 from tests.fixtures.adc_stub import adc_stub_get_beat
 from tests.fixtures.dsp_filters import filter_chain
+from tests.fixtures.normalizer import zscore_normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_SRC = PROJECT_ROOT / "firmware" / "src"
@@ -30,6 +31,7 @@ C_DSP_PIPELINE_SOURCE = r"""
 #include "dsp/adc_stub.h"
 #include "dsp/filter.h"
 #include "dsp/filter_coeffs.h"
+#include "dsp/normalizer.h"
 #include "ml/quantization_params.h"
 #include <stdio.h>
 #include <stdint.h>
@@ -78,6 +80,7 @@ int main(int argc, char** argv)
     lewis_filter_chain_init(&chain);
     lewis_filter_chain_reset(&chain);
     lewis_filter_chain_process(&chain, frame, frame, INPUT_LEN);
+    lewis_zscore_normalize(frame, INPUT_LEN);
     quantize(frame, quantized, INPUT_LEN);
 
     FILE* fout = fopen(out_path, "wb");
@@ -127,6 +130,7 @@ def dsp_pipeline_bin(tmp_path_factory: pytest.TempPathFactory) -> Path:
         str(c_path),
         str(FIRMWARE_SRC / "dsp" / "adc_stub.c"),
         str(FIRMWARE_SRC / "dsp" / "filter.c"),
+        str(FIRMWARE_SRC / "dsp" / "normalizer.c"),
         "-lm",
         "-o",
         str(bin_path),
@@ -158,7 +162,8 @@ def _python_filtered_beat(idx: int) -> np.ndarray:
     raw = adc_stub_get_beat(idx)
     frame = (raw.astype(np.float32) - zero_point) * scale
     filtered, _, _ = filter_chain(frame)
-    return _quantize(filtered, scale, zero_point)
+    normalized = zscore_normalize(filtered)
+    return _quantize(normalized, scale, zero_point)
 
 
 def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

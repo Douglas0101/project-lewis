@@ -4,6 +4,7 @@
 #include "ml/quantization_params.h"
 #include "dsp/adc_stub.h"
 #include "dsp/filter.h"
+#include "dsp/normalizer.h"
 #include "app/command_loop.h"
 
 #include <stdint.h>
@@ -50,6 +51,7 @@ static void apply_dsp_pipeline(const int8_t* raw_input, int8_t* quantized_out, s
     dequantize_beat(raw_input, s_float_input, len);
     lewis_filter_chain_reset(&s_filter_chain);
     lewis_filter_chain_process(&s_filter_chain, s_float_input, s_float_input, len);
+    lewis_zscore_normalize(s_float_input, len);
     quantize_beat(s_float_input, quantized_out, len);
 }
 
@@ -107,7 +109,7 @@ static uint8_t uart_read_byte(void)
 }
 
 #define UART_BYTE_TIMEOUT_MS 100
-#define UART_FRAME_TIMEOUT_MS 5000
+#define UART_FRAME_TIMEOUT_MS 60000
 
 static bool uart_read_byte_timeout(uint8_t *out, uint32_t timeout_ms)
 {
@@ -168,9 +170,10 @@ static void infer_from_uart(uint8_t start_byte)
         return;
     }
 
-    /* Aplica filtros bandpass/notch no dominio float32. */
+    /* Aplica filtros bandpass/notch e normalizacao Z-score no dominio float32. */
     lewis_filter_chain_reset(&s_filter_chain);
     lewis_filter_chain_process(&s_filter_chain, frame, frame, LEWIS_INPUT_LEN);
+    lewis_zscore_normalize(frame, LEWIS_INPUT_LEN);
 
     /* Quantiza float32 -> int8 usando parametros do modelo. */
     quantize_beat(frame, input_quantized, LEWIS_INPUT_LEN);

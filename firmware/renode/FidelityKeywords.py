@@ -16,6 +16,8 @@ INPUT_BYTES = INPUT_SAMPLES * 4
 START_BYTE = 0x3C  # '<'
 END_BYTE = 0x3E  # '>'
 RESPONSE_LEN = 5
+START_DELAY_S = 0.1   # tempo para o firmware entrar em infer_from_uart
+BYTE_DELAY_S = 0.02   # evita overflow do buffer FIFO da UART emulada
 
 
 class FidelityKeywords:
@@ -44,10 +46,14 @@ class FidelityKeywords:
                 f"(esperado {INPUT_BYTES} bytes)"
             )
 
-        # Inicio de frame
+        # Inicio de frame: pausa para o firmware detectar '<' e entrar no handler
         self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {START_BYTE}")
+        time.sleep(START_DELAY_S)
+
         for byte in data:
             self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {byte}")
+            time.sleep(BYTE_DELAY_S)
+
         # Fim de frame
         self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {END_BYTE}")
 

@@ -31,6 +31,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from tests.fixtures.adc_stub import adc_stub_get_beat  # noqa: E402
 from tests.fixtures.dsp_filters import filter_chain  # noqa: E402
+from tests.fixtures.normalizer import zscore_normalize  # noqa: E402
 
 
 def _load_quant_params():
@@ -109,12 +110,13 @@ def generate_ground_truth(num_beats: int = 5) -> None:
         input_path = GROUND_TRUTH_DIR / f"ecg_input_{idx:02d}.bin"
         save_float32_bin(input_path, beat_float32)
 
-        # 2. Aplica pipeline DSP causal bandpass -> notch (igual ao firmware)
+        # 2. Aplica pipeline DSP causal bandpass -> notch -> zscore (igual ao firmware)
         #    para gerar a saida esperada.
         beat_filtered, _, _ = filter_chain(beat_float32)
+        beat_normalized = zscore_normalize(beat_filtered)
 
         # 3. Re-quantiza float32 -> int8 com a mesma formula do firmware.
-        input_quantized = quantize_float32_to_int8(beat_filtered, INPUT_SCALE, INPUT_ZERO_POINT)
+        input_quantized = quantize_float32_to_int8(beat_normalized, INPUT_SCALE, INPUT_ZERO_POINT)
 
         # 4. Inferencia TFLite Python com resolver de referencia.
         tensor = input_quantized.reshape(input_details["shape"]).astype(np.int8)

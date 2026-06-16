@@ -15,7 +15,8 @@ import pytest
 import tensorflow as tf
 
 from tests.fixtures.adc_stub import adc_stub_get_beat
-
+from tests.fixtures.dsp_filters import filter_chain
+from tests.fixtures.normalizer import zscore_normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_TFLITE = PROJECT_ROOT / "models" / "quantized" / "model_int8.tflite"
@@ -24,8 +25,9 @@ MODEL_TFLITE = PROJECT_ROOT / "models" / "quantized" / "model_int8.tflite"
 def run_python_inference(num_beats: int = 3) -> list[np.ndarray]:
     """Executa o modelo TFLite no Python para os beats do stub.
 
-    Usamos o resolver BUILTIN_REF para evitar diferencas numericas
-    introduzidas pelo XNNPACK delegate, garantindo comparacao justa
+    Reproduz o pipeline DSP do firmware (dequantiza -> filtra -> zscore -> quantiza)
+    antes da inferencia. Usamos o resolver BUILTIN_REF para evitar diferencas
+    numericas introduzidas pelo XNNPACK delegate, garantindo comparacao justa
     com o TFLM do firmware (que usa kernels de referencia / CMSIS-NN).
     """
     interpreter = tf.lite.Interpreter(
@@ -36,10 +38,26 @@ def run_python_inference(num_beats: int = 3) -> list[np.ndarray]:
     input_details = interpreter.get_input_details()[0]
     output_details = interpreter.get_output_details()[0]
 
+    qparams = input_details["quantization_parameters"]
+    in_scale = float(qparams["scales"][0])
+    in_zero_point = int(qparams["zero_points"][0])
+
     outputs = []
     for idx in range(num_beats):
         beat = adc_stub_get_beat(idx)
-        tensor = beat.reshape(input_details["shape"]).astype(np.int8)
+        # Pipeline DSP causal igual ao firmware.
+        beat_float = (beat.astype(np.float32) - in_zero_point) * in_scale
+        beat_filtered, _, _ = filter_chain(beat_float)
+        normalized = zscore_normalize(beat_filtered)
+        rounded = np.where(
+            normalized / in_scale >= 0.0,
+            np.floor(normalized / in_scale + 0.5),
+            np.ceil(normalized / in_scale - 0.5),
+        )
+        beat_quantized = np.clip(rounded.astype(np.int32) + in_zero_point, -128, 127).astype(
+            np.int8
+        )
+        tensor = beat_quantized.reshape(input_details["shape"]).astype(np.int8)
         interpreter.set_tensor(input_details["index"], tensor)
         interpreter.invoke()
         out = interpreter.get_tensor(output_details["index"])[0].copy()
@@ -65,7 +83,7 @@ class TestTflmBitexact:
         py_outputs = run_python_inference(firmware_report["beat_count"])
         uart_text = firmware_report["uart_log_text"]
         beat_re = re.compile(
-            r"Beat\s+(?P<idx>\d+):\s+\d+\s+ms\s*\(\d+\s+us\)?\s*,\s+output\s+\[(?P<values>[-\d,\s]+)\]"
+            r"Beat\s+(?P<idx>\d+):\s+\d+\s+ms\s*\(\d+\s+us\)?\s*,\s+output\s+\[(?P<values>[-\d,\s]+)\]"  # noqa: E501
         )
 
         fw_outputs = {}
@@ -77,9 +95,9 @@ class TestTflmBitexact:
             values = [int(v.strip()) for v in m.group("values").split(",")]
             fw_outputs[idx] = np.array(values, dtype=np.int8)
 
-        assert len(fw_outputs) == len(py_outputs), (
-            f"Numero de beats diverge: firmware={len(fw_outputs)}, python={len(py_outputs)}"
-        )
+        assert len(fw_outputs) == len(
+            py_outputs
+        ), f"Numero de beats diverge: firmware={len(fw_outputs)}, python={len(py_outputs)}"
 
         for idx, py_out in enumerate(py_outputs):
             fw_out = fw_outputs[idx]
