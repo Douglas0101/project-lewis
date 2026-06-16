@@ -127,5 +127,7 @@ markers = [
     "qg11: Quality Gate 11 — fault injection SPI/UART",
     "qg12: Quality Gate 12 — limites de arena RAM",
     "qg13: Quality Gate 13 — watchdog software de inferencia",
+    "qg16: Quality Gate 16 — filtros DSP bandpass/notch vs Python",
+    "qg17: Quality Gate 17 — fidelidade do pipeline filtrado no firmware",
     "slow: Testes lentos (CI condicional)",
 ]

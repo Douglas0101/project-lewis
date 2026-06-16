@@ -35,7 +35,8 @@ C_SOURCES_COMMON := \
 	$(SRC_DIR)/app/main.c \
 	$(SRC_DIR)/app/command_loop.c \
 	$(SRC_DIR)/utils/debug.c \
-	$(SRC_DIR)/dsp/adc_stub.c
+	$(SRC_DIR)/dsp/adc_stub.c \
+	$(SRC_DIR)/dsp/filter.c
 
 CXX_SOURCES_COMMON := \
 	$(SRC_DIR)/ml/inference.cpp

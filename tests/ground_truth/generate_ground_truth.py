@@ -30,6 +30,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from tests.fixtures.adc_stub import adc_stub_get_beat  # noqa: E402
+from tests.fixtures.dsp_filters import filter_chain  # noqa: E402
 
 
 def _load_quant_params():
@@ -103,13 +104,19 @@ def generate_ground_truth(num_beats: int = 5) -> None:
 
         # 1. Dequantiza int8 -> float32 (mesmo que o host enviaria pela UART).
         beat_float32 = dequantize_int8_to_float32(beat_int8, INPUT_SCALE, INPUT_ZERO_POINT)
+
+        # Salva entrada bruta (nao filtrada) — o firmware aplica filtros em runtime.
         input_path = GROUND_TRUTH_DIR / f"ecg_input_{idx:02d}.bin"
         save_float32_bin(input_path, beat_float32)
 
-        # 2. Re-quantiza float32 -> int8 com a mesma formula do firmware.
-        input_quantized = quantize_float32_to_int8(beat_float32, INPUT_SCALE, INPUT_ZERO_POINT)
+        # 2. Aplica pipeline DSP causal bandpass -> notch (igual ao firmware)
+        #    para gerar a saida esperada.
+        beat_filtered, _, _ = filter_chain(beat_float32)
 
-        # 3. Inferencia TFLite Python com resolver de referencia.
+        # 3. Re-quantiza float32 -> int8 com a mesma formula do firmware.
+        input_quantized = quantize_float32_to_int8(beat_filtered, INPUT_SCALE, INPUT_ZERO_POINT)
+
+        # 4. Inferencia TFLite Python com resolver de referencia.
         tensor = input_quantized.reshape(input_details["shape"]).astype(np.int8)
         interpreter.set_tensor(input_details["index"], tensor)
         interpreter.invoke()

@@ -38,9 +38,19 @@ Este documento descreve os limites e premissas das simulações executadas no Pr
 - Ao expirar, o watchdog loga `WATCHDOG_TIMEOUT` via UART e executa `NVIC_SystemReset()` no alvo/emulador ARM. Em host nativo, o equivalente usa `SIGALRM` e encerra com `lewis_hal_shutdown()`.
 - No Renode, o reset via `NVIC_SystemReset()` é observável como reinício da máquina; caso o modelo não o trate perfeitamente, o log `WATCHDOG_TIMEOUT` ainda é emitido e o firmware não entra em hard fault.
 
+## Filtros DSP no Pipeline de Inferência
+
+- A partir da v1.2 o firmware aplica um pipeline causal **bandpass 0.5–40 Hz** seguido de **notch 60 Hz** aos 500 samples de entrada antes da quantização e inferência.
+- Os filtros são implementados como cascata de biquads em **transposed direct-form II** (`firmware/src/dsp/filter.c`), sem alocação dinâmica e com estado zerado a cada batimento.
+- Os coeficientes são gerados deterministicamente por `scripts/generate_filter_coeffs.py` (SciPy, seed/fixos) e materializados em `firmware/src/dsp/filter_coeffs.h` e `tests/fixtures/dsp_filters.py`.
+- O pipeline Python de treinamento usa `filtfilt` (zero-phase, não causal). A simulação embarcada, porém, é causal; portanto a referência de fidelidade (QG10/QG17) é gerada aplicando os mesmos filtros causais usados no firmware.
+- **Implicação prática:** não espere bit-exatidão entre o sinal filtrado embarcado e um `filtfilt` offline; a comparação válida é contra a referência causal em `tests/fixtures/dsp_filters.py`.
+
 ## Referências
 
 - `Makefile`: target `verify-renode` para pinagem de versão.
 - `tests/test_tflm_bitexact.py`: tolerância de 1 LSB no QG8.
 - `tests/test_watchdog.py`: Quality Gate QG13 para validação do watchdog.
+- `tests/test_dsp_filters.py`: Quality Gate QG16 — filtros DSP vs Python.
+- `tests/test_dsp_fidelity.py`: Quality Gate QG17 — pipeline filtrado vs Python.
 - Documentação do Renode: semihosting via `BKPT 0xAB`.

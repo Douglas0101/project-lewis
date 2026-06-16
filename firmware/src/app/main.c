@@ -3,6 +3,7 @@
 #include "ml/inference.h"
 #include "ml/quantization_params.h"
 #include "dsp/adc_stub.h"
+#include "dsp/filter.h"
 #include "app/command_loop.h"
 
 #include <stdint.h>
@@ -12,8 +13,45 @@
 
 /* Buffers de inferencia alocados estaticamente para evitar consumo de stack.
  * O modelo atual opera com 500 amostras de entrada e 5 saidas int8. */
+static int8_t s_raw_input[LEWIS_INPUT_LEN];
+static float s_float_input[LEWIS_INPUT_LEN];
 static int8_t s_input[LEWIS_INPUT_LEN];
 static int8_t s_output[LEWIS_OUTPUT_LEN];
+
+static lewis_filter_chain_t s_filter_chain;
+
+static void dequantize_beat(const int8_t* quantized, float* float_out, size_t len)
+{
+    const float scale = LEWIS_QUANTIZATION_PARAMS_INPUT_SCALE;
+    const int32_t zp = LEWIS_QUANTIZATION_PARAMS_INPUT_ZERO_POINT;
+    for (size_t i = 0; i < len; ++i) {
+        float_out[i] = ((float)quantized[i] - (float)zp) * scale;
+    }
+}
+
+static void quantize_beat(const float* float_in, int8_t* quantized, size_t len)
+{
+    const float scale = LEWIS_QUANTIZATION_PARAMS_INPUT_SCALE;
+    const int32_t zp = LEWIS_QUANTIZATION_PARAMS_INPUT_ZERO_POINT;
+    for (size_t i = 0; i < len; ++i) {
+        float normalized = float_in[i] / scale;
+        int32_t q = (int32_t)(normalized + (normalized >= 0.0f ? 0.5f : -0.5f)) + zp;
+        if (q > 127) {
+            q = 127;
+        } else if (q < -128) {
+            q = -128;
+        }
+        quantized[i] = (int8_t)q;
+    }
+}
+
+static void apply_dsp_pipeline(const int8_t* raw_input, int8_t* quantized_out, size_t len)
+{
+    dequantize_beat(raw_input, s_float_input, len);
+    lewis_filter_chain_reset(&s_filter_chain);
+    lewis_filter_chain_process(&s_filter_chain, s_float_input, s_float_input, len);
+    quantize_beat(s_float_input, quantized_out, len);
+}
 
 static void print_report(void)
 {
@@ -28,7 +66,8 @@ static void print_report(void)
 static void run_demo_beats(void)
 {
     for (uint32_t beat = 0; beat < NUM_TEST_BEATS; ++beat) {
-        lewis_adc_stub_get_beat(beat, s_input);
+        lewis_adc_stub_get_beat(beat, s_raw_input);
+        apply_dsp_pipeline(s_raw_input, s_input, LEWIS_INPUT_LEN);
 
         uint32_t t0 = lewis_hal_benchmark_start();
         if (!lewis_inference_run(s_input, s_output)) {
@@ -129,19 +168,12 @@ static void infer_from_uart(uint8_t start_byte)
         return;
     }
 
+    /* Aplica filtros bandpass/notch no dominio float32. */
+    lewis_filter_chain_reset(&s_filter_chain);
+    lewis_filter_chain_process(&s_filter_chain, frame, frame, LEWIS_INPUT_LEN);
+
     /* Quantiza float32 -> int8 usando parametros do modelo. */
-    const float scale = LEWIS_QUANTIZATION_PARAMS_INPUT_SCALE;
-    const int32_t zp = LEWIS_QUANTIZATION_PARAMS_INPUT_ZERO_POINT;
-    for (int i = 0; i < LEWIS_INPUT_LEN; ++i) {
-        float normalized = frame[i] / scale;
-        int32_t q = (int32_t)(normalized + (normalized >= 0.0f ? 0.5f : -0.5f)) + zp;
-        if (q > 127) {
-            q = 127;
-        } else if (q < -128) {
-            q = -128;
-        }
-        input_quantized[i] = (int8_t)q;
-    }
+    quantize_beat(frame, input_quantized, LEWIS_INPUT_LEN);
 
     /* Executa inferencia. */
     if (!lewis_inference_run(input_quantized, output)) {
@@ -217,6 +249,9 @@ int main(void)
         lewis_hal_panic();
     }
     lewis_debug_print("Inference init OK\n");
+
+    lewis_filter_chain_init(&s_filter_chain);
+    lewis_debug_print("DSP filters init OK\n");
 
     run_demo_beats();
 
