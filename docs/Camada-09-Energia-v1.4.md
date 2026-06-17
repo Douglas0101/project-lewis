@@ -172,9 +172,9 @@ Integrar em [`../firmware/scripts/run_renode_tests.py`](../firmware/scripts/run_
   }
   ```
 
-  > Exemplo para uma janela de 1 s contendo exatamente 1 batimento. Valores
-  > arredondados a partir das correntes da Tabela 3.4, incluindo o consumo do
-  > AFE (≈0.1 mA por canal).
+  > Exemplo para uma janela de 1 s contendo exatamente 1 batimento no loop
+  > atual (sem otimizações de sleep/stop). O QG19 (< 50 mA) será atingido
+  > quando o firmware adotar duty-cycle com Stop/Standby entre batimentos.
 
 ## 6. Quality Gate QG19 — Consumo Energético
 
