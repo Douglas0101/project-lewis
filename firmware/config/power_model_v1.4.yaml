@@ -1,0 +1,48 @@
+# Modelo de consumo energético para simulação Renode v1.4
+# Valores típicos @ 25 °C, VDD = 3.3 V. Calibrar em hardware real.
+schema_version: "1.4.0"
+voltage_v: 3.3
+battery_capacity_mah: 500
+
+mcu:
+  states:
+    active:
+      current_ma: 90.0
+      description: "Cortex-M4 @ 168 MHz, todos os periféricos habilitados"
+    inference:
+      current_ma: 95.0
+      description: "Run + aceleração DSP/FPU + TFLM + CMSIS-NN"
+    sleep:
+      current_ma: 60.0
+      description: "Sleep @ 168 MHz (WFI), TIM2 e UART4 clocked"
+    stop:
+      current_ma: 0.35
+      description: "Stop mode com regulador low-power"
+    standby:
+      current_ma: 0.003
+      description: "Standby mode"
+
+  peripherals_increment_ma:
+    # Valores por MHz de clock do periférico (Tabela 28 do datasheet)
+    uart4: 0.0033
+    tim2: 0.0165
+    adc: 1.6            # analog part, when ADON=1
+
+afe:
+  model: "ADS1292R"
+  channels: 1
+  sample_rate_sps: 500
+  states:
+    normal:
+      power_uw_per_channel: 335
+    standby:
+      power_uw: 160
+    power_down:
+      power_uw: 1
+
+assumptions:
+  duty_cycle_bps: 1            # batimentos por segundo no cenário de referência
+  temperature_c: 25
+  notes: |
+    - O modelo não considera variação de tensão, temperatura nem processo.
+    - A corrente de inferência é uma estimativa; validar com instrumentação real.
