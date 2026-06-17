@@ -35,11 +35,13 @@ autonomia de bateria.
 ## 3. Modelo de Consumo
 
 ### 3.1 STM32F407VG (MCU)
-Baseado no datasheet DS8626 (Rev 11), VDD = 3.3 V, TA = 25 °C:
+Baseado no datasheet DS8626 (Rev 11), VDD = 3.3 V, TA = 25 °C.
+A linha "Run @ 168 MHz, periféricos ON" assume UART4, TIM2 e Flash habilitados,
+próximo do cenário de simulação atual:
 
 | Estado | Corrente Típica | Fonte |
 | :--- | :--- | :--- |
-| Run @ 168 MHz, periféricos ON | ~90 mA | Figura 25 / Tabela 22 (extrapolado) |
+| Run @ 168 MHz, periféricos ON (UART4 + TIM2 + Flash) | ~90 mA | Figura 25 / Tabela 22 (extrapolado) |
 | Sleep @ 168 MHz | ~60 mA | Tabela 22 |
 | Stop (regulador LP) | ~350 µA | Tabela 23 |
 | Standby | ~3 µA | Tabela 24 |
@@ -61,7 +63,7 @@ Baseado no datasheet SBAS502C:
 
 ## 4. Instrumentação do Firmware
 
-Adicionar ao `firmware/src/hal/hal.h`:
+Adicionar ao [`../firmware/src/hal/hal.h`](../firmware/src/hal/hal.h):
 ```c
 typedef enum {
     LEWIS_PWR_ACTIVE,
@@ -72,7 +74,7 @@ typedef enum {
 void lewis_hal_pwr_set_state(lewis_pwr_state_t state);
 ```
 
-Implementar em `firmware/src/hal/simulator/hal_sim.c`:
+Implementar em [`../firmware/src/hal/simulator/hal_sim.c`](../firmware/src/hal/simulator/hal_sim.c):
 ```c
 void lewis_hal_pwr_set_state(lewis_pwr_state_t state) {
     const char* name = (state == LEWIS_PWR_INFERENCE) ? "inference"
@@ -86,30 +88,35 @@ void lewis_hal_pwr_set_state(lewis_pwr_state_t state) {
 }
 ```
 
-Usar os hooks no `firmware/src/app/main.c`:
+Usar os hooks no [`../firmware/src/app/main.c`](../firmware/src/app/main.c):
 - `lewis_hal_pwr_set_state(LEWIS_PWR_INFERENCE)` antes de `lewis_inference_run()`.
 - `lewis_hal_pwr_set_state(LEWIS_PWR_ACTIVE)` após inferência.
-- Futuramente: `LEWIS_PWR_SLEEP` durante espera por próximo batimento (WFI).
+- `LEWIS_PWR_SLEEP` durante espera por próximo batimento (WFI), quando o loop
+  principal for adaptado para duty-cycle entre batimentos.
 
 ## 5. Extensão do Runner Renode
 
-Criar `firmware/scripts/energy_reporter.py` com funções:
+Criar [`../firmware/scripts/energy_reporter.py`](../firmware/scripts/energy_reporter.py)
+com a seguinte interface (implementação concreta na v1.4):
 
 ```python
 def parse_pwr_transitions(uart_log_text: str) -> list[dict]:
-    """Parseia linhas 'PWR <state> <ms>' e retorna transições."""
+    """Parseia linhas 'PWR <state> <ms>' e retorna transições ordenadas."""
+    transitions = []
+    for line in uart_log_text.splitlines():
+        if line.startswith("PWR "):
+            parts = line.split()
+            transitions.append({"state": parts[1], "ms": int(parts[2])})
+    return transitions
 
-def compute_energy(transitions, power_model: dict) -> dict:
-    """Calcula:
-    - duration_ms por estado
-    - charge_mah
-    - energy_mj
-    - average_current_ma
-    - estimated_autonomy_hours (para bateria de referência)
-    """
+def compute_energy(transitions: list[dict], power_model: dict) -> dict:
+    """Calcula durações, carga (mAh), energia (mJ), corrente média e autonomia."""
+    # Duração total e por estado; último estado estende até o tempo final
+    # da simulação (obtido do log UART ou parâmetro run_time).
+    ...
 ```
 
-Integrar em `firmware/scripts/run_renode_tests.py`:
+Integrar em [`../firmware/scripts/run_renode_tests.py`](../firmware/scripts/run_renode_tests.py):
 - Importar `energy_reporter`.
 - Após `parse_uart_log`, chamar `energy_reporter.compute_energy()`.
 - Incluir no `report` JSON:
