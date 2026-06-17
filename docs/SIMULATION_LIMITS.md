@@ -10,7 +10,7 @@ Toda a validação do firmware `v1.3-sim-deep` foi executada no emulador **Renod
 
 - Timings absolutos são *representativos*, não garantidos.
 - Comportamento de periféricos reais (ADC, DMA, PLL, watchdog independente) pode divergir.
-- Consumo de energia **não é medido** nem estimado nesta versão (débito técnico para v1.4).
+- Consumo de energia **não é medido** nem estimado nesta versão. O débito técnico e a especificação de modelagem estão em [`DEBITO_TECNICO_Energia_Renode-v1.4.md`](DEBITO_TECNICO_Energia_Renode-v1.4.md) e [`Camada-09-Energia-v1.4.md`](Camada-09-Energia-v1.4.md).
 
 ---
 

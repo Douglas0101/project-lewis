@@ -155,4 +155,4 @@ Exemplo de `reports/firmware_simulation_report.json`:
 3. ~~Adicionar testes de bit-exatidão comparando output int8 com interpretador Python.~~ **Concluído (QG8).**
 4. ~~Ativar CMSIS-NN e medir ganho de latência.~~ **Concluído (build ARM linka CMSIS-NN).**
 5. Estender CI para rodar `make firmware-test` em toda PR.
-6. Modelagem de energia/consumo no Renode (débito técnico para v1.4).
+6. **Modelagem de energia/consumo no Renode**: débito técnico documentado em [`DEBITO_TECNICO_Energia_Renode-v1.4.md`](DEBITO_TECNICO_Energia_Renode-v1.4.md); especificação em [`Camada-09-Energia-v1.4.md`](Camada-09-Energia-v1.4.md).
