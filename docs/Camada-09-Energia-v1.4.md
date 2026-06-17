@@ -126,7 +126,7 @@ def compute_energy(transitions: list[dict], power_model: dict,
                    total_runtime_ms: int) -> dict:
     """Calcula durações, carga (mAh), energia (mJ), corrente média e autonomia.
 
-    O `power_model` segue o esquema de `firmware/config/power_model_v1.4.yaml`:
+    O `power_model` segue o esquema de `../firmware/config/power_model_v1.4.yaml`:
     {
       "voltage_v": 3.3,
       "battery_capacity_mah": 500,
@@ -163,14 +163,17 @@ Integrar em [`../firmware/scripts/run_renode_tests.py`](../firmware/scripts/run_
 - Incluir no `report` JSON (exemplo ilustrativo para 1 batimento/s com sleep ativo):
   ```json
   "energy": {
-    "average_current_ma": 60.5,
-    "energy_mj_per_beat": 0.20,
-    "estimated_autonomy_hours": 8.3,
+    "average_current_ma": 61.0,
+    "energy_mj_per_beat": 0.202,
+    "estimated_autonomy_hours": 8.2,
     "state_durations_ms": {"active": 16, "inference": 16, "sleep": 968},
-    "total_charge_mah": 0.0168,
-    "total_energy_mj": 0.20
+    "total_charge_mah": 0.0170,
+    "total_energy_mj": 0.202
   }
   ```
+
+  > Valores arredondados a partir das correntes da Tabela 3.4, incluindo o
+  > consumo do AFE (≈0.1 mA por canal).
 
 ## 6. Quality Gate QG19 — Consumo Energético
 
