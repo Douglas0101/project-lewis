@@ -61,3 +61,4 @@ firmware/tools/renode_*/
 
 # --- UV lock (gerado) ---
 uv.lock
+.worktrees/
