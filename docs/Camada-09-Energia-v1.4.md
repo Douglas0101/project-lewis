@@ -181,6 +181,6 @@ Integrar em [`../firmware/scripts/run_renode_tests.py`](../firmware/scripts/run_
 | Critério | Valor | Como Validar |
 | :--- | :--- | :--- |
 | Corrente média @ 1 batimento/s | < 50 mA | `report["energy"]["average_current_ma"]` |
-| Energia por batimento | < 5 mJ | `report["energy"]["energy_mj_per_beat"]` |
-| Autonomia estimada (500 mAh) | > 8 h | `report["energy"]["estimated_autonomy_hours"]` |
+| Energia por batimento | < 165 mJ | `report["energy"]["energy_mj_per_beat"]` |
+| Autonomia estimada (500 mAh) | > 10 h | `report["energy"]["estimated_autonomy_hours"]` |
 | Estados instrumentados | ≥ 2 (active + inference) | presença de logs `PWR` |

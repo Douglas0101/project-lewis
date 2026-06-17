@@ -36,10 +36,12 @@ mcu:
   # Incrementos de corrente por periférico, a serem somados quando o
   # periférico estiver habilitado mas NÃO estiver incluído no estado base.
   # Valores por MHz de clock do periférico (DS8626 Rev 11, Tabela 28).
+  # NOTA: adc_stm32_internal refere-se ao ADC do STM32; o ADS1292R é
+  # modelado separadamente na seção `afe`.
   peripherals_increment_ma:
     uart4: 0.0033
     tim2: 0.0165
-    adc: 1.6            # analog part, when ADON=1 (adicional ao estado base)
+    adc_stm32_internal: 1.6  # analog part, when ADON=1 (adicional ao estado base)
 
 afe:
   model: "ADS1292R"

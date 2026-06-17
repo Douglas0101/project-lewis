@@ -32,7 +32,7 @@ de energia** no relatório de simulação.
 | AFE | Substituído por stub; ADS1292R não modelado | Modelar consumo do ADS1292R @ 500 SPS (335 µW/canal típico) |
 | Instrumentação | Logs de latência por batimento | Logs de estados de energia + timestamp virtual |
 | Relatório | `firmware_simulation_report.json` sem energia | Campo `energy_mj_per_beat`, `estimated_autonomy_hours` |
-| Quality Gate | Nenhum | QG19: consumo estimado < 50 mA médios @ 3.3 V para 1 batimento/s |
+| Quality Gate | Nenhum | QG19: < 50 mA médios e < 165 mJ/batimento @ 3.3 V para 1 batimento/s |
 
 ## 4. Abordagens Consideradas
 
