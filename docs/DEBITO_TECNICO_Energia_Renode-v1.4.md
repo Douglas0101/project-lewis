@@ -7,9 +7,9 @@
 A Fase 1 do Project-Lewis entrega um firmware de classificação de arritmias
 executável no emulador Renode (STM32F4Discovery) com métricas de latência,
 uso de RAM/Flash e bit-exatidão (QG7–QG18). No entanto, conforme registrado
-em `docs/Camada-08-Firmware-v1.1.md` (seção 8.10, item 6),
-`docs/Camada-09-Simulacao-v1.1.md` (seção 9.9, item 6 e seção 9.10, item 6)
-e `docs/SIMULATION_LIMITS.md` (seção 1), **não existe estimativa de consumo
+em [`Camada-08-Firmware-v1.1.md`](Camada-08-Firmware-v1.1.md) (seção 8.10, item 6),
+[`Camada-09-Simulacao-v1.1.md`](Camada-09-Simulacao-v1.1.md) (seção 9.10, item 6)
+e [`SIMULATION_LIMITS.md`](SIMULATION_LIMITS.md) (seção 1), **não existe estimativa de consumo
 de energia** no relatório de simulação.
 
 ## 2. Por que isso é um débito técnico
@@ -70,11 +70,12 @@ instrumentação mínima no firmware.
 
 ## 6. Critérios de Aceite para Resolver o Débito
 
-- [ ] Documento de especificação `docs/Camada-09-Energia-v1.4.md` aprovado.
-- [ ] Modelo de consumo YAML versionado em `firmware/config/power_model_v1.4.yaml`.
+- [ ] Documento de especificação [`Camada-09-Energia-v1.4.md`](Camada-09-Energia-v1.4.md) aprovado.
+- [ ] Modelo de consumo YAML versionado em [`firmware/config/power_model_v1.4.yaml`](../firmware/config/power_model_v1.4.yaml).
 - [ ] Firmware emite logs de transição de estado de energia no formato:
       `PWR <state> <ms>` (ex: `PWR inference 16`, `PWR active 984`).
-- [ ] Runner Renode gera campo `energy` no relatório JSON.
+- [ ] Runner Renode gera campo `energy` no relatório JSON, contendo
+      `energy_mj_per_beat` e `estimated_autonomy_hours`.
 - [ ] QG19 falha se `average_current_ma > 50 mA` para 1 batimento/s.
 - [ ] Limites documentados: valores são estimativas (@25 °C, VDD=3.3 V) e
       devem ser validados em silício real.
