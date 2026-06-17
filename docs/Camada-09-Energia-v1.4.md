@@ -97,7 +97,7 @@ Usar os hooks no [`../firmware/src/app/main.c`](../firmware/src/app/main.c):
 ## 5. Especificação da Extensão do Runner Renode
 
 Criar [`../firmware/scripts/energy_reporter.py`](../firmware/scripts/energy_reporter.py)
-com a seguinte interface (implementação concreta na próxima iteração de firmware):
+com a seguinte interface:
 
 ```python
 def parse_pwr_transitions(uart_log_text: str) -> list[dict]:
@@ -109,11 +109,16 @@ def parse_pwr_transitions(uart_log_text: str) -> list[dict]:
             transitions.append({"state": parts[1], "ms": int(parts[2])})
     return transitions
 
-def compute_energy(transitions: list[dict], power_model: dict) -> dict:
-    """Calcula durações, carga (mAh), energia (mJ), corrente média e autonomia."""
-    # Duração total e por estado; último estado estende até o tempo final
-    # da simulação (obtido do log UART ou parâmetro run_time).
-    ...
+def compute_energy(transitions: list[dict], power_model: dict,
+                   total_runtime_ms: int) -> dict:
+    """Calcula durações, carga (mAh), energia (mJ), corrente média e autonomia.
+
+    1. Para cada transição i, duração = transitions[i+1].ms - transitions[i].ms.
+    2. A última transição estende até total_runtime_ms.
+    3. Para cada estado, multiplica duração pela corrente do power_model.
+    4. Soma carga total (mAh) e energia total (mJ).
+    5. Deriva average_current_ma e estimated_autonomy_hours.
+    """
 ```
 
 Integrar em [`../firmware/scripts/run_renode_tests.py`](../firmware/scripts/run_renode_tests.py):
