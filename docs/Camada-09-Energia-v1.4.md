@@ -164,16 +164,17 @@ Integrar em [`../firmware/scripts/run_renode_tests.py`](../firmware/scripts/run_
   ```json
   "energy": {
     "average_current_ma": 61.0,
-    "energy_mj_per_beat": 0.202,
+    "energy_mj_per_beat": 202,
     "estimated_autonomy_hours": 8.2,
     "state_durations_ms": {"active": 16, "inference": 16, "sleep": 968},
     "total_charge_mah": 0.0170,
-    "total_energy_mj": 0.202
+    "total_energy_mj": 202
   }
   ```
 
-  > Valores arredondados a partir das correntes da Tabela 3.4, incluindo o
-  > consumo do AFE (≈0.1 mA por canal).
+  > Exemplo para uma janela de 1 s contendo exatamente 1 batimento. Valores
+  > arredondados a partir das correntes da Tabela 3.4, incluindo o consumo do
+  > AFE (≈0.1 mA por canal).
 
 ## 6. Quality Gate QG19 — Consumo Energético
 
