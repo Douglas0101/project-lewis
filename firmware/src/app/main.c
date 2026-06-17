@@ -5,10 +5,12 @@
 #include "dsp/adc_stub.h"
 #include "dsp/filter.h"
 #include "dsp/normalizer.h"
+#include "dsp/r_peak_detector.h"
 #include "app/command_loop.h"
 
 #include <stdint.h>
 #include <stddef.h>
+#include <math.h>
 
 #define NUM_TEST_BEATS 3
 
@@ -192,6 +194,42 @@ static void infer_from_uart(uint8_t start_byte)
     lewis_hal_uart_tx('>');
 }
 
+static void run_peak_demo(void)
+{
+#define PEAK_DEMO_LEN 4000U
+#define PEAK_DEMO_FS 500.0f
+#define PEAK_DEMO_N_PEAKS 5
+#define PEAK_DEMO_WIDTH 40
+
+    float sig[PEAK_DEMO_LEN];
+    for (size_t i = 0; i < PEAK_DEMO_LEN; ++i) {
+        sig[i] = 0.0f;
+    }
+
+    for (int p = 0; p < PEAK_DEMO_N_PEAKS; ++p) {
+        size_t center = 400U + (size_t)p * 800U;
+        for (int d = -PEAK_DEMO_WIDTH; d <= PEAK_DEMO_WIDTH; ++d) {
+            int idx = (int)center + d;
+            if (idx >= 0 && idx < (int)PEAK_DEMO_LEN) {
+                float x = (float)d / (float)(PEAK_DEMO_WIDTH / 3);
+                sig[(size_t)idx] += 1.0f * expf(-0.5f * x * x);
+            }
+        }
+    }
+
+    size_t peaks[LEWIS_RPEAK_MAX_PEAKS];
+    size_t n_peaks = 0;
+    int rc = lewis_detect_r_peaks(sig, PEAK_DEMO_LEN, PEAK_DEMO_FS, peaks, &n_peaks);
+
+    lewis_debug_print("[PEAK] rc=");
+    lewis_debug_print_int(rc);
+    lewis_debug_print(" count=");
+    lewis_debug_print_uint((uint32_t)n_peaks);
+    lewis_debug_print(" first=");
+    lewis_debug_print_uint((uint32_t)(n_peaks > 0U ? peaks[0] : 0U));
+    lewis_debug_print("\n");
+}
+
 static void command_loop(void)
 {
     lewis_debug_print("Modo comando UART ativo\n");
@@ -230,6 +268,11 @@ static void command_loop(void)
                 /* Simula travamento: loop infinito ate o watchdog reiniciar. */
                 __asm__ volatile("wfi");
             }
+            break;
+        case LEWIS_CMD_PEAK:
+            lewis_debug_print("[PEAK TEST]\n");
+            run_peak_demo();
+            lewis_command_reset();
             break;
         default:
             break;

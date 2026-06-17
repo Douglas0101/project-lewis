@@ -28,6 +28,8 @@ lewis_cmd_t lewis_command_feed(uint8_t byte)
             result = LEWIS_CMD_ECHO;
         } else if (cmd_is("WATCHDOG")) {
             result = LEWIS_CMD_WATCHDOG;
+        } else if (cmd_is("PEAK")) {
+            result = LEWIS_CMD_PEAK;
         }
         s_len = 0;
         return result;

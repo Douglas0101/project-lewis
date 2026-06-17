@@ -16,6 +16,7 @@ typedef enum {
     LEWIS_CMD_SHUTDOWN,
     LEWIS_CMD_ECHO,
     LEWIS_CMD_WATCHDOG,
+    LEWIS_CMD_PEAK,
 } lewis_cmd_t;
 
 lewis_cmd_t lewis_command_feed(uint8_t byte);

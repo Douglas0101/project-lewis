@@ -30,6 +30,11 @@ GATES = [
     ("QG7", "Build do firmware", "qg7"),
     ("QG8", "Bit-exatidão TFLM", "qg8"),
     ("QG9", "Latência e memória do firmware", "qg9"),
+    ("QG10", "Fidelidade numérica vs ground-truth", "qg10"),
+    ("QG13", "Watchdog software de inferência", "qg13"),
+    ("QG16", "Filtros DSP bandpass/notch vs Python", "qg16"),
+    ("QG17", "Fidelidade do pipeline filtrado C vs Python", "qg17"),
+    ("QG18", "Detector leve de R-peak em C vs AMPT", "qg18"),
 ]
 
 DLQ_PATHS = [
@@ -111,7 +116,7 @@ def _parse_junit_stats(xml_text: str) -> dict:
     return stats
 
 
-def _run_pytest(marker: str, timeout: int = 300) -> dict:
+def _run_pytest(marker: str, timeout: int = 600) -> dict:
     """Roda pytest para um marker e retorna estatisticas via JUnit XML."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".xml", delete=False) as tmp:
         junit_path = tmp.name

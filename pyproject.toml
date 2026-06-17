@@ -129,5 +129,6 @@ markers = [
     "qg13: Quality Gate 13 — watchdog software de inferencia",
     "qg16: Quality Gate 16 — filtros DSP bandpass/notch vs Python",
     "qg17: Quality Gate 17 — fidelidade do pipeline filtrado no firmware",
+    "qg18: Quality Gate 18 — detector leve de R-peak em C vs AMPT",
     "slow: Testes lentos (CI condicional)",
 ]
