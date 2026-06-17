@@ -94,10 +94,10 @@ Usar os hooks no [`../firmware/src/app/main.c`](../firmware/src/app/main.c):
 - `LEWIS_PWR_SLEEP` durante espera por próximo batimento (WFI), quando o loop
   principal for adaptado para duty-cycle entre batimentos.
 
-## 5. Extensão do Runner Renode
+## 5. Especificação da Extensão do Runner Renode
 
 Criar [`../firmware/scripts/energy_reporter.py`](../firmware/scripts/energy_reporter.py)
-com a seguinte interface (implementação concreta na v1.4):
+com a seguinte interface (implementação concreta na próxima iteração de firmware):
 
 ```python
 def parse_pwr_transitions(uart_log_text: str) -> list[dict]:
