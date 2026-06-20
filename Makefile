@@ -93,6 +93,12 @@ provenance:
 process:
 	$(PYTHON) -m src.data.aggregator
 
+features:
+	$(PYTHON) -m src.features.pipeline
+
+audit-training-data:
+	$(PYTHON) scripts/audit_training_data.py
+
 pretrain:
 	$(PYTHON) -m src.models.pretrain_chapman
 

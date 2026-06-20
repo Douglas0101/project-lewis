@@ -61,4 +61,21 @@ firmware/tools/renode_*/
 
 # --- UV lock (gerado) ---
 uv.lock
-.worktrees/
+
+# --- Dados e artefatos gerados ---
+/data/
+/build/
+/snapshots/
+/models/quantized/
+
+# --- Diretórios de ambiente / sessão ---
+.dvc/
+.kimi/
+.opencode/
+
+# --- Firmware ---
+firmware/data/
+firmware/tools/
+firmware/third_party/
+firmware/test_harness_report.json
+
