@@ -1,0 +1,25 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        UV_VERSION: "0.11.8"
+    image: project-lewis:latest
+    container_name: project-lewis-dev
+    volumes:
+      - .:/app
+      - lewis-venv:/app/.venv
+      - lewis-data:/app/data
+    working_dir: /app
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LEWIS_REQUIRE_DATA=0
+    # Sincroniza dependências de desenvolvimento no volume persistente e abre shell.
+    command: ["bash", "-c", "uv sync && exec bash"]
+    stdin_open: true
+    tty: true
+
+volumes:
+  lewis-venv:
+  lewis-data:

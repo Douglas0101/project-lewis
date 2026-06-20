@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "sdd-docs": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./docs"]
+    },
+    "sdd-rules": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./.kimi", "./.opencode", "./AGENTS.md"]
+    },
+    "project-lewis-src": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./src", "./firmware/src", "./tests", "./scripts"]
+    }
+  }
+}
