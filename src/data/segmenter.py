@@ -117,6 +117,7 @@ class ECGSegmenter:
                     "n_descartados_bordas": 0,
                     "n_usados_600ms": 0,
                     "n_usados_1000ms": 0,
+                    "kept_indices": [],
                     "window_len": self.window_len,
                     "fs": self.fs,
                 },
@@ -144,6 +145,7 @@ class ECGSegmenter:
 
         segments: List[np.ndarray] = []
         segment_labels: List[str] = []
+        kept_indices: List[int] = []
         n_discarded = 0
         n_600ms = 0
         n_1000ms = 0
@@ -205,6 +207,7 @@ class ECGSegmenter:
 
             segments.append(seg)
             segment_labels.append(str(labels[i]))
+            kept_indices.append(i)
 
         n_kept = len(segments)
         LOGGER.info(
@@ -225,6 +228,7 @@ class ECGSegmenter:
                     "n_descartados_bordas": n_discarded,
                     "n_usados_600ms": n_600ms,
                     "n_usados_1000ms": n_1000ms,
+                    "kept_indices": [],
                     "window_len": self.window_len,
                     "fs": self.fs,
                 },
@@ -238,6 +242,7 @@ class ECGSegmenter:
             "n_descartados_bordas": n_discarded,
             "n_usados_600ms": n_600ms,
             "n_usados_1000ms": n_1000ms,
+            "kept_indices": np.array(kept_indices, dtype=np.int64),
             "window_len": self.window_len,
             "fs": self.fs,
         }
