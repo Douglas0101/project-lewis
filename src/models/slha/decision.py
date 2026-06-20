@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from typing import Literal
 
 from .schemas import HardwareSpecs, TrainingConfig
 
@@ -33,12 +34,14 @@ def decide_training_config(
     TrainingConfig
     """
     has_gpu = specs.gpu.available and specs.gpu.count > 0
-    accelerator = "gpu" if has_gpu else "cpu"
+    accelerator: Literal["cpu", "gpu"] = "gpu" if has_gpu else "cpu"
     devices = 1
 
     if has_gpu:
         total_memory_mb = specs.gpu.devices[0].total_memory_mb
-        precision = "mixed_float16" if _supports_mixed_precision(specs) else "float32"
+        precision: Literal["float32", "mixed_float16"] = (
+            "mixed_float16" if _supports_mixed_precision(specs) else "float32"
+        )
     else:
         total_memory_mb = int(specs.ram.available_gb * 1024)
         precision = "float32"

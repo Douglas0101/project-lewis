@@ -19,20 +19,17 @@ LOGGER = logging.getLogger("lewis.slha.discovery")
 
 def _read_cpu() -> CPUInfo:
     try:
-        info = {
-            "physical_cores": psutil.cpu_count(logical=False) or 1,
-            "logical_cores": psutil.cpu_count(logical=True) or 1,
-            "max_freq_mhz": None,
-            "architecture": platform.machine(),
-            "flags": [],
-        }
+        physical_cores = psutil.cpu_count(logical=False) or 1
+        logical_cores = psutil.cpu_count(logical=True) or 1
+        max_freq_mhz: float | None = None
         freq = psutil.cpu_freq()
         if freq and freq.max:
-            info["max_freq_mhz"] = float(freq.max)
+            max_freq_mhz = float(freq.max)
     except Exception as exc:  # pragma: no cover
         raise DiscoveryError(f"Falha ao ler CPU: {exc}") from exc
 
     # flags SIMD (melhor esforço)
+    flags: list[str] = []
     try:
         if hasattr(os, "sysconf") and os.path.isdir("/proc"):
             with open("/proc/cpuinfo", "r", encoding="utf-8") as fh:
@@ -40,12 +37,18 @@ def _read_cpu() -> CPUInfo:
                     if line.startswith("flags"):
                         raw = line.split(":", 1)[1].strip().split()
                         wanted = {"avx", "avx2", "avx512f", "sse4_2", "fma"}
-                        info["flags"] = sorted([f for f in raw if f in wanted])
+                        flags = sorted([f for f in raw if f in wanted])
                         break
     except Exception:
-        pass
+        LOGGER.debug("Não foi possível ler flags SIMD", exc_info=True)
 
-    return CPUInfo(**info)
+    return CPUInfo(
+        physical_cores=physical_cores,
+        logical_cores=logical_cores,
+        max_freq_mhz=max_freq_mhz,
+        architecture=platform.machine(),
+        flags=flags,
+    )
 
 
 def _read_gpu() -> GPUInfo:

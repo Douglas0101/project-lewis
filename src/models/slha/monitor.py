@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Optional
@@ -62,7 +61,7 @@ class ResourceMonitor(tf.keras.callbacks.Callback):
                 # Deixamos como None quando pynvml não está disponível.
                 gpu_mem_total = self._try_gpu_memory_total()
         except Exception:
-            pass
+            LOGGER.debug("Não foi possível detectar memória GPU", exc_info=True)
 
         return ResourceLog(
             epoch=epoch,

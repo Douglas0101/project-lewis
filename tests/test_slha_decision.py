@@ -1,7 +1,5 @@
 """Tests for the SLHA decision engine."""
 
-import pytest
-
 from src.models.slha.decision import decide_training_config
 from src.models.slha.schemas import CPUInfo, DiskInfo, GPUDevice, GPUInfo, HardwareSpecs, RAMInfo
 

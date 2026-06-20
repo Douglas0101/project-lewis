@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import Optional
 
 import numpy as np
 import psutil
@@ -47,7 +46,7 @@ def warmup_model(
         batches_run = 0
         for i in range(0, min(len(X), batch_size * max_batches), batch_size):
             x_batch = X[i : i + batch_size]
-            y_batch = y[i : i + batch_size]
+            _ = y[i : i + batch_size]
             with tf.GradientTape(persistent=False, watch_accessed_variables=False):
                 _ = model(tf.stop_gradient(x_batch), training=False)
             batches_run += 1

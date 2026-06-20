@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import numpy as np
+import tensorflow as tf
+
 from .decision import decide_training_config
 from .discovery import discover_hardware
 from .monitor import ResourceMonitor
+from .schemas import TrainingConfig
 from .warmup import warmup_model
 
 __all__ = [
@@ -17,11 +21,11 @@ __all__ = [
 
 
 def auto_configure_training(
-    X_sample: object,
-    y_sample: object,
-    model: object,
+    X_sample: np.ndarray,
+    y_sample: np.ndarray,
+    model: tf.keras.Model,
     reference_batch_size: int = 64,
-):
+) -> TrainingConfig:
     """Caminho feliz: discovery → warmup → decision.
 
     Parameters
