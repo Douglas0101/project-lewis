@@ -242,6 +242,33 @@ O Project-Lewis entrega um firmware C/C++17 para **STM32F407VG** rodando **Tenso
 | **ML** | TFLM INT8, arena estática 64 KB, modelo < 64 KB |
 | **Debug** | UART4 sem `printf`/semihosting |
 
+### 🔌 Firmware Test Harness
+
+O projeto inclui um **test harness C/C++** para validação automatizada do firmware, permitindo rodar as mesmas suites no host (compilação nativa) e no Renode (STM32F4 emulado) e comparar as saídas do C com as referências Python.
+
+| Componente | Descrição |
+| :--- | :--- |
+| `firmware/tests/harness.{c,h}` | Mini-framework de registro/execução de testes e asserts |
+| `firmware/tests/harness_main.c` | Ponto de entrada que registra todas as suites |
+| `firmware/tests/test_dsp.c` | Filtros DSP C vs Python (QG16) |
+| `firmware/tests/test_r_peak.c` | Detector R-peak C vs AMPT Python (QG18) |
+| `firmware/tests/test_inference.cpp` / `test_pipeline.c` | Inferência/pipeline C vs Python (QG8, QG17) |
+| `firmware/scripts/generate_harness_fixtures.py` | Gera fixtures C a partir das referências Python |
+| `firmware/scripts/run_harness.py` | Orquestra build native/Renode e gera relatório |
+| `firmware/renode/harness.resc` | Plataforma Renode para o harness |
+| `firmware/stm32f407vg_harness.ld` | Linker script com pilha de 64 KB |
+
+```bash
+cd firmware
+make harness-native    # executa no host (rápido, sem hardware)
+make harness-renode    # executa no Renode (STM32F4 emulado)
+make harness           # ambos os ambientes
+# ou diretamente
+python3 scripts/run_harness.py --mode both
+```
+
+O relatório é gerado em `firmware/test_harness_report.json` com o resumo `native`/`renode` de PASS/FAIL/TOTAL.
+
 ### 🧪 Simulação Renode
 
 ```bash
@@ -249,6 +276,7 @@ make firmware-deps     # ARM GCC 13.3 + Renode 1.15.3
 make firmware-build    # ELF para STM32F4
 make firmware-test     # 5 s de simulação headless
 make hard-gates        # Hard Gates HG-01..HG-06
+make harness-renode    # harness de testes no Renode
 ```
 
 > ⚠️ **Limites:** timings são representativos, energia não é estimada e há tolerância de 1 LSB entre CMSIS-NN e kernels de referência. Veja [`docs/SIMULATION_LIMITS.md`](docs/SIMULATION_LIMITS.md).
@@ -358,13 +386,14 @@ make quantize       # QG6
 make export         # headers C
 ```
 
-### 5. Firmware e Simulação
+### 5. Firmware, Harness e Simulação
 
 ```bash
 cd firmware
 make firmware-deps
 make firmware-build
 make firmware-test
+make harness           # test harness native + renode
 ```
 
 ### 6. Testes Completos
@@ -404,9 +433,9 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 | **QG11** | Fault injection | Graceful degradation | `pytest -m qg11` |
 | **QG12** | Arena limit (48 KB RAM) | `INIT FAIL` sem HardFault | `pytest -m qg12` |
 | **QG13** | Watchdog de inferência | Reset após timeout | `pytest -m qg13` |
-| **QG16** | Filtros DSP vs Python | correlação > 0,99 | `pytest -m qg16` |
-| **QG17** | Pipeline filtrado C vs Python | MAE < 0,01 / cosine > 0,99 | `pytest -m qg17` |
-| **QG18** | Detector R-peak C vs AMPT | Sens ≥ 90%; PPV ≥ 90% | `pytest -m qg18` |
+| **QG16** | Filtros DSP vs Python | correlação > 0,99 / RMSE < 1e-6 | `pytest -m qg16` / `make harness` |
+| **QG17** | Pipeline filtrado C vs Python | MAE < 0,01 / cosine > 0,99 | `pytest -m qg17` / `make harness` |
+| **QG18** | Detector R-peak C vs AMPT | Sens ≥ 90%; PPV ≥ 90% | `pytest -m qg18` / `make harness` |
 | **QG19** | Consumo energético | < 50 mA e < 165 mJ/batimento @ 3,3 V | `reports/firmware_simulation_report.json` |
 
 > QG19 é um débito técnico documentado para a v1.4. Veja [`docs/DEBITO_TECNICO_Energia_Renode-v1.4.md`](docs/DEBITO_TECNICO_Energia_Renode-v1.4.md).
