@@ -1,0 +1,18 @@
+# Renode platform script para STM32F4Discovery + Project-Lewis firmware harness.
+
+using sysbus
+mach create "stm32f4discovery-lewis-harness"
+
+include @scripts/single-node/stm32f4_discovery.resc
+
+$lewis_bin=@/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/build/stm32f4/lewis_harness.bin
+sysbus LoadBinary $lewis_bin 0x08000000
+
+cpu VectorTableOffset 0x08000000
+
+:description: Project-Lewis firmware harness on STM32F4 Discovery
+
+$uart_log?="/tmp/renode_harness_uart.log"
+sysbus.uart4 CreateFileBackend $uart_log true
+
+start
