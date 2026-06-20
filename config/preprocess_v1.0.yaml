@@ -16,3 +16,12 @@ preprocess_v1.0:
     type: "zscore_global"
     eps: 1.0e-12
     per_record: false
+  outlier_clipping:
+    enabled: true
+    method: "fixed"           # "fixed" ou "percentile"
+    fixed_limits: [-5.0, 5.0] # mV; usado quando method=fixed
+    percentile: 0.001         # caudas simétricas; usado quando method=percentile
+    max_abs_limit: 10.0       # teto de segurança absoluto (mV)
+  post_normalize_clipping:
+    enabled: true
+    zscore_limits: [-10.0, 10.0]  # clipa z-scores residuais extremos após normalização

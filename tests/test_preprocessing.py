@@ -4,7 +4,7 @@ Validates:
 * QG1.1 — Butterworth bandpass 0.5-40 Hz, order 4, filtfilt (zero-phase)
 * QG1.2 — Detrend linear
 * QG1.3 — Z-score global (mean ≈ 0, std ≈ 1)
-* QG1.4 — No clipping (range ±5 mV)
+* QG1.4 — Outlier clipping after filter/detrend (range ±5 mV)
 * QG1.5 — Idempotency via lineage
 * QG1.6 — DLQ for failures
 * QG1.7 — Global stats mandatory when per_record=False
@@ -296,6 +296,77 @@ class TestPreprocessorProcess:
         assert (
             not production_dlq.exists() or production_dlq.stat().st_size == 0
         ), "Production DLQ was populated by tests"
+
+
+@pytest.mark.qg1
+class TestPreprocessorClipping:
+    """Validate post-filter outlier clipping."""
+
+    def _per_record_pre(self, dlq_path: Path) -> ECGPreprocessor:
+        pre = ECGPreprocessor(dlq_path=dlq_path)
+        pre.cfg["normalization"] = pre.cfg["normalization"].copy()
+        pre.cfg["normalization"]["per_record"] = True
+        pre.per_record = True
+        return pre
+
+    def test_clip_outliers_fixed_limits(self, dlq_path):
+        """QG1.4: values outside [-5, +5] mV are clipped before normalization."""
+        pre = self._per_record_pre(dlq_path)
+        x = np.array([-10.0, -2.0, 0.0, 3.0, 7.0], dtype=np.float64)
+        y, meta = pre._clip_outliers(x)
+
+        assert meta["enabled"] is True
+        assert meta["method"] == "fixed"
+        assert meta["limits"] == [-5.0, 5.0]
+        assert meta["n_clipped"] == 2
+        assert float(y.min()) == -5.0
+        assert float(y.max()) == 5.0
+
+    def test_clip_outliers_no_clipping_when_in_range(self, dlq_path):
+        pre = self._per_record_pre(dlq_path)
+        x = np.array([-2.0, -1.0, 0.0, 1.0, 2.0], dtype=np.float64)
+        y, meta = pre._clip_outliers(x)
+
+        assert meta["n_clipped"] == 0
+        np.testing.assert_array_equal(x, y)
+
+    def test_process_records_clipping_in_lineage(self, dlq_path, tmp_path: Path):
+        """Lineage must contain clip_outliers step with metadata."""
+        pre = self._per_record_pre(dlq_path)
+        x = np.zeros(500)
+        x[100] = 10.0  # single outlier above +5 mV
+
+        _, _ = pre.process(
+            x,
+            record_id="test_clip",
+            dataset="mitdb",
+            fs_orig=500.0,
+            raw_path=Path("data/raw_mitbih/test_clip"),
+            lead_name="MLII",
+        )
+
+        lineage_path = tmp_path / "lineage" / "mitdb" / "test_clip_lineage.json"
+        assert lineage_path.exists()
+        lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        steps = [s["step"] for s in lineage["pipeline"]]
+        assert "clip_outliers" in steps
+        clip_step = next(s for s in lineage["pipeline"] if s["step"] == "clip_outliers")
+        assert clip_step["enabled"] is True
+        assert "limits" in clip_step
+        assert "n_clipped" in clip_step
+
+    def test_post_normalize_clip_limits_zscore(self, dlq_path):
+        """QG1.4: post-normalization z-score clipping at ±10."""
+        pre = self._per_record_pre(dlq_path)
+        x = np.array([-15.0, -2.0, 0.0, 3.0, 12.0], dtype=np.float64)
+        y, meta = pre._post_normalize_clip(x)
+
+        assert meta["enabled"] is True
+        assert meta["method"] == "fixed_zscore"
+        assert meta["limits"] == [-10.0, 10.0]
+        assert meta["n_clipped"] == 2
+        assert float(y.min()) == -10.0
+        assert float(y.max()) == 10.0
 
 
 @pytest.mark.qg1

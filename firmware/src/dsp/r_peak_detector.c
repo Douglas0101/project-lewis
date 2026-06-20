@@ -158,9 +158,11 @@ int lewis_detect_r_peaks(
         refractory = 1U;
     }
 
-    float deriv[LEWIS_RPEAK_MAX_SAMPLES];
-    float squared[LEWIS_RPEAK_MAX_SAMPLES];
-    float mwi[LEWIS_RPEAK_MAX_SAMPLES];
+    /* VLA proporcional ao sinal de entrada: economiza pilha no embarcado
+     * e permite sinais maiores no host nativo. */
+    float deriv[len];
+    float squared[len];
+    float mwi[len];
 
     derivative_5point(sig, deriv, len);
     square_signal(deriv, squared, len);

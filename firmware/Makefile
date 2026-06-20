@@ -114,7 +114,8 @@ CXXFLAGS_STM = $(CFLAGS_STM_COMMON) -fno-rtti -fno-exceptions -std=c++17 \
 
 LDFLAGS_STM = -mcpu=cortex-m4 -mthumb -mfloat-abi=hard -mfpu=fpv4-sp-d16 \
 	-T$(LDSCRIPT) \
-	--specs=nosys.specs
+	--specs=nosys.specs \
+	-lm
 
 OBJECTS_STM := $(patsubst $(SRC_DIR)/%.c,$(BUILD_STM)/%.o,$(C_SOURCES_STM) $(C_SOURCES_SIM) $(C_SOURCES_UART_ARM))
 OBJECTS_STM_CXX := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_STM)/%.o,$(CXX_SOURCES_STM))
@@ -206,6 +207,31 @@ CXX_SOURCES_NAT := $(CXX_SOURCES_COMMON)
 OBJECTS_NAT := $(patsubst $(SRC_DIR)/%.c,$(BUILD_NAT)/%.o,$(C_SOURCES_NAT) $(C_SOURCES_SIM) $(C_SOURCES_UART_NAT))
 OBJECTS_NAT_CXX := $(patsubst $(SRC_DIR)/%.cpp,$(BUILD_NAT)/%.o,$(CXX_SOURCES_NAT))
 
+# ---------------------------------------------------------------------------
+# Test Harness
+# ---------------------------------------------------------------------------
+HARNESS_DIR := $(PROJECT_ROOT)/tests
+HARNESS_MAIN := $(HARNESS_DIR)/harness_main.c
+HARNESS_C_SOURCES := \
+	$(HARNESS_DIR)/harness.c \
+	$(HARNESS_DIR)/test_dsp.c \
+	$(HARNESS_DIR)/test_r_peak.c
+ifeq ($(LEWIS_USE_TFLM),1)
+HARNESS_C_SOURCES += $(HARNESS_DIR)/test_pipeline.c
+endif
+HARNESS_CXX_SOURCES := \
+	$(HARNESS_DIR)/test_inference.cpp
+
+HARNESS_OBJECTS_NAT := \
+	$(patsubst $(HARNESS_DIR)/%.c,$(BUILD_NAT)/harness/%.o,$(HARNESS_C_SOURCES)) \
+	$(patsubst $(HARNESS_DIR)/%.cpp,$(BUILD_NAT)/harness/%.o,$(HARNESS_CXX_SOURCES)) \
+	$(patsubst $(HARNESS_DIR)/%.c,$(BUILD_NAT)/harness/%.o,$(HARNESS_MAIN))
+
+HARNESS_OBJECTS_STM := \
+	$(patsubst $(HARNESS_DIR)/%.c,$(BUILD_STM)/harness/%.o,$(HARNESS_C_SOURCES)) \
+	$(patsubst $(HARNESS_DIR)/%.cpp,$(BUILD_STM)/harness/%.o,$(HARNESS_CXX_SOURCES)) \
+	$(patsubst $(HARNESS_DIR)/%.c,$(BUILD_STM)/harness/%.o,$(HARNESS_MAIN))
+
 CONFIG_NAT_STAMP := $(BUILD_NAT)/.config_$(ALLOW_STUB)_$(LEWIS_USE_TFLM).stamp
 
 .PHONY: _config_state_force_nat
@@ -237,10 +263,46 @@ $(BUILD_NAT)/lewis: $(OBJECTS_NAT) $(OBJECTS_NAT_CXX)
 	@mkdir -p $(dir $@)
 	$(CXX_NATIVE) $(OBJECTS_NAT) $(OBJECTS_NAT_CXX) $(LDFLAGS_NAT) -o $@
 
+$(BUILD_NAT)/harness/%.o: $(HARNESS_DIR)/%.c $(CONFIG_NAT_STAMP) $(MAKEFILE_LIST) $(BUILD_NAT)/config.h
+	@mkdir -p $(dir $@)
+	$(CC_NATIVE) $(CFLAGS_NAT) -I$(HARNESS_DIR) -c $< -o $@
+
+$(BUILD_NAT)/harness/%.o: $(HARNESS_DIR)/%.cpp $(CONFIG_NAT_STAMP) $(MAKEFILE_LIST) $(BUILD_NAT)/config.h
+	@mkdir -p $(dir $@)
+	$(CXX_NATIVE) $(CXXFLAGS_NAT) -I$(HARNESS_DIR) -c $< -o $@
+
+$(BUILD_STM)/harness/%.o: $(HARNESS_DIR)/%.c $(CONFIG_STM_STAMP) $(MAKEFILE_LIST) $(BUILD_STM)/config.h
+	@mkdir -p $(dir $@)
+	$(CC_ARM) $(CFLAGS_STM) -I$(HARNESS_DIR) -c $< -o $@
+
+$(BUILD_STM)/harness/%.o: $(HARNESS_DIR)/%.cpp $(CONFIG_STM_STAMP) $(MAKEFILE_LIST) $(BUILD_STM)/config.h
+	@mkdir -p $(dir $@)
+	$(CXX_ARM) $(CXXFLAGS_STM) -I$(HARNESS_DIR) -c $< -o $@
+
+HARNESS_LINK_OBJECTS_NAT := \
+	$(filter-out $(BUILD_NAT)/app/%.o,$(OBJECTS_NAT)) \
+	$(OBJECTS_NAT_CXX)
+
+HARNESS_LINK_OBJECTS_STM := \
+	$(filter-out $(BUILD_STM)/app/%.o,$(OBJECTS_STM)) \
+	$(OBJECTS_STM_CXX)
+
+$(BUILD_NAT)/lewis_harness: $(HARNESS_LINK_OBJECTS_NAT) $(HARNESS_OBJECTS_NAT)
+	@mkdir -p $(dir $@)
+	$(CXX_NATIVE) $(HARNESS_LINK_OBJECTS_NAT) $(HARNESS_OBJECTS_NAT) $(LDFLAGS_NAT) -o $@
+
+$(BUILD_STM)/lewis_harness.elf: LDSCRIPT := $(PROJECT_ROOT)/stm32f407vg_harness.ld
+$(BUILD_STM)/lewis_harness.elf: $(HARNESS_LINK_OBJECTS_STM) $(HARNESS_OBJECTS_STM)
+	@mkdir -p $(dir $@)
+	$(CC_ARM) $(HARNESS_LINK_OBJECTS_STM) $(HARNESS_OBJECTS_STM) $(LDFLAGS_STM) -o $@
+
+$(BUILD_STM)/lewis_harness.bin: $(BUILD_STM)/lewis_harness.elf
+	$(OBJCOPY) -O binary $< $@
+
 # ---------------------------------------------------------------------------
 # Targets publicos
 # ---------------------------------------------------------------------------
-.PHONY: all stm32f4 stm32f4-48k native native-tflm clean clean-all firmware-run firmware-test size tflm-lib tflm-lib-native firmware-deps
+.PHONY: all stm32f4 stm32f4-48k native native-tflm clean clean-all firmware-run firmware-test size tflm-lib tflm-lib-native firmware-deps harness harness-native harness-renode
 
 all: stm32f4
 
@@ -301,3 +363,11 @@ firmware-test:
 
 size: stm32f4
 	$(SIZE) $(BUILD_STM)/lewis.elf
+
+harness-native: tflm-lib-native $(BUILD_NAT)/lewis_harness
+	python3 $(PROJECT_ROOT)/scripts/run_harness.py --mode native
+
+harness-renode: tflm-lib $(BUILD_STM)/lewis_harness.bin
+	python3 $(PROJECT_ROOT)/scripts/run_harness.py --mode renode
+
+harness: harness-native harness-renode

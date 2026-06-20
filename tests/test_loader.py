@@ -79,6 +79,29 @@ class TestLoaderSignal:
         assert sig.min() >= -5.0, f"Signal min = {sig.min():.3f} mV"
         assert sig.max() <= 5.0, f"Signal max = {sig.max():.3f} mV"
 
+    def test_strict_range_raises_on_out_of_range(self):
+        """strict_range=True must raise ValueError for signals outside [-5, +5] mV."""
+        raw = Path("data/raw_incart")
+        _require_or_skip(raw, "raw_incart")
+        rec = raw / "I01"
+        if not rec.with_suffix(".dat").exists():
+            pytest.skip("Record I01 .dat not found")
+
+        with pytest.raises(ValueError, match="Range físico fora de"):
+            MITBIHLoader.load_signal(rec, channel=0, units="physical", strict_range=True)
+
+    def test_default_range_warns_but_returns_signal(self):
+        """Default strict_range=False must return signal even when out of range."""
+        raw = Path("data/raw_incart")
+        _require_or_skip(raw, "raw_incart")
+        rec = raw / "I01"
+        if not rec.with_suffix(".dat").exists():
+            pytest.skip("Record I01 .dat not found")
+
+        sig = MITBIHLoader.load_signal(rec, channel=0, units="physical")
+        assert sig.ndim == 1
+        assert len(sig) > 0
+
     def test_gain_read_from_header(self):
         """QG1: adc_gain must be read from .hea, not hardcoded."""
         raw = Path("data/raw_mitbih")

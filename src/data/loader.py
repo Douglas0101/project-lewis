@@ -73,6 +73,7 @@ class MITBIHLoader:
         record_path: Path,
         channel: int = 0,
         units: str = "physical",
+        strict_range: bool = False,
     ) -> np.ndarray:
         """Carrega sinal de um registro WFDB.
 
@@ -85,6 +86,10 @@ class MITBIHLoader:
         units : str
             "physical" → mV (wfdb converte usando adc_gain/baseline do .hea).
             "digital"  → ADC counts.
+        strict_range : bool
+            Se True, levanta ValueError quando o sinal físico viola [-5, 5] mV.
+            O padrão é False: apenas loga warning, preservando a completude dos
+            dados; o clipping é aplicado no pré-processamento pós-filtro.
 
         Returns
         -------
@@ -96,7 +101,8 @@ class MITBIHLoader:
         FileNotFoundError
             Se .hea ou .dat não existirem.
         ValueError
-            Se units não for "physical" ou "digital", ou se range violar [-5, 5] mV.
+            Se units não for "physical" ou "digital", ou se strict_range=True e
+            o range violar [-5, 5] mV.
         """
         if units not in {"physical", "digital"}:
             raise ValueError(f"units must be 'physical' or 'digital', got {units!r}")
@@ -139,12 +145,13 @@ class MITBIHLoader:
         if units == "physical":
             vmin, vmax = float(sig.min()), float(sig.max())
             if vmin < -5.0 or vmax > 5.0:
-                LOGGER.warning(
-                    "Range físico fora de [-5, +5] mV para %s: [%.3f, %.3f]",
-                    record_path.name,
-                    vmin,
-                    vmax,
+                msg = (
+                    f"Range físico fora de [-5, +5] mV para {record_path.name}: "
+                    f"[{vmin:.3f}, {vmax:.3f}]"
                 )
+                if strict_range:
+                    raise ValueError(msg)
+                LOGGER.warning(msg)
             # WARN se gain/baseline divergirem drasticamente do padrão MIT-BIH
             if gain is not None and abs(gain - 200.0) > 50.0:
                 LOGGER.warning(

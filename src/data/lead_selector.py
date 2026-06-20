@@ -31,7 +31,6 @@ DATASET_LEAD_MAP = {
 
 # Para datasets onde o índice é fixo (não depende do nome no header)
 DATASET_FIXED_INDEX = {
-    "mitbih": 0,
     "svdb": 0,
     "afdb": 0,
 }
@@ -85,7 +84,33 @@ def select_lead(
 
     n_leads = p_signal.shape[1]
 
-    # Para MIT-BIH, SVDB, AFDB usamos índice fixo (0) conforme spec
+    # Para MIT-BIH: buscar "MLII" pelo nome exato. Alguns registros (102, 104)
+    # não possuem MLII e usam V5/V2; nesses casos usamos índice 0 como fallback.
+    if dataset_name == "mitbih":
+        if sig_name is None:
+            raise ValueError(f"Dataset {dataset_name}: sig_name ausente no header")
+        if expected_lead in sig_name:
+            idx = sig_name.index(expected_lead)
+            LOGGER.debug(
+                "Lead selecionado para %s: índice=%d nome=%s (busca por nome)",
+                dataset_name,
+                idx,
+                expected_lead,
+            )
+            return p_signal[:, idx].astype(np.float64), expected_lead
+        LOGGER.warning(
+            "MIT-BIH: lead '%s' não encontrado em sig_name=%s — fallback para índice 0 (%s)",
+            expected_lead,
+            sig_name,
+            sig_name[0] if sig_name else "?",
+        )
+        idx = 0
+        if idx >= n_leads:
+            raise ValueError(f"Dataset {dataset_name}: índice fixo {idx} excede n_leads={n_leads}")
+        actual_name = sig_name[idx] if sig_name and idx < len(sig_name) else expected_lead
+        return p_signal[:, idx].astype(np.float64), actual_name
+
+    # Para SVDB, AFDB usamos índice fixo (0) conforme spec
     if dataset_name in DATASET_FIXED_INDEX:
         idx = DATASET_FIXED_INDEX[dataset_name]
         if idx >= n_leads:
@@ -99,7 +124,7 @@ def select_lead(
         )
         return p_signal[:, idx].astype(np.float64), actual_name
 
-    # Para Chapman e INCART: buscar pelo nome exato
+    # Para Chapman, INCART, PTB-XL: buscar pelo nome exato
     if sig_name is None:
         raise ValueError(f"Dataset {dataset_name}: sig_name ausente no header")
 
@@ -128,9 +153,18 @@ def get_lead_index(
     Útil para validação antes de chamar select_lead.
     """
     dataset_name = dataset_name.lower().strip()
-    if dataset_name in DATASET_FIXED_INDEX:
-        return DATASET_FIXED_INDEX[dataset_name]
     if sig_name is None:
         raise ValueError(f"Dataset {dataset_name}: sig_name é None")
+
+    # MIT-BIH: preferir MLII pelo nome; fallback índice 0
+    if dataset_name == "mitbih":
+        expected = DATASET_LEAD_MAP[dataset_name]
+        if expected in sig_name:
+            return sig_name.index(expected)
+        return 0
+
+    if dataset_name in DATASET_FIXED_INDEX:
+        return DATASET_FIXED_INDEX[dataset_name]
+
     expected = DATASET_LEAD_MAP[dataset_name]
     return sig_name.index(expected)
