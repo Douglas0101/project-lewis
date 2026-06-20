@@ -55,6 +55,17 @@ DEFAULT_CONFIG: Dict[str, Any] = {
         "eps": 1.0e-12,
         "per_record": False,
     },
+    "outlier_clipping": {
+        "enabled": True,
+        "method": "fixed",
+        "fixed_limits": [-5.0, 5.0],
+        "percentile": 0.001,
+        "max_abs_limit": 10.0,
+    },
+    "post_normalize_clipping": {
+        "enabled": True,
+        "zscore_limits": [-10.0, 10.0],
+    },
 }
 
 
@@ -150,17 +161,32 @@ class ECGPreprocessor:
         self.eps = float(norm_cfg.get("eps", 1.0e-12))
         self.per_record = bool(norm_cfg.get("per_record", False))
 
+        # Parâmetros de clipping de outliers
+        clip_cfg = self.cfg.get("outlier_clipping", {})
+        self.clip_enabled = bool(clip_cfg.get("enabled", True))
+        self.clip_method = str(clip_cfg.get("method", "fixed"))
+        self.clip_fixed_limits = tuple(clip_cfg.get("fixed_limits", [-5.0, 5.0]))
+        self.clip_percentile = float(clip_cfg.get("percentile", 0.001))
+        self.clip_max_abs = float(clip_cfg.get("max_abs_limit", 10.0))
+
+        # Parâmetros de clipping pós-normalização (evita z-scores extremos)
+        post_cfg = self.cfg.get("post_normalize_clipping", {})
+        self.post_clip_enabled = bool(post_cfg.get("enabled", True))
+        self.post_clip_limits = tuple(post_cfg.get("zscore_limits", [-10.0, 10.0]))
+
         # Estatísticas globais (populadas externamente se per_record=False)
         self._global_mean: Optional[float] = None
         self._global_std: Optional[float] = None
 
         LOGGER.info(
-            "ECGPreprocessor inicializado | config=%s | fs=%.1f | band=[%.2f, %.2f] | order=%d",
+            "ECGPreprocessor inicializado | config=%s | fs=%.1f | "
+            "band=[%.2f, %.2f] | order=%d | clip=%s",
             self.config_version,
             self.fs,
             self.lowcut,
             self.highcut,
             self.order,
+            self.clip_enabled,
         )
 
     def filter(self, x: np.ndarray) -> np.ndarray:
@@ -173,6 +199,51 @@ class ECGPreprocessor:
     def detrend(self, x: np.ndarray) -> np.ndarray:
         """Remove drift DC linear."""
         return signal.detrend(x, type="linear")
+
+    def _clip_outliers(self, x: np.ndarray) -> Tuple[np.ndarray, dict]:
+        """Clipa amostras extremas após filtro/detrend, antes da normalização.
+
+        O clipping ocorre no estágio pós-filtro para não distorcer fase e para
+        remover picos residuais (ex: offsets/ganho em INCART) sem descartar
+        registros inteiros.
+
+        Returns
+        -------
+        tuple
+            (x_clipado, metadata_dict com limits e n_clipped)
+        """
+        if not self.clip_enabled:
+            return x, {"enabled": False}
+
+        if self.clip_method == "fixed":
+            lo, hi = self.clip_fixed_limits
+        elif self.clip_method == "percentile":
+            p_lo = self.clip_percentile * 100.0
+            p_hi = 100.0 - p_lo
+            lo = float(np.percentile(x, p_lo))
+            hi = float(np.percentile(x, p_hi))
+            # Simetriza para não criar viés de amplitude
+            max_abs = max(abs(lo), abs(hi))
+            max_abs = min(max_abs, self.clip_max_abs)
+            lo, hi = -max_abs, max_abs
+        else:
+            raise ValueError(f"clip_method desconhecido: {self.clip_method}")
+
+        # Segurança absoluta: nunca clipa além de max_abs_limit
+        lo = max(lo, -self.clip_max_abs)
+        hi = min(hi, self.clip_max_abs)
+
+        n_clipped = int(np.sum((x < lo) | (x > hi)))
+        if n_clipped > 0:
+            LOGGER.debug("Clipping %d amostras para [%.3f, %.3f] mV", n_clipped, lo, hi)
+            x = np.clip(x, lo, hi)
+
+        return x, {
+            "enabled": True,
+            "method": self.clip_method,
+            "limits": [float(lo), float(hi)],
+            "n_clipped": n_clipped,
+        }
 
     def normalize(self, x: np.ndarray) -> np.ndarray:
         """Z-score global ou por registro.
@@ -196,6 +267,34 @@ class ECGPreprocessor:
             )
 
         return (x - self._global_mean) / (self._global_std + self.eps)
+
+    def _post_normalize_clip(self, x: np.ndarray) -> Tuple[np.ndarray, dict]:
+        """Clipa z-scores extremos após normalização.
+
+        Garante que outliers residuais (gerados quando sinais clipados em mV
+        possuem amplitude muito acima da média do dataset) não dominem o
+        treinamento dos modelos.
+        """
+        if not self.post_clip_enabled:
+            return x, {"enabled": False}
+
+        lo, hi = self.post_clip_limits
+        n_clipped = int(np.sum((x < lo) | (x > hi)))
+        if n_clipped > 0:
+            LOGGER.debug(
+                "Pós-normalização: clipping %d amostras para [%.1f, %.1f] z",
+                n_clipped,
+                lo,
+                hi,
+            )
+            x = np.clip(x, lo, hi)
+
+        return x, {
+            "enabled": True,
+            "method": "fixed_zscore",
+            "limits": [float(lo), float(hi)],
+            "n_clipped": n_clipped,
+        }
 
     def _check_idempotency(
         self,
@@ -413,7 +512,17 @@ class ECGPreprocessor:
                 }
             )
 
-            # Step 4: Normalize
+            # Step 4: Outlier clipping (pós-filtro/detrend, pré-normalização)
+            step = "clip_outliers"
+            x, clip_meta = self._clip_outliers(x)
+            lineage["pipeline"].append(
+                {
+                    "step": "clip_outliers",
+                    **clip_meta,
+                }
+            )
+
+            # Step 5: Normalize
             step = "normalize"
             x = self.normalize(x)
             lineage["pipeline"].append(
@@ -422,6 +531,16 @@ class ECGPreprocessor:
                     "type": "zscore_global",
                     "mean": float(np.mean(x)),
                     "std": float(np.std(x)),
+                }
+            )
+
+            # Step 6: Post-normalization z-score clipping
+            step = "post_normalize_clip"
+            x, post_clip_meta = self._post_normalize_clip(x)
+            lineage["pipeline"].append(
+                {
+                    "step": "post_normalize_clip",
+                    **post_clip_meta,
                 }
             )
 

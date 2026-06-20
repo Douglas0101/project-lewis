@@ -231,7 +231,17 @@ class ECGAggregator:
         for idx, rec in enumerate(records, start=1):
             record_name = rec["record_name"]
             fs_native = float(rec["fs"])
-            record_path = _find_record_path(raw_dir, record_name)
+
+            # Prefer catalog source_path when available (handles Chapman JSxxxx vs Sxxxx mismatch)
+            record_path: Optional[Path] = None
+            source_path = rec.get("source_path")
+            if source_path:
+                candidate = Path(source_path).with_suffix("")
+                if candidate.with_suffix(".hea").exists():
+                    record_path = candidate
+            if record_path is None:
+                record_path = _find_record_path(raw_dir, record_name)
+
             if record_path is None:
                 LOGGER.warning("Record not found: %s/%s", dataset, record_name)
                 skipped += 1
