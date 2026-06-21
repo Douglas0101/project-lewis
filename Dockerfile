@@ -1,6 +1,6 @@
 # Project-Lewis — Container de produção/desenvolvimento
 # Hardware-alvo: STM32F4 (TFLM); container usado para CI/reprodução de ambiente.
-FROM python:3.13-slim-bookworm
+FROM python:3.12-slim-bookworm
 
 ARG UV_VERSION=0.11.8
 ENV UV_COMPILE_BYTECODE=1 \
@@ -31,8 +31,8 @@ WORKDIR /app
 # README.md é necessário porque pyproject.toml o referencia.
 COPY pyproject.toml uv.lock README.md ./
 
-# Sincroniza dependências de produção (lockfile garante reprodutibilidade)
-RUN uv sync --no-dev --frozen
+# Sincroniza dependências de desenvolvimento (lockfile garante reprodutibilidade)
+RUN uv sync --frozen
 
 # Copia o código-fonte do projeto (incluindo testes para CI)
 COPY src ./src
