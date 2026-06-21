@@ -13,6 +13,10 @@ Plano de execução de tasks decompostas. Atualizar a cada sessão.
 
 ## Concluídas
 
+- [x] 2026-06-21 — Conferência em engenharia aplicada do SLHA vs SDD v2.0
+  - Documento: `docs/superpowers/conferencias/2026-06-21-slha-applied-engineering-review.md`
+  - RF-01..RF-12 e RNF-01..RNF-08 revisados e rastreados
+  - Análise por camada, trade-offs, riscos e recomendações documentados
 - [x] 2026-06-20 — Auditoria de qualidade dos dados pré-treino (QG0–QG3 + dataset de features)
   - Schemas pydantic: `src/data/training_schemas.py`
   - Auditoria: `scripts/audit_training_data.py` + relatórios JSON/Markdown + DLQ
