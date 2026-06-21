@@ -45,6 +45,68 @@ Revisar a implementação do Sistema de Leitura de Hardware Automático (SLHA) s
 
 ## 4. Análise por Camada
 
+### 4.1 Discovery
+
+**Pontos fortes:**
+- Uso de `psutil` e `tf.config` sem dependências extras.
+- Leitura de flags SIMD via `/proc/cpuinfo` é leve e headless.
+- Fallback para CPU-only é automático e sem exceções.
+
+**Observações técnicas:**
+- `tf.config.experimental.get_device_details` pode retornar `memory_limit` igual à memória total alocada pelo TF, não necessariamente VRAM física. Isso é aceitável para heurística de batch size, mas deve ser documentado.
+- Em WSL2 sem passthrough GPU, `tf.config.list_physical_devices("GPU")` geralmente retorna lista vazia, ativando o fallback corretamente.
+
+**Decisão de design recomendada:** manter a abordagem; considerar adição de `pynvml` como fallback para VRAM detalhada no futuro (já previsto como opcional no SDD).
+
+### 4.2 Warmup
+
+**Pontos fortes:**
+- Execução com `tf.GradientTape(watch_accessed_variables=False)` e `training=False` garante que pesos não sejam alterados.
+- Limite de `max_batches=2` e `timeout_seconds=30` protege contra loops longos.
+
+**Observações técnicas:**
+- A estimativa de memória por amostra é baseada no delta de RSS do processo. Em ambientes com garbage collection ativo do TF, o pico pode subestimar a memória real das ativações.
+- O warmup roda no accelerator selecionado (GPU se disponível), o que é fiel ao uso real.
+
+**Decisão de design recomendada:** manter; adicionar comentário documentando que a estimativa é conservadora e pode ser ajustada via fator de segurança.
+
+### 4.3 Decision
+
+**Pontos fortes:**
+- Heurística simples e previsível: 75% da memória disponível, batch size limitado ao reference.
+- Seleção de `mixed_float16` apenas quando compute capability ≥ 7.0 evita instabilidade numérica em hardware antigo.
+
+**Observações técnicas:**
+- O cálculo `usable_memory = total_memory * 0.75` é global; não considera outros processos concorrentes. Para máquinas compartilhadas, isso pode ser otimista.
+- `num_workers` fixado em `min(4, logical_cores)` é razoável para ECG (I/O leve), mas pode ser insuficiente para datasets maiores.
+
+**Decisão de design recomendada:** manter heurística por simplicidade; documentar que o fator 0.75 pode ser exposto como parâmetro futuro.
+
+### 4.4 Monitor
+
+**Pontos fortes:**
+- Callback Keras nativo, sem modificar o loop de treino.
+- Isolamento de falhas: exceções no monitor não interrompem o treino.
+- Alertas de CPU, RAM e GPU memory cobrem os recursos críticos.
+
+**Observações técnicas:**
+- `cpu_percent` é normalizado para [0, 100], o que mascara uso multi-core acima de 100% em processos multiprocessados. Para o SLHA (single-process TF), isso é aceitável.
+- GPU utilization requer `pynvml`; sem ele, apenas memória total é reportada.
+
+**Decisão de design recomendada:** manter; considerar log de `cpu_percent` bruto em modo debug no futuro.
+
+### 4.5 Integração com Scripts de Treino
+
+**Pontos fortes:**
+- Opt-in via `use_slha=True` preserva comportamento padrão.
+- Logs persistidos em `experiment_dir/slha/` permitem auditoria por experimento.
+
+**Observações técnicas:**
+- O sample usado no warmup (`X_train[:8]` / `next(gen)[:8]`) assume que as primeiras amostras são representativas. Para datasets muito desbalanceados, isso pode afetar a estimativa de memória.
+- O `ResourceMonitor` é adicionado sem `log_path` se `use_slha=False`, o que é correto.
+
+**Decisão de design recomendada:** manter; documentar que amostras devem ser representativas.
+
 ## 5. Decisões de Design e Trade-offs
 
 ## 6. Riscos e Mitigações
