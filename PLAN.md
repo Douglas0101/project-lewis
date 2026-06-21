@@ -13,6 +13,12 @@ Plano de execução de tasks decompostas. Atualizar a cada sessão.
 
 ## Concluídas
 
+- [x] 2026-06-21 — Onboarding e execução intuitiva em equipe
+  - Targets auto-documentados no Makefile (`make help`, `make setup`, `make doctor`, `make dev`)
+  - Script `scripts/check_environment.py` para checagem de ambiente
+  - `CONTRIBUTING.md` com workflow de equipe
+  - Dockerfile corrigido para Python 3.12 + dev dependencies
+  - README atualizado com fluxo de primeiro acesso
 - [x] 2026-06-20 — Auditoria de qualidade dos dados pré-treino (QG0–QG3 + dataset de features)
   - Schemas pydantic: `src/data/training_schemas.py`
   - Auditoria: `scripts/audit_training_data.py` + relatórios JSON/Markdown + DLQ
