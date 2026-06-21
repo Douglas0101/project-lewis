@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import logging
-from typing import Literal
+from pathlib import Path
+from typing import Literal, Optional
 
 from .schemas import HardwareSpecs, TrainingConfig
 
@@ -17,6 +18,7 @@ def decide_training_config(
     specs: HardwareSpecs,
     estimated_memory_per_sample_mb: float = 8.0,
     reference_batch_size: int = 64,
+    log_path: Optional[Path] = None,
 ) -> TrainingConfig:
     """Calcula configuração de treino com base nas specs e na memória estimada por amostra.
 
@@ -28,6 +30,8 @@ def decide_training_config(
         Memória adicional estimada por amostra durante o treino (inclui ativações).
     reference_batch_size : int
         Batch size desejado quando a memória permitir.
+    log_path : Path, optional
+        Se informado, persiste a configuração em JSON neste caminho.
 
     Returns
     -------
@@ -53,7 +57,7 @@ def decide_training_config(
     num_workers = min(4, specs.cpu.logical_cores)
     pin_memory = has_gpu
 
-    return TrainingConfig(
+    config = TrainingConfig(
         accelerator=accelerator,
         strategy="single_device",
         devices=devices,
@@ -62,6 +66,13 @@ def decide_training_config(
         num_workers=num_workers,
         pin_memory=pin_memory,
     )
+
+    if log_path is not None:
+        log_path = Path(log_path)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        log_path.write_text(config.model_dump_json(indent=2), encoding="utf-8")
+
+    return config
 
 
 def _supports_mixed_precision(specs: HardwareSpecs) -> bool:
