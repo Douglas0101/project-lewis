@@ -17,6 +17,12 @@ Plano de execução de tasks decompostas. Atualizar a cada sessão.
   - Documento: `docs/superpowers/conferencias/2026-06-21-slha-applied-engineering-review.md`
   - RF-01..RF-12 e RNF-01..RNF-08 revisados e rastreados
   - Análise por camada, trade-offs, riscos e recomendações documentados
+- [x] 2026-06-21 — Onboarding e execução intuitiva em equipe
+  - Targets auto-documentados no Makefile (`make help`, `make setup`, `make doctor`, `make dev`)
+  - Script `scripts/check_environment.py` para checagem de ambiente
+  - `CONTRIBUTING.md` com workflow de equipe
+  - Dockerfile corrigido para Python 3.12 + dev dependencies
+  - README atualizado com fluxo de primeiro acesso
 - [x] 2026-06-20 — Auditoria de qualidade dos dados pré-treino (QG0–QG3 + dataset de features)
   - Schemas pydantic: `src/data/training_schemas.py`
   - Auditoria: `scripts/audit_training_data.py` + relatórios JSON/Markdown + DLQ

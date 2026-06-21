@@ -25,13 +25,18 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Cache uv
         uses: actions/cache@v4
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
+          path: ~/.cache/uv
+          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
           restore-keys: |
-            pip-${{ runner.os }}-
+            uv-${{ runner.os }}-
 
       - name: Install system dependencies
         run: |
@@ -40,9 +45,8 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
-          pip install robotframework
+          uv sync --frozen
+          uv pip install robotframework
 
       - name: Cache firmware toolchain / Renode
         uses: actions/cache@v4
@@ -53,13 +57,19 @@ jobs:
             firmware-tools-${{ runner.os }}-
 
       - name: Install firmware tooling
-        run: make firmware-deps
+        run: uv run make firmware-deps
 
       - name: Verify Renode Version
-        run: make verify-renode
+        run: uv run make verify-renode
+
+      - name: Lint
+        run: uv run make lint
+
+      - name: Tests
+        run: uv run make test
 
       - name: Run hard gates
-        run: make hard-gates-ci
+        run: uv run make hard-gates-ci
 
       - name: Upload firmware artifacts
         if: always()
