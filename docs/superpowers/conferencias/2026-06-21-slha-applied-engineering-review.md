@@ -11,6 +11,20 @@ Revisar a implementação do Sistema de Leitura de Hardware Automático (SLHA) s
 
 ## 2. Sumário Executivo
 
+A implementação do SLHA no Project-Lewis está **conforme ao SDD v2.0** para todos os requisitos funcionais e não-funcionais críticos. Os principais pontos fortes são:
+
+- Arquitetura modular e bem isolada (Discovery → Warmup → Decision → Monitor).
+- Fallback robusto para CPU-only.
+- Integração opt-in que não altera o comportamento padrão dos scripts de treino.
+- Logs estruturados em todas as fases quando habilitados.
+
+Os principais gaps são:
+
+- RNF-02 (overhead de warmup < 5%) não validado automaticamente.
+- Dependência de `pynvml` opcional limita métricas GPU em alguns ambientes.
+
+**Veredito:** O SLHA está tecnicamente maduro para uso em equipe, com melhorias incrementais documentadas para versões futuras.
+
 ## 3. Rastreabilidade de Requisitos
 
 ### Requisitos Funcionais
@@ -109,6 +123,36 @@ Revisar a implementação do Sistema de Leitura de Hardware Automático (SLHA) s
 
 ## 5. Decisões de Design e Trade-offs
 
+| Decisão | Alternativa não escolhida | Trade-off | Avaliação |
+|---------|---------------------------|-----------|-----------|
+| Heurística simples de batch size | Grid search de batch size | Menor custo computacional, mas menos ótimo | ✅ Adequado para edge/embedded |
+| `mixed_float16` apenas CC ≥ 7.0 | Sempre `mixed_float16` | Estabilidade numérica vs velocidade | ✅ Conservador e seguro |
+| Warmup com 2 batches | Perfil completo de época | Baixo overhead, mas estimativa aproximada | ✅ Compatível com RNF-02 |
+| Logs JSON/JSONL opcionais | Logging estruturado obrigatório | Flexibilidade vs auditoria sempre ativa | ✅ Opt-in alinhado ao RF-12 |
+| `pynvml` opcional | Dependência obrigatória | Menos setup em CPU-only vs métricas GPU pobres | ✅ Alinhado ao fallback CPU-only |
+
 ## 6. Riscos e Mitigações
 
+| Risco | Probabilidade | Impacto | Mitigação atual | Recomendação |
+|-------|---------------|---------|-----------------|--------------|
+| GPU indisponível | Alta em laptops/CPU-only | Média | Fallback para `cpu`/`float32` | ✅ Adequada |
+| Estimativa de memória otimista | Média | Média | Fator de segurança 0.75 | Considerar fator configurável |
+| Falha no SLHA quebra treino | Baixa | Alto | Try/except no monitor e discovery | ✅ Adequada |
+| Ambiente Python 3.13+ | Média | Alto | Restrição em `pyproject.toml` | ✅ Resolvido na frente de onboarding |
+| Overhead de warmup > 5% | Baixa | Média | Timeout 30s, max 2 batches | Medir em benchmark futuro |
+
 ## 7. Recomendações e Ações
+
+### Ações imediatas (alto retorno)
+1. **Documentar o fator de segurança de memória** em `docs/Camada-04-Modelagem-v1.1.md` ou SDD.
+2. **Adicionar benchmark de overhead de warmup** para validar RNF-02.
+3. **Garantir que CI execute testes SLHA** em ambiente Python 3.12.
+
+### Ações futuras (médio retorno)
+4. Expor `memory_safety_factor` como parâmetro de `decide_training_config`.
+5. Adicionar testes de stress para monitor em alta carga de CPU/RAM.
+6. Avaliar `pynvml` como dependência dev opcional para métricas GPU completas.
+
+### Não fazer
+- Não introduzir PyTorch Lightning, Nsight, DLProf, LOTUS ou JAX (proibido pelo RNF-08).
+- Não tornar SLHA obrigatório (violaria RF-12).
