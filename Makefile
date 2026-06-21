@@ -1,4 +1,4 @@
-.PHONY: help env download-all download-chapman download-mitbih mirror mirror-restore \
+.PHONY: help env setup doctor dev download-all download-chapman download-mitbih mirror mirror-restore \
         catalog qg0 dlq-replay test clean clean-raw clean-mirrors \
         process pretrain finetune quantize export provenance all \
         docker-build docker-run docker-shell pre-commit-install lint format type-check \
@@ -23,6 +23,17 @@ DATA    := data
 help: ## Show this help message
 	@echo "Project-Lewis Makefile targets:"
 	@grep -E '^[a-zA-Z0-9_-]+:.*##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  %-24s %s\n", $$1, $$2}'
+
+# ---------------------------------------------------------------------------
+# Onboarding
+# ---------------------------------------------------------------------------
+setup: env pre-commit-install ## Setup completo para novo contribuinte
+
+doctor: ## Verifica se o ambiente local atende aos pre-requisitos
+	$(PYTHON) scripts/check_environment.py
+
+dev: ## Abre shell no container Docker de desenvolvimento
+	docker compose up -d app && docker compose exec app bash
 
 # ---------------------------------------------------------------------------
 # Ambiente reprodutível (uv)
