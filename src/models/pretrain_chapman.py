@@ -22,6 +22,13 @@ from .backbone_1d import build_backbone_1d_multilabel, save_model_config
 LOGGER = logging.getLogger("lewis.camada04.pretrain")
 
 
+def _maybe_import_slha():
+    """Importa o SLHA apenas quando necessário (lazy)."""
+    from src.models import slha
+
+    return slha
+
+
 def _set_seeds(seed: int = 42) -> None:
     """Fixa seeds para reprodutibilidade."""
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -80,6 +87,7 @@ def pretrain_chapman(
     learning_rate: float = 1e-3,
     seed: int = 42,
     experiment_dir: Optional[Path] = None,
+    use_slha: bool = False,
 ) -> Tuple[tf.keras.Model, dict]:
     """Pré-treina backbone em Chapman-Shaoxing (multi-label).
 
@@ -152,6 +160,24 @@ def pretrain_chapman(
 
     # Callbacks
     callbacks = _make_callbacks(experiment_dir)
+
+    # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
+    if use_slha:
+        slha = _maybe_import_slha()
+        gen = data_generator()
+        X_sample, y_sample = next(gen)
+        config = slha.auto_configure_training(
+            X_sample=X_sample[:8],
+            y_sample=y_sample[:8],
+            model=model,
+            reference_batch_size=batch_size,
+            log_dir=experiment_dir / "slha",
+        )
+        batch_size = config.batch_size
+        LOGGER.info("SLHA config: %s", config.model_dump_json())
+        callbacks.append(
+            slha.ResourceMonitor(log_path=experiment_dir / "slha" / "resource_logs.jsonl")
+        )
 
     # Treinar
     history = model.fit(

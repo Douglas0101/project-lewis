@@ -23,6 +23,13 @@ from .backbone_1d import freeze_conv_layers, save_model_config
 LOGGER = logging.getLogger("lewis.camada04.finetune")
 
 
+def _maybe_import_slha():
+    """Importa o SLHA apenas quando necessário (lazy)."""
+    from src.models import slha
+
+    return slha
+
+
 def _set_seeds(seed: int = 42) -> None:
     """Fixa seeds para reprodutibilidade."""
     os.environ["PYTHONHASHSEED"] = str(seed)
@@ -100,6 +107,7 @@ def finetune_mitbih(
     seed: int = 42,
     experiment_dir: Optional[Path] = None,
     monitor: str = "val_loss",
+    use_slha: bool = False,
 ) -> Tuple[tf.keras.Model, dict]:
     """Fine-tuning com backbone congelado.
 
@@ -168,6 +176,23 @@ def finetune_mitbih(
 
     # Callbacks
     callbacks = _make_callbacks(experiment_dir, monitor=monitor)
+
+    # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
+    if use_slha:
+        slha = _maybe_import_slha()
+        n_sample = min(8, len(X_train))
+        config = slha.auto_configure_training(
+            X_sample=X_train[:n_sample],
+            y_sample=y_train[:n_sample],
+            model=model,
+            reference_batch_size=batch_size,
+            log_dir=experiment_dir / "slha",
+        )
+        batch_size = config.batch_size
+        LOGGER.info("SLHA config: %s", config.model_dump_json())
+        callbacks.append(
+            slha.ResourceMonitor(log_path=experiment_dir / "slha" / "resource_logs.jsonl")
+        )
 
     # Treinar
     history = model.fit(
