@@ -13,6 +13,10 @@ Plano de execução de tasks decompostas. Atualizar a cada sessão.
 
 ## Concluídas
 
+- [x] 2026-06-21 — Conferência em engenharia aplicada do SLHA vs SDD v2.0
+  - Documento: `docs/superpowers/conferencias/2026-06-21-slha-applied-engineering-review.md`
+  - RF-01..RF-12 e RNF-01..RNF-08 revisados e rastreados
+  - Análise por camada, trade-offs, riscos e recomendações documentados
 - [x] 2026-06-21 — Onboarding e execução intuitiva em equipe
   - Targets auto-documentados no Makefile (`make help`, `make setup`, `make doctor`, `make dev`)
   - Script `scripts/check_environment.py` para checagem de ambiente
