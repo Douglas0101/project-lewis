@@ -17,10 +17,16 @@ LOGGER = logging.getLogger("lewis.slha.monitor")
 class ResourceMonitor(tf.keras.callbacks.Callback):
     """Loga uso de CPU/RAM/GPU a cada epoch sem interromper o treino."""
 
-    def __init__(self, log_path: Optional[Path] = None, alert_cpu_threshold: float = 95.0):
+    def __init__(
+        self,
+        log_path: Optional[Path] = None,
+        alert_cpu_threshold: float = 95.0,
+        alert_ram_threshold: float = 95.0,
+    ):
         super().__init__()
         self.log_path = Path(log_path) if log_path else None
         self.alert_cpu_threshold = alert_cpu_threshold
+        self.alert_ram_threshold = alert_ram_threshold
         self._process = psutil.Process()
 
     def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
@@ -45,21 +51,31 @@ class ResourceMonitor(tf.keras.callbacks.Callback):
         # psutil pode retornar valores > 100 em CPUs multi-core; normalizar para escala 0-100.
         cpu_percent = max(0.0, min(100.0, cpu_percent))
         ram_used_gb = self._process.memory_info().rss / (1024**3)
+        system_ram = psutil.virtual_memory()
+        ram_percent = system_ram.percent
+
         alerts = []
         if cpu_percent > self.alert_cpu_threshold:
             alerts.append(f"CPU acima de {self.alert_cpu_threshold}%")
+        if ram_percent > self.alert_ram_threshold:
+            alerts.append(f"RAM do sistema acima de {self.alert_ram_threshold}%")
 
         gpu_util = None
         gpu_mem_used = None
         gpu_mem_total = None
         try:
-            import tensorflow as tf
-
             gpus = tf.config.list_physical_devices("GPU")
             if gpus:
                 # tf não expõe utilização percentual facilmente sem pynvml.
                 # Deixamos como None quando pynvml não está disponível.
                 gpu_mem_total = self._try_gpu_memory_total()
+                if gpu_mem_total:
+                    gpu_info = self._try_gpu_memory_info()
+                    if gpu_info:
+                        gpu_mem_used = gpu_info.get("used_mb")
+                        gpu_util = gpu_info.get("util_percent")
+                        if gpu_mem_used and (gpu_mem_used / gpu_mem_total) > 0.95:
+                            alerts.append("GPU memory acima de 95%")
         except Exception:
             LOGGER.debug("Não foi possível detectar memória GPU", exc_info=True)
 
@@ -81,5 +97,23 @@ class ResourceMonitor(tf.keras.callbacks.Callback):
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
             info = pynvml.nvmlDeviceGetMemoryInfo(handle)
             return float(info.total) / (1024 * 1024)
+        except Exception:
+            return None
+
+    def _try_gpu_memory_info(self) -> Optional[dict]:
+        try:
+            import pynvml
+
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            mem_info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            used_mb = float(mem_info.used) / (1024 * 1024)
+            util_percent = None
+            try:
+                util = pynvml.nvmlDeviceGetUtilizationRates(handle)
+                util_percent = float(util.gpu)
+            except Exception:
+                LOGGER.debug("Não foi possível ler utilização GPU", exc_info=True)
+            return {"used_mb": used_mb, "util_percent": util_percent}
         except Exception:
             return None
