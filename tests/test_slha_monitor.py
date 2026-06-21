@@ -26,6 +26,11 @@ def _tiny_model():
     return model
 
 
+class ExplodingMonitor(ResourceMonitor):
+    def _build_log(self, epoch):
+        raise RuntimeError("injected failure")
+
+
 def test_monitor_writes_resource_logs():
     X, y = _tiny_dataset()
     model = _tiny_model()
@@ -40,3 +45,12 @@ def test_monitor_writes_resource_logs():
             assert "epoch" in entry
             assert "cpu_percent" in entry
             assert "ram_used_gb" in entry
+
+
+def test_monitor_failure_does_not_stop_training():
+    X, y = _tiny_dataset()
+    model = _tiny_model()
+    monitor = ExplodingMonitor()
+    history = model.fit(X, y, epochs=2, batch_size=4, callbacks=[monitor], verbose=0)
+    assert history.history["loss"]
+    assert len(history.history["loss"]) == 2
