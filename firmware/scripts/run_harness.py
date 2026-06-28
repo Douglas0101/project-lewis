@@ -84,7 +84,11 @@ def parse_output(text: str) -> dict:
 
 
 def build_native() -> int:
-    r = run(["make", str(HARNESS_ELF_NATIVE)], cwd=FIRMWARE_ROOT, timeout=300)
+    r = run(
+        ["make", str(HARNESS_ELF_NATIVE), "LEWIS_USE_TFLM=1"],
+        cwd=FIRMWARE_ROOT,
+        timeout=300,
+    )
     if r.returncode != 0:
         print(r.stdout)
         print(r.stderr, file=sys.stderr)
@@ -92,7 +96,11 @@ def build_native() -> int:
 
 
 def build_renode() -> int:
-    r = run(["make", str(HARNESS_BIN_STM)], cwd=FIRMWARE_ROOT, timeout=300)
+    r = run(
+        ["make", str(HARNESS_BIN_STM), "LEWIS_USE_TFLM=1", "RENODE_SIMULATION=1"],
+        cwd=FIRMWARE_ROOT,
+        timeout=300,
+    )
     if r.returncode != 0:
         print(r.stdout)
         print(r.stderr, file=sys.stderr)

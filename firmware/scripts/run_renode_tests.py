@@ -71,11 +71,15 @@ start
 
 
 def _compile_beat_re() -> re.Pattern:
-    """Regex tolerante para linhas de beat da UART."""
+    """Regex tolerante para linhas de beat da UART (two-stage v2.0).
+
+    Aceita tanto ``output=[...]`` (formato atual) quanto ``output [...]``
+    (formato legado usado em logs de teste), com espacamento flexivel.
+    """
     return re.compile(
         r"Beat\s+(?P<idx>\d+)\s*:\s*(?P<time>\d+)\s*ms"
-        r"(?:\s*\(\s*(?P<us>\d+)\s*(?:us|us|us)?\s*\))?"
-        r"\s*,?\s+output\s*\[\s*(?P<values>[-\d,\s]+)\s*\]",
+        r"(?:\s*\(\s*(?P<us>\d+)\s*us\s*\))?"
+        r"\s*,\s*class=\w+\s*,\s*output\s*=?\s*\[\s*(?P<values>[-\d,\s]+)\s*\]",
         re.IGNORECASE,
     )
 
@@ -94,8 +98,8 @@ def parse_uart_log(log_text):
     }
 
     header_re = re.compile(r"===\s*Project-Lewis\s+Firmware\s+v(?P<version>[\d.]+)\s*===")
-    model_re = re.compile(r"Model\s+size\s*:\s*(?P<size>\d+)\s*bytes")
-    init_ok_re = re.compile(r"Inference\s+init\s+OK", re.IGNORECASE)
+    model_re = re.compile(r"Model\s+size\s*(?:\([^)]*\))?\s*:\s*(?P<size>\d+)\s*bytes")
+    init_ok_re = re.compile(r"Stage1\s+inference\s+init\s+OK", re.IGNORECASE)
     arena_re = re.compile(r"Arena\s+used\s*:\s*(?P<arena>\d+)\s*bytes")
     beat_re = _compile_beat_re()
     end_re = re.compile(r"===\s*Fim\s*===")
@@ -136,10 +140,11 @@ def parse_uart_log(log_text):
 
 def check_report(parsed, expected_beats=3):
     """Avalia checks estruturais."""
+    model_size = parsed["model_size_bytes"]
     checks = {
         "header": parsed["header"],
-        "model_size": parsed["model_size_bytes"] is not None
-        and parsed["model_size_bytes"] < 64 * 1024,
+        # Two-stage v2.0: soma dos FlatBuffers (stage1+stage2) deve caber na Flash.
+        "model_size": model_size is not None and model_size < 512 * 1024,
         "inference_init": parsed["inference_init"],
         "beats": len(parsed["beats"]) >= expected_beats,
         "end": parsed["end"],

@@ -15,7 +15,7 @@ INPUT_SAMPLES = 500
 INPUT_BYTES = INPUT_SAMPLES * 4
 START_BYTE = 0x3C  # '<'
 END_BYTE = 0x3E  # '>'
-RESPONSE_LEN = 5
+RESPONSE_LEN = 3
 START_DELAY_S = 0.1   # tempo para o firmware entrar em infer_from_uart
 BYTE_DELAY_S = 0.02   # evita overflow do buffer FIFO da UART emulada
 
