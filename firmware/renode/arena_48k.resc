@@ -20,8 +20,9 @@ machine LoadPlatformDescriptionFromString $sram_desc
 cpu PerformanceInMips 125
 
 # Carrega o firmware compilado.
-# O caminho padrao eh absoluto para funcionar independentemente do CWD.
-$lewis_bin=@/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/build/stm32f4/lewis_48k.bin
+# Caminho relativo ao diretorio deste script (.resc) para funcionar em qualquer
+# workspace (CI, worktree, maquina de desenvolvimento).
+$lewis_bin=@../../build/stm32f4/lewis_48k.bin
 sysbus LoadBinary $lewis_bin 0x08000000
 
 # Configura o vetor de reset para o inicio da Flash.

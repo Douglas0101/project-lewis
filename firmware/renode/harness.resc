@@ -5,7 +5,9 @@ mach create "stm32f4discovery-lewis-harness"
 
 include @scripts/single-node/stm32f4_discovery.resc
 
-$lewis_bin=@/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/build/stm32f4/lewis_harness.bin
+# Caminho relativo ao diretorio deste script (.resc) para funcionar em qualquer
+# workspace (CI, worktree, maquina de desenvolvimento).
+$lewis_bin=@../../build/stm32f4/lewis_harness.bin
 sysbus LoadBinary $lewis_bin 0x08000000
 
 cpu VectorTableOffset 0x08000000

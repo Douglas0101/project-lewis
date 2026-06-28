@@ -7,9 +7,10 @@ mach create "stm32f4discovery-lewis"
 include @scripts/single-node/stm32f4_discovery.resc
 
 # Carrega o firmware compilado.
-# O caminho padrao eh absoluto para funcionar independentemente do CWD.
-# Os testes Robot podem sobrescrever $lewis_bin com `Execute Command` antes do script.
-$lewis_bin=@/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/build/stm32f4/lewis.bin
+# Caminho relativo ao diretorio deste script (.resc) para funcionar em qualquer
+# workspace (CI, worktree, maquina de desenvolvimento). Os testes Robot podem
+# sobrescrever $lewis_bin com `Execute Command` antes do script.
+$lewis_bin=@../../build/stm32f4/lewis.bin
 sysbus LoadBinary $lewis_bin 0x08000000
 
 # Configura o vetor de reset para o inicio da Flash.
