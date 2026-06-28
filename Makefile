@@ -6,6 +6,7 @@
         firmware-run firmware-test hard-gates hard-gates-ci check-strict-markers check-no-stub \
         verify-renode \
         knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
+        knowledge-reindex-if-docs-changed \
         memory-commit
 
 # Detecta ambiente virtual se existente; caso contrário usa python3/pytest do sistema.
@@ -218,6 +219,17 @@ knowledge-clean:
 
 knowledge-validate:
 	$(UV) run python scripts/validate_knowledge_index.py
+
+knowledge-reindex-if-docs-changed:
+	@mkdir -p data/lineage
+	@CURRENT=$$(find docs src/knowledge -type f \( -name '*.md' -o -name '*.py' \) | sort | xargs sha256sum | sha256sum | awk '{print $$1}'); \
+	if [ -f data/lineage/.knowledge_checksum ] && [ "$$(cat data/lineage/.knowledge_checksum)" = "$$CURRENT" ]; then \
+		echo "[C11] Knowledge sources unchanged; skipping reindex."; \
+	else \
+		echo "[C11] Knowledge sources changed; reindexing..."; \
+		$(UV) run python -m src.knowledge.cli reindex; \
+		echo "$$CURRENT" > data/lineage/.knowledge_checksum; \
+	fi
 
 # ---------------------------------------------------------------------------
 # Memory / ArtifactRegistry

@@ -10,14 +10,10 @@ from typing import Any, Dict, Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
-ExperimentStage = Literal[
-    "pretrain", "stage1", "stage2", "finetune", "two_stage", "inference"
-]
+ExperimentStage = Literal["pretrain", "stage1", "stage2", "finetune", "two_stage", "inference"]
 RunType = Literal["train", "val", "test", "summary", "inference"]
 Severity = Literal["info", "warning", "critical"]
-AlertCategory = Literal[
-    "performance_drop", "qg_failure", "resource_fault", "anomaly"
-]
+AlertCategory = Literal["performance_drop", "qg_failure", "resource_fault", "anomaly"]
 Status = Literal["running", "completed", "failed"]
 
 
@@ -191,6 +187,32 @@ class AlertOut(_Base):
     recorded_at: datetime
     resolved: bool
     resolved_at: Optional[datetime]
+    extra: Optional[Dict[str, Any]]
+
+
+class ArtifactCreate(_Base):
+    """Dados para criação de artefato."""
+
+    run_id: int
+    artifact_type: str = Field(..., min_length=1, max_length=64)
+    path: str = Field(..., min_length=1, max_length=512)
+    checksum: str = Field(..., min_length=1, max_length=64)
+    name: Optional[str] = Field(default=None, max_length=255)
+    dvc_status: Optional[str] = Field(default="untracked", max_length=32)
+    extra: Optional[Dict[str, Any]] = None
+
+
+class ArtifactOut(_Base):
+    """Representação de artefato."""
+
+    id: int
+    run_id: int
+    name: Optional[str]
+    artifact_type: str
+    path: str
+    checksum: str
+    dvc_status: str
+    recorded_at: datetime
     extra: Optional[Dict[str, Any]]
 
 
