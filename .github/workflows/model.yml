@@ -43,34 +43,28 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
+          enable-cache: true
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest dvc
+        run: uv sync --frozen
 
       - name: Configure DVC remote (stub)
         run: |
-          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - name: Pull Chapman dataset
-        run: dvc pull data/raw_chapman.dvc
+        run: uv run dvc pull data/raw_chapman.dvc
 
       - name: QG4 — Pré-treino
         run: |
-          pytest tests/test_pretrain.py -m qg4 --tb=short
+          uv run pytest tests/test_pretrain.py -m qg4 --tb=short
 
       - name: Upload pretrain artifact
         if: always()
@@ -94,30 +88,24 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
+          enable-cache: true
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest dvc
+        run: uv sync --frozen
 
       - name: Configure DVC remote (stub)
         run: |
-          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - name: Pull datasets via DVC
-        run: dvc pull
+        run: uv run dvc pull
 
       - name: Download pretrain artifact
         uses: actions/download-artifact@v4
@@ -126,7 +114,7 @@ jobs:
           path: models/
 
       - name: QG5 — Fine-tuning
-        run: pytest tests/test_finetune.py -m qg5 --tb=short
+        run: uv run pytest tests/test_finetune.py -m qg5 --tb=short
 
       - name: Upload finetune artifact
         if: always()
@@ -152,30 +140,24 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
+          enable-cache: true
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest dvc
+        run: uv sync --frozen
 
       - name: Configure DVC remote (stub)
         run: |
-          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - name: Pull datasets via DVC
-        run: dvc pull
+        run: uv run dvc pull
 
       - name: Download finetune artifact
         uses: actions/download-artifact@v4
@@ -184,12 +166,12 @@ jobs:
           path: models/
 
       - name: QG6 — Quantização
-        run: pytest tests/test_quantization.py -m qg6 --tb=short
+        run: uv run pytest tests/test_quantization.py -m qg6 --tb=short
 
       - name: Export TFLM deliverables
         run: |
-          make quantize
-          make export
+          uv run make quantize
+          uv run make export
 
       - name: Upload firmware artifacts
         if: always()

@@ -22,6 +22,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Cache datasets
         uses: actions/cache@v4
         with:
@@ -37,10 +42,7 @@ jobs:
             datasets-
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+        run: uv sync --frozen
 
       - name: Restore from mirror (offline-safe)
         run: |
@@ -49,14 +51,14 @@ jobs:
           fi
 
       - name: Build catalog
-        run: python -c "from src.data._catalog import build_catalog; build_catalog()"
+        run: uv run python -c "from src.data._catalog import build_catalog; build_catalog()"
 
       - name: Quality Gate QG0
         env:
           LEWIS_REQUIRE_DATA: "1"
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-        run: make qg0
+        run: uv run make qg0
 
       - name: Upload QG0 artifacts
         if: always()
