@@ -5,7 +5,8 @@
         firmware-deps firmware-tflm firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
         firmware-run firmware-test hard-gates hard-gates-ci check-strict-markers check-no-stub \
         verify-renode \
-        knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate
+        knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
+        memory-commit
 
 # Detecta ambiente virtual se existente; caso contrário usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
@@ -217,6 +218,12 @@ knowledge-clean:
 
 knowledge-validate:
 	$(UV) run python scripts/validate_knowledge_index.py
+
+# ---------------------------------------------------------------------------
+# Memory / ArtifactRegistry
+# ---------------------------------------------------------------------------
+memory-commit:
+	$(UV) run python scripts/memory_commit.py --run-id $(RUN_ID) --path $(ARTIFACT_PATH) --type $(ARTIFACT_TYPE)
 
 all: env download-all catalog test quality-report
 
