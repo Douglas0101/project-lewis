@@ -63,6 +63,10 @@ def _resolve_arm_toolchain() -> Path | None:
 class TestQG7Build:
     def test_firmware_build_zero_warnings(self):
         """QG7: build STM32F4 com -Werror deve terminar com sucesso."""
+        if _resolve_arm_toolchain() is None:
+            pytest.skip(
+                "Toolchain ARM nao encontrado (defina ARM_TOOLCHAIN ou verifique firmware/tools)"
+            )
         subprocess.run(
             ["make", "-C", str(FIRMWARE_ROOT), "LEWIS_USE_TFLM=1", "stm32f4"],
             check=True,
