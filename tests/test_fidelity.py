@@ -35,16 +35,10 @@ def _load_quant_params():
     """Carrega parametros de quantizacao do modelo a partir do JSON exportado."""
     path = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
     if not path.exists():
-        raise FileNotFoundError(f"Parametros de quantizacao nao encontrados: {path}")
+        pytest.skip(f"Parametros de quantizacao nao encontrados: {path}")
     data = json.loads(path.read_text(encoding="utf-8"))
     return data["input"], data["output"]
 
-
-INPUT_QUANT, OUTPUT_QUANT = _load_quant_params()
-INPUT_SCALE = INPUT_QUANT["scale"]
-INPUT_ZERO_POINT = INPUT_QUANT["zero_point"]
-OUTPUT_SCALE = OUTPUT_QUANT["scale"]
-OUTPUT_ZERO_POINT = OUTPUT_QUANT["zero_point"]
 
 # Limiares QG10.
 MIN_COSINE_SIMILARITY = 0.99
@@ -212,9 +206,18 @@ class TestFidelity:
             timeout=300,
         )
 
+    @pytest.fixture(scope="class")
+    def quant_params(self) -> tuple[dict, dict]:
+        """Fornece escalas e zero-points de quantizacao (lazy load)."""
+        return _load_quant_params()
+
     @pytest.mark.parametrize("idx", [0, 1, 2, 3, 4])
-    def test_beat_fidelity(self, idx: int) -> None:
+    def test_beat_fidelity(self, idx: int, quant_params: tuple[dict, dict]) -> None:
         """QG10: saida do firmware deve ser proxima a ground-truth Python."""
+        input_quant, output_quant = quant_params
+        output_scale = output_quant["scale"]
+        output_zero_point = output_quant["zero_point"]
+
         expected_path = GROUND_TRUTH_DIR / f"expected_output_{idx:02d}.bin"
         if not expected_path.exists():
             pytest.skip(
@@ -233,8 +236,8 @@ class TestFidelity:
             f"Resposta inesperada: {firmware_int8.shape}"
         )
 
-        expected_f32 = _dequantize(expected_int8, OUTPUT_SCALE, OUTPUT_ZERO_POINT)
-        firmware_f32 = _dequantize(firmware_int8, OUTPUT_SCALE, OUTPUT_ZERO_POINT)
+        expected_f32 = _dequantize(expected_int8, output_scale, output_zero_point)
+        firmware_f32 = _dequantize(firmware_int8, output_scale, output_zero_point)
 
         cosine = _cosine_similarity(expected_f32, firmware_f32)
         mae = float(np.mean(np.abs(expected_f32 - firmware_f32)))
