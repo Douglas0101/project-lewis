@@ -57,7 +57,7 @@ class FidelityKeywords:
         # Fim de frame
         self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {END_BYTE}")
 
-    def wait_for_response_in_log(self, log_path: str, timeout: float = 30.0) -> None:
+    def wait_for_response_in_log(self, log_path: str, timeout: float = 180.0) -> None:
         """Aguarda ate que ``log_path`` contenha uma resposta ``<5xint8>``.
 
         A saida do firmware e escrita no arquivo de backend da UART. Este

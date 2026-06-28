@@ -145,7 +145,7 @@ static uint8_t uart_read_byte(void)
 }
 
 #define UART_BYTE_TIMEOUT_MS 100
-#define UART_FRAME_TIMEOUT_MS 60000
+#define UART_FRAME_TIMEOUT_MS 180000
 
 static bool uart_read_byte_timeout(uint8_t *out, uint32_t timeout_ms)
 {
