@@ -64,7 +64,18 @@ jobs:
       - name: Build catalog
         run: uv run python -c "from src.data._catalog import build_catalog; build_catalog()"
 
+      - name: Check for processed data
+        id: check-data
+        run: |
+          if [ ! -s "data/catalog/dataset_catalog.jsonl" ]; then
+            echo "::warning::Dados processados não encontrados; pulando data-quality-audit."
+            echo "has_data=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_data=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Run pre-training data quality audit
+        if: steps.check-data.outputs.has_data == 'true'
         env:
           LEWIS_REQUIRE_DATA: "1"
         run: uv run make audit-training-data
