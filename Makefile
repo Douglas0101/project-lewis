@@ -2,7 +2,7 @@
         catalog qg0 dlq-replay test clean clean-raw clean-mirrors \
         process pretrain finetune quantize export provenance all \
         docker-build docker-run docker-shell pre-commit-install lint format type-check \
-        firmware-deps firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
+        firmware-deps firmware-tflm firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
         firmware-run firmware-test hard-gates hard-gates-ci check-strict-markers check-no-stub \
         verify-renode \
         knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate
@@ -17,6 +17,7 @@ else
 endif
 UV      := uv
 DATA    := data
+FIRMWARE_DIR := firmware
 
 # ---------------------------------------------------------------------------
 # Ambiente reprodutível (uv)
@@ -140,6 +141,9 @@ verify-renode:
 
 firmware-deps:
 	$(MAKE) -C firmware firmware-deps
+
+firmware-tflm:
+	$(FIRMWARE_DIR)/scripts/install_tflm.sh
 
 firmware-tflm-lib:
 	$(MAKE) -C firmware tflm-lib

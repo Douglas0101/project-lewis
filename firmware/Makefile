@@ -154,6 +154,12 @@ $(BUILD_STM)/lewis.elf: $(OBJECTS_STM) $(OBJECTS_STM_CXX)
 $(BUILD_STM)/lewis.bin: $(BUILD_STM)/lewis.elf
 	$(OBJCOPY) -O binary $< $@
 
+# Quando TFLM esta ativo, o build do firmware depende da biblioteca ja gerada.
+ifeq ($(LEWIS_USE_TFLM),1)
+$(BUILD_STM)/lewis.elf: tflm-lib
+$(BUILD_STM)/lewis_48k.elf: tflm-lib
+endif
+
 # ---------------------------------------------------------------------------
 # TFLM
 # ---------------------------------------------------------------------------

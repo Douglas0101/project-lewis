@@ -93,5 +93,6 @@ firmware/tools/renode_*/
 firmware/data/
 firmware/tools/
 firmware/third_party/
+!firmware/third_party/tflite-micro.commit
 firmware/test_harness_report.json
 

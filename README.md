@@ -343,6 +343,7 @@ O relatório é gerado em `firmware/test_harness_report.json` com o resumo `nati
 
 ```bash
 make firmware-deps     # ARM GCC 13.3 + Renode 1.15.3
+make firmware-tflm     # clone + build do TensorFlow Lite Micro (host + ARM)
 make firmware-build    # ELF para STM32F4
 make firmware-test     # 5 s de simulação headless
 make hard-gates        # Hard Gates HG-01..HG-06
@@ -410,7 +411,8 @@ project-lewis/
 │   ├── scripts/           # runners Renode
 │   ├── tests/             # testes HIL
 │   ├── Makefile
-│   └── third_party/       # tflite-micro
+│   ├── third_party/       # tflite-micro (clonado em build time, ver .commit)
+│   └── tools/             # ARM GCC e Renode (instalados localmente)
 ├── models/                # Modelos treinados e quantizados
 │   ├── stage1_float32_v2.0.keras
 │   ├── stage2_float32_v2.0.keras
@@ -489,6 +491,7 @@ make export         # headers C
 ```bash
 cd firmware
 make firmware-deps
+make firmware-tflm
 make firmware-build
 make firmware-test
 make harness           # test harness native + renode

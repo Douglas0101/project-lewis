@@ -49,6 +49,18 @@ jobs:
       - name: Install firmware tooling
         run: uv run make firmware-deps
 
+      - name: Cache TFLM build
+        id: cache-tflm
+        uses: actions/cache@v4
+        with:
+          path: firmware/third_party/tflite-micro
+          key: tflm-${{ runner.os }}-${{ hashFiles('firmware/third_party/tflite-micro.commit', 'firmware/scripts/install_tflm.sh') }}
+          restore-keys: |
+            tflm-${{ runner.os }}-
+
+      - name: Install / cache TFLM
+        run: uv run make firmware-tflm
+
       - name: Verify Renode Version
         run: uv run make verify-renode
 

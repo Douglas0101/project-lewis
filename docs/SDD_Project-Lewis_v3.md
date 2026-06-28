@@ -42,7 +42,7 @@ O Project-Lewis é um sistema de classificação de arritmias cardíacas via ECG
 | Container | Docker, docker-compose | latest | Reprodutibilidade total |
 | Versionamento Dados | DVC | latest | `.dvc` no Git; binários em S3/GCS |
 | Firmware | C (C99/C11), arm-none-eabi-gcc | 13.3.rel1 | Bare-metal, sem newlib printf |
-| ML Embarcado | TensorFlow Lite Micro (TFLM) | latest | Source em `third_party/tflite-micro/` |
+| ML Embarcado | TensorFlow Lite Micro (TFLM) | latest | Source em `firmware/third_party/tflite-micro/`, pinado por `firmware/third_party/tflite-micro.commit` |
 | DSP Embarcado | CMSIS-DSP, CMSIS-NN | latest | Aceleração Cortex-M4F |
 | Simulação | Renode | 1.15.3 | Emulação fiel STM32F4Discovery |
 | AFE | ADS1292R | — | 1 canal, 500 SPS, referência real |

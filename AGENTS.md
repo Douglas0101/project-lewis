@@ -17,7 +17,7 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 | Container | Docker, docker-compose | Reprodutibilidade |
 | Dados | DVC (remote local `~/.cache/project-lewis-dvc`; S3/GCS opcional) | Versionamento de datasets |
 | Firmware | C/C++ bare-metal, arm-none-eabi-gcc 13.3.rel1 | Bare-metal |
-| ML Embarcado | TFLM, CMSIS-DSP, CMSIS-NN | Aceleração Cortex-M4F |
+| ML Embarcado | TFLM, CMSIS-DSP, CMSIS-NN | Aceleração Cortex-M4F; TFLM clonado em `firmware/third_party/tflite-micro/` e pinado por `firmware/third_party/tflite-micro.commit` |
 | Simulação | Renode 1.15.3 | Emulação fiel STM32F4 |
 | Hardware | STM32F407VG, ADS1292R | 168 MHz, 192KB SRAM, 1MB Flash |
 | Compliance | LGPD Lei 13.709/18 | Por design |
