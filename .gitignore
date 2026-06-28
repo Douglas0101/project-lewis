@@ -92,6 +92,11 @@ firmware/tools/renode_*/
 .opencode/
 .worktrees/
 
+# --- Notebooks ---
+notebooks/.ipynb_checkpoints/
+**/*.ipynb_checkpoints/
+*.nbconvert.ipynb
+
 # --- Firmware ---
 firmware/data/
 firmware/tools/

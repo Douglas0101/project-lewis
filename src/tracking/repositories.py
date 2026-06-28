@@ -12,10 +12,19 @@ from typing import Any, Dict, List, Optional, Sequence, cast
 from sqlalchemy import desc, func, select
 from sqlalchemy.orm import Session, joinedload
 
-from src.tracking.models import Alert, Experiment, HardwareSnapshot, Metric, Prediction, Run
+from src.tracking.models import (
+    Alert,
+    Artifact,
+    Experiment,
+    HardwareSnapshot,
+    Metric,
+    Prediction,
+    Run,
+)
 from src.tracking.schemas import (
     AlertCreate,
     AlertUpdate,
+    ArtifactCreate,
     ExperimentCreate,
     ExperimentUpdate,
     HardwareSnapshotCreate,
@@ -279,9 +288,7 @@ class HardwareSnapshotRepository:
         return entity
 
     def create_many(self, items: Sequence[HardwareSnapshotCreate]) -> List[HardwareSnapshot]:
-        entities = [
-            HardwareSnapshot(**item.model_dump(exclude_unset=True)) for item in items
-        ]
+        entities = [HardwareSnapshot(**item.model_dump(exclude_unset=True)) for item in items]
         self.session.add_all(entities)
         self.session.flush()
         return entities
@@ -292,6 +299,36 @@ class HardwareSnapshotRepository:
             .where(HardwareSnapshot.run_id == run_id)
             .order_by(HardwareSnapshot.recorded_at)
         )
+        return self.session.execute(stmt).scalars().all()
+
+
+class ArtifactRepository:
+    """CRUD de artefatos versionados."""
+
+    def __init__(self, session: Session):
+        self.session = session
+
+    def create(self, data: ArtifactCreate) -> Artifact:
+        entity = Artifact(**data.model_dump(exclude_unset=True))
+        self.session.add(entity)
+        self.session.flush()
+        return entity
+
+    def get(self, artifact_id: int) -> Optional[Artifact]:
+        return self.session.get(Artifact, artifact_id)
+
+    def get_by_checksum(self, checksum: str) -> Optional[Artifact]:
+        stmt = select(Artifact).where(Artifact.checksum == checksum).limit(1)
+        return self.session.execute(stmt).scalars().first()
+
+    def list_by_run(
+        self,
+        run_id: int,
+        artifact_type: Optional[str] = None,
+    ) -> Sequence[Artifact]:
+        stmt = select(Artifact).where(Artifact.run_id == run_id).order_by(Artifact.recorded_at)
+        if artifact_type:
+            stmt = stmt.where(Artifact.artifact_type == artifact_type)
         return self.session.execute(stmt).scalars().all()
 
 

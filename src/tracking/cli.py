@@ -33,9 +33,7 @@ def _build_parser() -> argparse.ArgumentParser:
     show_parser = subparsers.add_parser("show-experiment", help="Mostra detalhes")
     show_parser.add_argument("experiment_id", type=int)
 
-    compare_parser = subparsers.add_parser(
-        "compare", help="Compara experimentos por uma métrica"
-    )
+    compare_parser = subparsers.add_parser("compare", help="Compara experimentos por uma métrica")
     compare_parser.add_argument("--stage", type=str, default=None)
     compare_parser.add_argument("--metric", type=str, default="F1_macro")
     compare_parser.add_argument("--limit", type=int, default=50)
@@ -85,10 +83,7 @@ def _cmd_list(args: argparse.Namespace) -> int:
         print("-" * 90)
         for exp in experiments:
             created = exp.created_at.isoformat() if exp.created_at else "-"
-            print(
-                f"{exp.id:<6} {exp.stage:<12} {exp.status:<10} "
-                f"{exp.name:<40} {created}"
-            )
+            print(f"{exp.id:<6} {exp.stage:<12} {exp.status:<10} " f"{exp.name:<40} {created}")
         return 0
     finally:
         session.close()
@@ -159,10 +154,7 @@ def _cmd_alerts(args: argparse.Namespace) -> int:
         for alert in alerts:
             run_id = alert.run_id if alert.run_id is not None else "-"
             msg = (alert.message or "")[:50]
-            print(
-                f"{alert.id:<6} {run_id:<6} {alert.severity:<10} "
-                f"{alert.category:<18} {msg}"
-            )
+            print(f"{alert.id:<6} {run_id:<6} {alert.severity:<10} " f"{alert.category:<18} {msg}")
         return 0
     finally:
         session.close()

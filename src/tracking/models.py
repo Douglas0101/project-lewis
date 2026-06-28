@@ -7,6 +7,7 @@ Tabelas:
 - prediction: predição individual (opcional, para auditoria).
 - alert: quedas, falhas de QG e anomalias.
 - hardware_snapshot: uso de recursos computacionais.
+- artifact: artefato versionado (modelo, scaler, relatório, etc.).
 """
 
 from __future__ import annotations
@@ -90,10 +91,11 @@ class Run(Base):
     predictions: Mapped[list["Prediction"]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
-    alerts: Mapped[list["Alert"]] = relationship(
+    alerts: Mapped[list["Alert"]] = relationship(back_populates="run", cascade="all, delete-orphan")
+    hardware_snapshots: Mapped[list["HardwareSnapshot"]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
-    hardware_snapshots: Mapped[list["HardwareSnapshot"]] = relationship(
+    artifacts: Mapped[list["Artifact"]] = relationship(
         back_populates="run", cascade="all, delete-orphan"
     )
 
@@ -104,9 +106,7 @@ class Metric(Base):
     __tablename__ = "metric"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(
-        ForeignKey("run.id", ondelete="CASCADE"), nullable=False
-    )
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
     namespace: Mapped[str] = mapped_column(
         String(32), default="global", comment="global, per_class, history"
     )
@@ -128,9 +128,7 @@ class Prediction(Base):
     __tablename__ = "prediction"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(
-        ForeignKey("run.id", ondelete="CASCADE"), nullable=False
-    )
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
     sample_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     true_label: Mapped[int | None] = mapped_column(Integer, nullable=True)
     predicted_label: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -186,9 +184,7 @@ class HardwareSnapshot(Base):
     __tablename__ = "hardware_snapshot"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    run_id: Mapped[int] = mapped_column(
-        ForeignKey("run.id", ondelete="CASCADE"), nullable=False
-    )
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
     cpu_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
     ram_used_gb: Mapped[float | None] = mapped_column(Float, nullable=True)
     gpu_utilization_percent: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -199,3 +195,25 @@ class HardwareSnapshot(Base):
     extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
     run: Mapped["Run"] = relationship(back_populates="hardware_snapshots")
+
+
+class Artifact(Base):
+    """Artefato versionado vinculado a uma run."""
+
+    __tablename__ = "artifact"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
+    name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    artifact_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    path: Mapped[str] = mapped_column(String(512), nullable=False)
+    checksum: Mapped[str] = mapped_column(String(64), nullable=False)
+    dvc_status: Mapped[str] = mapped_column(
+        String(32), default="untracked", comment="untracked, tracked, pushed"
+    )
+    recorded_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    extra: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
+    run: Mapped["Run"] = relationship(back_populates="artifacts")

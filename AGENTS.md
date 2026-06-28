@@ -18,6 +18,8 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 | Dados | DVC (remote local `~/.cache/project-lewis-dvc`; S3/GCS opcional) | Versionamento de datasets |
 | Firmware | C/C++ bare-metal, arm-none-eabi-gcc 13.3.rel1 | Bare-metal |
 | ML Embarcado | TFLM, CMSIS-DSP, CMSIS-NN | Aceleração Cortex-M4F; TFLM clonado em `firmware/third_party/tflite-micro/` e pinado por `firmware/third_party/tflite-micro.commit` |
+| Knowledge (C11) | sqlite-vec, sentence-transformers, MCP Python SDK | RAG local offline; sem LangChain/Chroma/typer |
+| Memory | `src/memory/` + tabela `Artifact` do tracking | Checksums SHA-256 e registro de artefatos por run |
 | Simulação | Renode 1.15.3 | Emulação fiel STM32F4 |
 | Hardware | STM32F407VG, ADS1292R | 168 MHz, 192KB SRAM, 1MB Flash |
 | Compliance | LGPD Lei 13.709/18 | Por design |
@@ -46,6 +48,7 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 8. **C08 — Firmware** — `docs/Camada-08-Firmware-v1.1.md`
 9. **C09 — Simulação/Energia** — `docs/Camada-09-Simulacao-v1.1.md` / `docs/Camada-09-Energia-v1.4.md`
 10. **C10 — Test Harness** — `docs/SDD_Project-Lewis_v3.md` (seção 3.10)
+11. **C11 — Knowledge Layer (RAG)** — `docs/SDD-C11-Knowledge-Impl-v2.0.md`
 
 ## Quality Gates (QG0–QG19)
 | QG | Camada | Critério | Threshold |
@@ -70,6 +73,8 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 | QG17 | C08/C10 | Pipeline C vs Python | Equivalência funcional |
 | QG18 | C08/C10 | Detector R-peak | Sens/PPV ≥ 90% vs AMPT Python |
 | QG19 | C09 | Consumo energético | < 50 mA médio, < 165 mJ/batimento, > 10 h autonomia |
+| QG-C11 | C11 | Knowledge index | DB < 500 MB, zero PII, MRR@5 ≥ 0.7, recall camada ≥ 0.9 |
+| QG-MEM | Memory | Artifact registry | Checksum único por artefato, path resolvível, FK para run |
 
 ## Regras de Ouro
 1. Nunca usar Radix UI

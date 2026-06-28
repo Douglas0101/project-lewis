@@ -139,9 +139,7 @@ def finish_tracking_run(
         if eval_result:
             record_evaluation_metrics(sess, run_id, eval_result)
             if experiment_id:
-                record_alert_on_qg_failure(
-                    sess, experiment_id, run_id, eval_result, stage_label
-                )
+                record_alert_on_qg_failure(sess, experiment_id, run_id, eval_result, stage_label)
 
 
 def record_fold_results(

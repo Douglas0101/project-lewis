@@ -7,6 +7,7 @@ A variável de ambiente ``LEWIS_TRACKING_DB`` pode sobrescrever o caminho.
 from __future__ import annotations
 
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Generator
 
@@ -46,6 +47,7 @@ def get_session(engine=None) -> Session:
     return get_sessionmaker(engine)()
 
 
+@contextmanager
 def session_scope(engine=None) -> Generator[Session, None, None]:
     """Context manager para sessões SQLAlchemy com rollback automático."""
     session = get_session(engine)

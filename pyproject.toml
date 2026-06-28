@@ -22,6 +22,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "absl-py>=2.0.0",
     "wfdb>=4.1.2",
     "numpy>=1.26.4",
     "scipy>=1.11.4",
@@ -41,6 +42,7 @@ dependencies = [
     "sqlite-vec>=0.1.0,<1.0.0",
     "mcp>=1.6.0,<2.0.0",
     "tf-keras>=2.21.0",
+    "tensorflow-model-optimization>=0.8.0,<0.9.0",
 ]
 
 [project.urls]
@@ -68,6 +70,7 @@ packages = ["src"]
 
 [tool.uv]
 default-groups = ["dev"]
+override-dependencies = ["absl-py>=2.0.0"]
 
 [tool.black]
 line-length = 100

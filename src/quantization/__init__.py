@@ -16,6 +16,7 @@ from src.quantization.ptq import (
     representative_dataset_stratified,
     validate_int8_io,
 )
+from src.quantization.representative_dataset import StratifiedRepresentativeDataset
 
 __all__ = [
     "calibrate",
@@ -26,6 +27,7 @@ __all__ = [
     "representative_dataset_factory",
     "representative_dataset_random",
     "representative_dataset_stratified",
+    "StratifiedRepresentativeDataset",
     "extract_quantization_params",
     "generate_c_header",
 ]
