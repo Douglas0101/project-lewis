@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
-"""Gera dataset versionado de ground-truth para teste de fidelidade QG10.
+"""Gera dataset versionado de ground-truth para teste de fidelidade QG10 (two-stage v2.0).
 
 Para cada batimento sintetico (``idx``):
   1. Obtem 500 amostras int8 do ``tests.fixtures.adc_stub.adc_stub_get_beat``.
   2. Dequantiza int8 -> float32 com os parametros de entrada do modelo.
   3. Salva o sinal float32 little-endian em ``ecg_input_{idx:02d}.bin``.
-  4. Re-quantiza float32 -> int8 usando a mesma formula do firmware.
-  5. Executa inferencia no interpretador TFLite Python (resolver BUILTIN_REF).
-  6. Salva os 5 logits/probabilidades int8 em ``expected_output_{idx:02d}.bin``.
+  4. Aplica pipeline DSP (bandpass/notch/zscore) e re-quantiza float32 -> int8.
+  5. Executa inferencia two-stage no interpretador TFLite Python (resolver BUILTIN_REF):
+     - Estagio 1: N (0) vs Anormal (1).
+     - Se Anormal, executa Estagio 2 (S/V/F) e salva os 3 logits int8.
+     - Se N, salva 3 zeros (S/V/F ausentes).
+  6. Salva a saida final de 3 int8 em ``expected_output_{idx:02d}.bin``.
 
 O dataset versionado permite reproduzir o teste de fidelidade (QG10) de
 forma deterministica, comparando a saida do firmware em Renode com a saida
@@ -49,7 +52,8 @@ INPUT_ZERO_POINT = INPUT_QUANT["zero_point"]
 OUTPUT_SCALE = OUTPUT_QUANT["scale"]
 OUTPUT_ZERO_POINT = OUTPUT_QUANT["zero_point"]
 
-MODEL_TFLITE = PROJECT_ROOT / "models" / "quantized" / "model_int8.tflite"
+STAGE1_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage1_int8_v2.0.tflite"
+STAGE2_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage2_int8_v2.0.tflite"
 GROUND_TRUTH_DIR = Path(__file__).resolve().parent
 
 
@@ -79,26 +83,35 @@ def save_int8_bin(path: Path, data: np.ndarray) -> None:
     path.write_bytes(data.astype(np.int8).tobytes())
 
 
-def load_python_interpreter() -> tf.lite.Interpreter:
+def load_python_interpreter(model_path: Path) -> tf.lite.Interpreter:
     """Carrega o modelo TFLite com resolver de referencia (BUILTIN_REF)."""
-    if not MODEL_TFLITE.exists():
-        raise FileNotFoundError(f"Modelo nao encontrado: {MODEL_TFLITE}")
+    if not model_path.exists():
+        raise FileNotFoundError(f"Modelo nao encontrado: {model_path}")
 
     interpreter = tf.lite.Interpreter(
-        model_path=str(MODEL_TFLITE),
+        model_path=str(model_path),
         experimental_op_resolver_type=tf.lite.experimental.OpResolverType.BUILTIN_REF,
     )
     interpreter.allocate_tensors()
     return interpreter
 
 
+def argmax_int8(values: np.ndarray) -> int:
+    """Argmax compativel com a implementacao C."""
+    return int(np.argmax(values))
+
+
 def generate_ground_truth(num_beats: int = 5) -> None:
     """Gera arquivos binarios de entrada e saida esperada para ``num_beats``."""
     GROUND_TRUTH_DIR.mkdir(parents=True, exist_ok=True)
-    interpreter = load_python_interpreter()
 
-    input_details = interpreter.get_input_details()[0]
-    output_details = interpreter.get_output_details()[0]
+    stage1 = load_python_interpreter(STAGE1_TFLITE)
+    stage2 = load_python_interpreter(STAGE2_TFLITE)
+
+    stage1_input_details = stage1.get_input_details()[0]
+    stage1_output_details = stage1.get_output_details()[0]
+    stage2_input_details = stage2.get_input_details()[0]
+    stage2_output_details = stage2.get_output_details()[0]
 
     for idx in range(num_beats):
         beat_int8 = adc_stub_get_beat(idx)
@@ -118,24 +131,33 @@ def generate_ground_truth(num_beats: int = 5) -> None:
         # 3. Re-quantiza float32 -> int8 com a mesma formula do firmware.
         input_quantized = quantize_float32_to_int8(beat_normalized, INPUT_SCALE, INPUT_ZERO_POINT)
 
-        # 4. Inferencia TFLite Python com resolver de referencia.
-        tensor = input_quantized.reshape(input_details["shape"]).astype(np.int8)
-        interpreter.set_tensor(input_details["index"], tensor)
-        interpreter.invoke()
-        output_int8 = interpreter.get_tensor(output_details["index"])[0].copy()
+        # 4. Estagio 1: N vs Anormal.
+        tensor = input_quantized.reshape(stage1_input_details["shape"]).astype(np.int8)
+        stage1.set_tensor(stage1_input_details["index"], tensor)
+        stage1.invoke()
+        stage1_out = stage1.get_tensor(stage1_output_details["index"])[0].copy()
+
+        # 5. Se Anormal, executa Estagio 2 (S/V/F); caso contrario, saida e zero.
+        stage1_cls = argmax_int8(stage1_out)
+        if stage1_cls == 1:
+            stage2.set_tensor(stage2_input_details["index"], tensor)
+            stage2.invoke()
+            final_out = stage2.get_tensor(stage2_output_details["index"])[0].copy()
+        else:
+            final_out = np.zeros(stage2_output_details["shape"][1], dtype=np.int8)
 
         output_path = GROUND_TRUTH_DIR / f"expected_output_{idx:02d}.bin"
-        save_int8_bin(output_path, output_int8)
+        save_int8_bin(output_path, final_out)
 
         print(
             f"[ground-truth] idx={idx:02d} input={input_path} "
-            f"output={output_path} out={output_int8.tolist()}"
+            f"output={output_path} stage1={stage1_cls} out={final_out.tolist()}"
         )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Gera dataset de ground-truth para teste de fidelidade QG10."
+        description="Gera dataset de ground-truth para teste de fidelidade QG10 (two-stage v2.0)."
     )
     parser.add_argument(
         "--num-beats",
