@@ -11,15 +11,29 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 | Gerenciador | uv (Astral) | Lockfile nativo; nunca requirements.txt cru |
 | Dados | numpy, scipy, pandas, wfdb | Base numérica + sinais |
 | ML | TensorFlow 2.21, scikit-learn, imbalanced-learn | Treinamento + utilidades |
+| Tracking | SQLite, SQLAlchemy 2.0 | Banco local de experimentos, métricas e alertas |
 | Testes | pytest (>=8.0), pytest-cov, pytest-xdist | Pirâmide 70/20/10 |
 | Qualidade | black, isort, flake8, mypy, bandit, pre-commit | Hooks obrigatórios |
 | Container | Docker, docker-compose | Reprodutibilidade |
-| Dados | DVC (remote S3/GCS) | Versionamento de datasets |
+| Dados | DVC (remote local `~/.cache/project-lewis-dvc`; S3/GCS opcional) | Versionamento de datasets |
 | Firmware | C/C++ bare-metal, arm-none-eabi-gcc 13.3.rel1 | Bare-metal |
 | ML Embarcado | TFLM, CMSIS-DSP, CMSIS-NN | Aceleração Cortex-M4F |
 | Simulação | Renode 1.15.3 | Emulação fiel STM32F4 |
 | Hardware | STM32F407VG, ADS1292R | 168 MHz, 192KB SRAM, 1MB Flash |
 | Compliance | LGPD Lei 13.709/18 | Por design |
+
+## Datasets Versionados (C01)
+
+| Dataset | Registros | Uso no pipeline | Estado |
+|---------|-----------|-----------------|--------|
+| Chapman-Shaoxing | 45.152 | Pré-treino backbone (superclasses SCP-ECG) | ✅ presente + mirror + DVC |
+| MIT-BIH Arrhythmia | 48 | Fine-tuning / teste (AAMI beat-level) | ✅ presente + ZIP cache + DVC |
+| MIT-BIH SVDB | 78 | Fine-tuning (supraventricular) | ✅ presente + ZIP cache + DVC |
+| MIT-BIH AFDB | 25 | Fine-tuning (fibrilação atrial) | ✅ presente + ZIP cache + DVC |
+| INCART | 75 | Fine-tuning (diversidade russa) | ✅ presente + ZIP cache + DVC |
+| PTB-XL | 43.598 | **Fallback adicional** para pré-treino / backbone alternativo | ✅ presente + DVC |
+
+> **Nota:** PTB-XL não consta da `ESPECIFICACAO_Fase1_Agentes-v1.1.md` original, mas foi adicionado como fallback de pré-treino por também conter 12-lead ECG a 500 Hz com superclasses SCP-ECG.
 
 ## Camadas SDD (Project-Lewis)
 1. **C01 — Ingestão** — `docs/Camada-01-Ingestao-v1.1.md`
@@ -36,12 +50,12 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 ## Quality Gates (QG0–QG19)
 | QG | Camada | Critério | Threshold |
 |----|--------|----------|-----------|
-| QG0 | C01 | Download completo + checksums | Chapman ≥ 45k, MIT-BIH 48, SVDB 78, AFDB 25, INCART 75 |
+| QG0 | C01 | Download completo + checksums | Chapman ≥ 45k, MIT-BIH 48, SVDB 78, AFDB 25, INCART 75; PTB-XL como fallback adicional para pré-treino |
 | QG1 | C02 | Resample + pré-processamento | Fs=500Hz, range ±5mV, Z-score, linhagem 100% |
 | QG2 | C03 | AMPT @ 500Hz | Sens > 96.5%, PPV > 99.0%, F1 > 97.5% |
 | QG3 | C03 | Features | Janela 1000ms, ≥10 dimensões, sem NaN, SMOTE em feature space |
 | QG4 | C04 | Pré-treino Chapman | AUC-ROC macro > 0.85, loss < 0.15 |
-| QG5 | C04 | Fine-tuning MIT-BIH+ | Acc > 93%, F1-macro > 85%, MCC > 0.80 |
+| QG5 | C04 | Fine-tuning MIT-BIH+ (v2.2) | Pipeline duas etapas (N vs Anormal → S/V/F); Acc > 78%, F1-macro > 30%; QG5' Estágio 1: recall Anormal ≥ 30%, precision Anormal ≥ 25%, F1-macro ≥ 55%; QG5' Estágio 2: F1(S) ≥ 55%, F1(V) ≥ 70%, F1(F) ≥ 15%, F1-macro ≥ 45% |
 | QG6 | C05 | Quantização + Exportação | ΔF1-macro < 2%, FlatBuffer < 64KB, header compilável |
 | QG7 | C08 | Build firmware | Sem warnings (-Werror), FlatBuffer < 64KB |
 | QG8 | C08/C10 | Bit-exatidão | int8 vs Python BUILTIN_REF |
@@ -73,6 +87,7 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 13. Senhas hasheadas (Argon2id/bcrypt) — se houver camada de auth
 14. LGPD: nenhum PII em logs
 15. Revisão humana para código crítico
+16. Classe Q (paced/unclassifiable) excluída da classificação final a partir de v2.0 — tratada como "Anormal" no Estágio 1
 
 > **Nota:** A arquitetura atual não inclui autenticação. Esta regra é condicional e só se aplica se uma camada de auth for introduzida no futuro.
 
