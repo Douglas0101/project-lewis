@@ -1,8 +1,9 @@
-"""Quality Gate QG10 — Fidelidade da inferencia UART no Renode.
+"""Quality Gate QG10 — Fidelidade da inferencia UART no Renode (two-stage v2.0).
 
 Para cada batimento de ground-truth, o teste:
   1. Envia o frame ``<500×float32 little-endian>`` pela UART do STM32F4 emulado.
-  2. Captura a resposta binaria ``<5×int8>`` do firmware.
+  2. Captura a resposta binaria ``<3×int8>`` do firmware (S/V/F do Estagio 2;
+     zeros quando o Estagio 1 classifica como N).
   3. Compara a saida do firmware com a saida esperada do interpretador TFLite
      Python usando similaridade de cosseno e MAE sobre os valores dequantizados.
 
@@ -49,8 +50,8 @@ OUTPUT_ZERO_POINT = OUTPUT_QUANT["zero_point"]
 MIN_COSINE_SIMILARITY = 0.99
 MAX_MAE = 0.01
 
-# Format constants for the UART response frame <5×int8>.
-RESPONSE_LEN = 5
+# Format constants for the UART response frame <3×int8> (two-stage v2.0).
+RESPONSE_LEN = 3
 START_BYTE = ord("<")
 END_BYTE = ord(">")
 
@@ -167,14 +168,14 @@ def _run_robot_for_beat(idx: int) -> bytes:
 
 
 def _extract_response_frame(log_bytes: bytes) -> np.ndarray:
-    """Extrai a ultima resposta ``<5×int8>`` do log binario da UART."""
-    # Procura pelo ultimo '<' que precede exatamente 5 bytes e '>'.
+    """Extrai a ultima resposta ``<3×int8>`` do log binario da UART."""
+    # Procura pelo ultimo '<' que precede exatamente 3 bytes e '>'.
     for start in range(len(log_bytes) - 1, -1, -1):
         if log_bytes[start] == START_BYTE:
             end = start + RESPONSE_LEN + 1  # indice do terminador '>'
             if end < len(log_bytes) and log_bytes[end] == END_BYTE:
                 return np.frombuffer(log_bytes[start + 1 : end], dtype=np.int8)
-    raise ValueError("Frame de resposta '<5×int8>' nao encontrado no log UART")
+    raise ValueError("Frame de resposta '<3×int8>' nao encontrado no log UART")
 
 
 def _dequantize(values: np.ndarray, scale: float, zero_point: int) -> np.ndarray:
@@ -222,11 +223,15 @@ class TestFidelity:
             )
 
         expected_int8 = np.fromfile(expected_path, dtype=np.int8)
-        assert expected_int8.shape == (5,), f"Formato inesperado: {expected_int8.shape}"
+        assert expected_int8.shape == (RESPONSE_LEN,), (
+            f"Formato inesperado: {expected_int8.shape}"
+        )
 
         log_bytes = _run_robot_for_beat(idx)
         firmware_int8 = _extract_response_frame(log_bytes)
-        assert firmware_int8.shape == (5,), f"Resposta inesperada: {firmware_int8.shape}"
+        assert firmware_int8.shape == (RESPONSE_LEN,), (
+            f"Resposta inesperada: {firmware_int8.shape}"
+        )
 
         expected_f32 = _dequantize(expected_int8, OUTPUT_SCALE, OUTPUT_ZERO_POINT)
         firmware_f32 = _dequantize(firmware_int8, OUTPUT_SCALE, OUTPUT_ZERO_POINT)

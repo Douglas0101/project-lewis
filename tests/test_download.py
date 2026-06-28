@@ -240,10 +240,7 @@ def test_wfdb_header_parseable(ds: str) -> None:
     pytest.importorskip("wfdb")
     from src.data._catalog import extract_metadata
 
-    hea_files = sorted(
-        h for h in raw.glob("*.hea")
-        if h.stem not in AFDB_ANNOTATIONS_ONLY
-    )
+    hea_files = sorted(h for h in raw.glob("*.hea") if h.stem not in AFDB_ANNOTATIONS_ONLY)
     assert hea_files, f"no .hea files under {raw}"
     sample = hea_files[0]
     meta = extract_metadata(sample, dataset=ds)

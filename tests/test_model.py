@@ -71,8 +71,8 @@ class TestBackboneArchitecture:
         conv_layers = [layer for layer in model.layers if isinstance(layer, tf.keras.layers.Conv1D)]
         assert len(conv_layers) == 3
         assert conv_layers[0].filters == 16
-        assert conv_layers[1].filters == 32
-        assert conv_layers[2].filters == 64
+        assert conv_layers[1].filters == 40
+        assert conv_layers[2].filters == 80
 
     def test_maxpool_layers_exist(self):
         model = build_backbone_1d(input_len=500, num_classes=5)
@@ -94,7 +94,7 @@ class TestBackboneArchitecture:
         model = build_backbone_1d(input_len=500, num_classes=5)
         dense = [layer for layer in model.layers if isinstance(layer, tf.keras.layers.Dense)]
         assert len(dense) == 2
-        assert dense[0].units == 64  # embedding
+        assert dense[0].units == 80  # embedding
         assert dense[1].units == 5  # classifier
 
     def test_dropout_rate(self):
@@ -106,6 +106,37 @@ class TestBackboneArchitecture:
     def test_output_activation_softmax(self):
         model = build_backbone_1d(input_len=500, num_classes=5)
         assert model.layers[-1].activation == tf.keras.activations.softmax
+
+    def test_scaled_backbone_passes_tflm_constraints(self):
+        """QG4: variante maior deve caber em <64KB de FlatBuffer INT8."""
+        model = build_backbone_1d(
+            input_len=500,
+            num_classes=5,
+            conv_filters=[32, 64, 96],
+            dense_units=96,
+        )
+        info = TFLMConstraints.validate_model(model)
+        assert info["total_params"] > 20_000
+        assert info["flatbuffer_kb_est"] <= TFLMConstraints.MAX_FLATBUFFER_KB, (
+            f"Estimated FlatBuffer={info['flatbuffer_kb_est']}KB exceeds limit"
+        )
+
+    def test_backbone_with_features_passes_tflm_constraints(self):
+        """QG4: backbone com features morfológicas adicionais cabe em <64KB."""
+        from src.models.backbone_1d import build_backbone_1d_with_features
+
+        model = build_backbone_1d_with_features(
+            input_len=500,
+            num_classes=2,
+            num_features=2,
+            conv_filters=[32, 64, 96],
+            dense_units=96,
+        )
+        info = TFLMConstraints.validate_model(model)
+        assert info["flatbuffer_kb_est"] <= TFLMConstraints.MAX_FLATBUFFER_KB, (
+            f"Estimated FlatBuffer={info['flatbuffer_kb_est']}KB exceeds limit"
+        )
+        assert len(model.inputs) == 2
 
     def test_forward_pass(self):
         model = build_backbone_1d(input_len=500, num_classes=5)

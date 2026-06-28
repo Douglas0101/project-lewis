@@ -69,11 +69,15 @@ class TestQG7Build:
             timeout=300,
         )
 
-    def test_flatbuffer_size_under_64kb(self, firmware_report):
-        """QG7: FlatBuffer do modelo deve ter menos de 64 KB."""
-        size = firmware_report["model_size_bytes"]
-        assert size is not None
-        assert size < 64 * 1024, f"Modelo tem {size} bytes (limite 64 KB)"
+    def test_flatbuffer_size_under_64kb(self):
+        """QG7: cada FlatBuffer (stage1/stage2) deve ter menos de 64 KB."""
+        quantized_dir = PROJECT_ROOT / "models" / "quantized"
+        for name in ("stage1_int8_v2.0.tflite", "stage2_int8_v2.0.tflite"):
+            path = quantized_dir / name
+            if not path.exists():
+                pytest.skip(f"Modelo nao encontrado: {path}")
+            size = path.stat().st_size
+            assert size < 64 * 1024, f"{name} tem {size} bytes (limite 64 KB)"
 
 
 @pytest.mark.qg9

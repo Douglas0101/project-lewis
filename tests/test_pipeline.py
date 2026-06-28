@@ -76,7 +76,9 @@ def test_pipeline_processes_mitbih_family(isolated_dirs):
         assert lin["pipeline"][1]["step"] == "resample"
         assert lin["pipeline"][2]["step"] == "filter"
         assert lin["pipeline"][3]["step"] == "detrend"
-        assert lin["pipeline"][4]["step"] == "normalize"
+        assert lin["pipeline"][4]["step"] == "clip_outliers"
+        assert lin["pipeline"][5]["step"] == "normalize"
+        assert lin["pipeline"][6]["step"] == "post_normalize_clip"
 
 
 @pytest.mark.qg1

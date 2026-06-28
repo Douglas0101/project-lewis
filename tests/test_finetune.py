@@ -14,8 +14,11 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+import tensorflow as tf
+
 from src.models.backbone_1d import build_backbone_1d, freeze_conv_layers
 from src.models.evaluate import evaluate_aami, evaluate_fold
+from src.models.finetune_mitbih import SparseCategoricalFocalLoss
 from src.models.train import _normalize_fold
 
 
@@ -121,3 +124,59 @@ class TestAAMIEvaluation:
         assert "per_class" in result
         assert "global" in result
         assert "y_pred" in result
+
+
+@pytest.mark.qg5
+class TestSparseCategoricalFocalLoss:
+    """Valida focal loss para classes desbalanceadas."""
+
+    def test_focal_loss_lower_for_correct_high_confidence(self):
+        loss = SparseCategoricalFocalLoss(gamma=2.0)
+        y_true = tf.constant([[0], [1], [2]], dtype=tf.int32)
+        # Predições quase perfeitas
+        y_pred = tf.constant(
+            [
+                [0.99, 0.005, 0.005],
+                [0.005, 0.99, 0.005],
+                [0.005, 0.005, 0.99],
+            ],
+            dtype=tf.float32,
+        )
+        loss_correct = float(tf.reduce_mean(loss(y_true, y_pred)))
+
+        # Predições erradas (confidentes na classe errada)
+        y_pred_wrong = tf.constant(
+            [
+                [0.005, 0.99, 0.005],
+                [0.005, 0.005, 0.99],
+                [0.99, 0.005, 0.005],
+            ],
+            dtype=tf.float32,
+        )
+        loss_wrong = float(tf.reduce_mean(loss(y_true, y_pred_wrong)))
+
+        assert loss_correct < loss_wrong
+
+    def test_focal_loss_with_alpha_scales_class(self):
+        y_true = tf.constant([[0], [1]], dtype=tf.int32)
+        y_pred = tf.constant(
+            [
+                [0.5, 0.5],
+                [0.5, 0.5],
+            ],
+            dtype=tf.float32,
+        )
+        alpha = np.array([1.0, 2.0], dtype=np.float32)
+        loss_weighted = SparseCategoricalFocalLoss(gamma=1.0, alpha=alpha)
+        # Chamar call diretamente para obter per-sample loss (Loss.__call__ reduz)
+        losses = loss_weighted.call(y_true, y_pred).numpy()
+        # Classe 1 tem alpha dobrado => loss deve ser maior
+        assert losses[1] > losses[0]
+
+    def test_focal_loss_get_config_roundtrip(self):
+        alpha = np.array([0.25, 0.75], dtype=np.float32)
+        loss = SparseCategoricalFocalLoss(gamma=1.5, alpha=alpha, from_logits=True)
+        config = loss.get_config()
+        assert config["gamma"] == 1.5
+        assert config["from_logits"] is True
+        assert config["alpha"] == alpha.tolist()

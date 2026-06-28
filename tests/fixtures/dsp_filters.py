@@ -62,20 +62,20 @@ NOTCH_COEFFS_FLAT = np.array(
 NOTCH_COEFFS = NOTCH_COEFFS_FLAT.reshape(-1, 5)
 
 
-def _biquad_sample(x: float, coeffs: np.ndarray, state: np.ndarray) -> float:
-    """Processa uma amostra em uma secao biquad (transposed DF-II)."""
-    b0, b1, b2, a1, a2 = coeffs
-    d0, d1 = state[0], state[1]
-    y = b0 * x + d0
-    state[0] = b1 * x - a1 * y + d1
-    state[1] = b2 * x - a2 * y
+def _biquad_sample(x: np.float32, coeffs: np.ndarray, state: np.ndarray) -> np.float32:
+    """Processa uma amostra em uma secao biquad (transposed DF-II) em float32."""
+    b0, b1, b2, a1, a2 = coeffs.astype(np.float32)
+    d0, d1 = np.float32(state[0]), np.float32(state[1])
+    y = np.float32(b0 * x + d0)
+    state[0] = np.float32(b1 * x - a1 * y + d1)
+    state[1] = np.float32(b2 * x - a2 * y)
     return y
 
 
-def _cascade_sample(x: float, coeffs: np.ndarray, states: np.ndarray) -> float:
-    """Processa uma amostra em cascata de biquads."""
+def _cascade_sample(x: np.float32, coeffs: np.ndarray, states: np.ndarray) -> np.float32:
+    """Processa uma amostra em cascata de biquads em float32."""
     n_sections = coeffs.shape[0]
-    y = x
+    y = np.float32(x)
     for i in range(n_sections):
         y = _biquad_sample(y, coeffs[i], states[i])
     return y
@@ -88,6 +88,8 @@ def cascade_process_block(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Processa um bloco em cascata de biquads.
 
+    Reproduz a implementacao C em precisao simples para equivalencia bit-a-bit.
+
     Returns
     -------
     output, states
@@ -98,7 +100,7 @@ def cascade_process_block(
     if states is None:
         states = np.zeros((n_sections, 2), dtype=np.float32)
     for i in range(n):
-        out[i] = _cascade_sample(float(input_arr[i]), coeffs, states)
+        out[i] = _cascade_sample(np.float32(input_arr[i]), coeffs, states)
     return out, states
 
 

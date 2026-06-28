@@ -2,6 +2,9 @@
 
 R1: a versao nativa deve ser vinculada com a biblioteca TFLM host e produzir
 os mesmos resultados do interpretador Python de referencia (BUILTIN_REF).
+
+No pipeline two-stage v2.0 o firmware responde com 3 int8 correspondentes
+as classes S/V/F do Estagio 2 (zeros quando o Estagio 1 classifica como N).
 """
 
 from __future__ import annotations
@@ -22,7 +25,8 @@ from tests.fixtures.normalizer import zscore_normalize
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_DIR = PROJECT_ROOT / "firmware"
 NATIVE_BIN = FIRMWARE_DIR / "build" / "native" / "lewis"
-MODEL_TFLITE = PROJECT_ROOT / "models" / "quantized" / "model_int8.tflite"
+STAGE1_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage1_int8_v2.0.tflite"
+STAGE2_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage2_int8_v2.0.tflite"
 QPARAMS_PATH = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
 
 
@@ -63,7 +67,8 @@ def _run_native(timeout: float = 3.0) -> str:
 
 def _parse_native_outputs(stdout: str) -> list[np.ndarray]:
     pattern = re.compile(
-        r"Beat\s+(?P<idx>\d+):\s+\d+\s+ms\s*\(\d+\s+us\)\s*,\s*output\s+\[(?P<values>[-\d,\s]+)\]"
+        r"Beat\s+(?P<idx>\d+):\s+\d+\s+ms\s*\(\d+\s+us\)\s*,\s*class=\w+\s*,\s*"
+        r"output\s*=\s*\[(?P<values>[-\d,\s]+)\]"
     )
     outputs = []
     for match in pattern.finditer(stdout):
@@ -72,19 +77,37 @@ def _parse_native_outputs(stdout: str) -> list[np.ndarray]:
     return outputs
 
 
+def _quantize_input(beat_float: np.ndarray, in_scale: float, in_zero_point: int) -> np.ndarray:
+    """Reproduz a quantizacao int8 do firmware."""
+    rounded = np.where(
+        beat_float / in_scale >= 0.0,
+        np.floor(beat_float / in_scale + 0.5),
+        np.ceil(beat_float / in_scale - 0.5),
+    )
+    return np.clip(rounded.astype(np.int32) + in_zero_point, -128, 127).astype(np.int8)
+
+
 def _run_python_reference(num_beats: int) -> list[np.ndarray]:
-    """Executa o modelo TFLite no Python usando BUILTIN_REF.
+    """Executa o pipeline two-stage no Python usando BUILTIN_REF.
 
     Retorna os outputs dequantizados em float32 para comparacao justa com o
     firmware nativo (TFLM tambem dequantiza internamente para float32).
     """
-    interpreter = tf.lite.Interpreter(
-        model_path=str(MODEL_TFLITE),
+    stage1 = tf.lite.Interpreter(
+        model_path=str(STAGE1_TFLITE),
         experimental_op_resolver_type=tf.lite.experimental.OpResolverType.BUILTIN_REF,
     )
-    interpreter.allocate_tensors()
-    input_details = interpreter.get_input_details()[0]
-    output_details = interpreter.get_output_details()[0]
+    stage1.allocate_tensors()
+    stage1_input = stage1.get_input_details()[0]
+    stage1_output = stage1.get_output_details()[0]
+
+    stage2 = tf.lite.Interpreter(
+        model_path=str(STAGE2_TFLITE),
+        experimental_op_resolver_type=tf.lite.experimental.OpResolverType.BUILTIN_REF,
+    )
+    stage2.allocate_tensors()
+    stage2_input = stage2.get_input_details()[0]
+    stage2_output = stage2.get_output_details()[0]
 
     qparams = _read_quantization_params()
     in_scale = qparams["input"]["scale"]
@@ -99,21 +122,21 @@ def _run_python_reference(num_beats: int) -> list[np.ndarray]:
         beat_float = (beat.astype(np.float32) - in_zero_point) * in_scale
         beat_filtered, _, _ = filter_chain(beat_float)
         normalized = zscore_normalize(beat_filtered)
-        rounded = np.where(
-            normalized / in_scale >= 0.0,
-            np.floor(normalized / in_scale + 0.5),
-            np.ceil(normalized / in_scale - 0.5),
-        )
-        beat_quantized = np.clip(
-            rounded.astype(np.int32) + in_zero_point,
-            -128,
-            127,
-        ).astype(np.int8)
-        tensor = beat_quantized.reshape(input_details["shape"]).astype(np.int8)
-        interpreter.set_tensor(input_details["index"], tensor)
-        interpreter.invoke()
-        out = interpreter.get_tensor(output_details["index"])[0].copy()
-        outputs.append((out.astype(np.float32) - out_zero_point) * out_scale)
+        beat_quantized = _quantize_input(normalized, in_scale, in_zero_point)
+        tensor = beat_quantized.reshape(stage1_input["shape"]).astype(np.int8)
+
+        stage1.set_tensor(stage1_input["index"], tensor)
+        stage1.invoke()
+        stage1_out = stage1.get_tensor(stage1_output["index"])[0].copy()
+
+        if int(np.argmax(stage1_out)) == 1:
+            stage2.set_tensor(stage2_input["index"], tensor)
+            stage2.invoke()
+            final_out = stage2.get_tensor(stage2_output["index"])[0].copy()
+        else:
+            final_out = np.zeros(stage2_output["shape"][1], dtype=np.int8)
+
+        outputs.append((final_out.astype(np.float32) - out_zero_point) * out_scale)
     return outputs
 
 
