@@ -4,12 +4,12 @@ Plano de execução de tasks decompostas. Atualizar a cada sessão.
 
 ## Ativas
 
-- [ ] **Finalização v3.0** — Resolver ambiente TFLM, validar e integrar branch `feature/plano-v3-rag-memory`
-  - Instalar toolchain ARM e Renode na worktree (`scripts/install_firmware_tools.sh`).
-  - Clonar/buildar `firmware/third_party/tflite-micro` no commit pinado.
-  - Reexecutar `pytest tests/` e confirmar que erros de ambiente foram resolvidos.
-  - Criar PR para `develop` com revisão humana.
-  - Limpar worktree e branch após merge.
+- [x] **Finalização v3.0** — Resolver ambiente TFLM, validar e integrar branch `feature/plano-v3-rag-memory`
+  - [x] Instalar toolchain ARM e Renode na worktree (`scripts/install_firmware_tools.sh`).
+  - [x] Clonar/buildar `firmware/third_party/tflite-micro` no commit pinado (via cache do repo principal).
+  - [x] Reexecutar `pytest tests/` e confirmar que erros de ambiente foram resolvidos.
+  - [x] Criar PR para `develop` com revisão humana: https://github.com/Douglas0101/project-lewis/pull/4
+  - [ ] Limpar worktree e branch após merge.
 
 ## Backlog
 
