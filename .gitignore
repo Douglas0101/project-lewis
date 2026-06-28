@@ -82,6 +82,9 @@ firmware/tools/renode_*/
 /models/stage*_threshold*.json
 /models/input_scaler_*.pkl
 /models/quantized/
+!/models/quantized/stage1_int8_v2.0.tflite
+!/models/quantized/stage2_int8_v2.0.tflite
+!/models/quantized/quantization_params.json
 
 # --- Diretórios de ambiente / sessão ---
 .dvc/
