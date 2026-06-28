@@ -8,7 +8,7 @@ PROJECT_ROOT := $(PROJECT_ROOT:%/=%)
 # Toolchain
 # ---------------------------------------------------------------------------
 TOOLS_DIR := $(PROJECT_ROOT)/tools
-ARM_DIR   := $(TOOLS_DIR)/xpack-arm-none-eabi-gcc-13.3.1-1.1
+ARM_DIR   := $(TOOLS_DIR)/arm-gnu-toolchain-13.3.rel1
 RENOD_DIR := $(TOOLS_DIR)/renode-1.15.3
 
 CC_ARM    := $(ARM_DIR)/bin/arm-none-eabi-gcc
@@ -355,7 +355,7 @@ clean-all: clean
 	$(MAKE) -f $(TFLM_MAKEFILE) TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=cmsis_nn clean
 
 firmware-deps:
-	$(PROJECT_ROOT)/scripts/install_deps.sh
+	$(PROJECT_ROOT)/../scripts/install_firmware_tools.sh
 
 TFLM_CMSIS_FLAG :=
 ifeq ($(USE_CMSIS_NN),1)
