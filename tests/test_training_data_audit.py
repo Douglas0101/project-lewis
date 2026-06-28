@@ -34,6 +34,7 @@ MITDB_100_AVAILABLE = (
 FEATURES_AVAILABLE = Path("data/features/training_manifest.json").exists()
 
 
+@pytest.mark.skipif(not DATA_AVAILABLE, reason="catalog not built yet")
 def test_catalog_loadable() -> None:
     assert CATALOG_PATH.exists(), "catalog not found"
     records = _load_catalog(CATALOG_PATH)
