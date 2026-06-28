@@ -2,19 +2,56 @@ name: Camada 1 Ingest (QG0 + Catalog)
 
 on:
   push:
+    branches: [main, develop]
     paths:
       - "src/data/**"
-      - "tests/test_download.py"
+      - "tests/test_download*.py"
       - "src/data/checksums.json"
       - ".github/workflows/ingest.yml"
+      - "pyproject.toml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "src/data/**"
+      - "tests/test_download*.py"
+      - "src/data/checksums.json"
+      - ".github/workflows/ingest.yml"
+      - "pyproject.toml"
   schedule:
     - cron: "0 3 * * 0"
   workflow_dispatch:
 
 jobs:
-  qg0:
+  ingest-smoke:
+    name: Ingest smoke (fast, no network datasets)
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run ingest smoke tests
+        run: uv run pytest tests/test_download_smoke.py -m smoke --tb=short
+
+      - name: Build catalog from synthetic fixtures
+        run: uv run pytest tests/test_download_smoke.py::test_smoke_catalog_build -v --tb=short
+
+  qg0-full:
+    name: Quality Gate QG0 — full dataset ingest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
 
@@ -41,9 +78,6 @@ jobs:
           restore-keys: |
             datasets-
 
-      - name: Install dependencies
-        run: uv sync --frozen
-
       - name: Restore from mirror (offline-safe)
         run: |
           if [ ! -d data/raw_mitbih ] || [ -z "$(ls -A data/raw_mitbih 2>/dev/null)" ]; then
@@ -61,7 +95,7 @@ jobs:
         env:
           KAGGLE_USERNAME: ${{ secrets.KAGGLE_USERNAME }}
           KAGGLE_KEY: ${{ secrets.KAGGLE_KEY }}
-        timeout-minutes: 20
+        timeout-minutes: 120
         run: |
           missing=0
           for dir in data/raw_chapman data/raw_mitbih data/raw_svdb data/raw_afdb data/raw_incart; do
