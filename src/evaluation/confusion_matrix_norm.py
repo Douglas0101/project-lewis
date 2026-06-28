@@ -1,10 +1,12 @@
+from typing import Optional
+
 import numpy as np
 import pandas as pd
 from sklearn.metrics import confusion_matrix
 
 
 def confusion_matrix_norm(
-    y_true: np.ndarray, y_pred: np.ndarray, labels: np.ndarray = None
+    y_true: np.ndarray, y_pred: np.ndarray, labels: Optional[np.ndarray] = None
 ) -> np.ndarray:
     """Return a row-normalized confusion matrix (recall per true class)."""
     cm = confusion_matrix(y_true, y_pred, labels=labels)
@@ -14,7 +16,7 @@ def confusion_matrix_norm(
 
 
 def confusion_matrix_report(
-    y_true: np.ndarray, y_pred: np.ndarray, labels: np.ndarray = None
+    y_true: np.ndarray, y_pred: np.ndarray, labels: Optional[np.ndarray] = None
 ) -> pd.DataFrame:
     """Return a per-class recall/precision DataFrame from a normalized CM."""
     cm_norm = confusion_matrix_norm(y_true, y_pred, labels=labels)
