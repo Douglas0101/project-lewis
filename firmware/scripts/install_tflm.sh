@@ -18,6 +18,7 @@ TFLM_DIR="${FIRMWARE_DIR}/third_party/tflite-micro"
 COMMIT_FILE="${FIRMWARE_DIR}/third_party/tflite-micro.commit"
 MAKEFILE="${FIRMWARE_DIR}/Makefile"
 INSTALLED_FLAG="${TFLM_DIR}/.tflm-installed"
+PATCHED_FLAG="${TFLM_DIR}/.tflm-patched"
 
 REPO_URL="https://github.com/tensorflow/tflite-micro.git"
 BUILD_JOBS="${TFLM_BUILD_JOBS:-1}"
@@ -116,9 +117,14 @@ fi
 
 # O TFLM ainda usa http://github.com em alguns scripts de download. Forcamos
 # https para evitar timeout/bloqueio em redes que nao permitem HTTP.
-info "Aplicando patch http -> https nos scripts de download..."
-find "${TFLM_DIR}/tensorflow/lite/micro/tools/make" -type f -name "*.sh" \
-    -exec sed -i 's|http://github.com|https://github.com|g' {} +
+if [[ -f "${PATCHED_FLAG}" ]]; then
+    info "Patch http -> https ja aplicado."
+else
+    info "Aplicando patch http -> https nos scripts de download..."
+    find "${TFLM_DIR}/tensorflow/lite/micro/tools/make" -type f -name "*.sh" \
+        -exec sed -i 's|http://github.com|https://github.com|g' {} +
+    touch "${PATCHED_FLAG}"
+fi
 
 cd "${TFLM_DIR}"
 
