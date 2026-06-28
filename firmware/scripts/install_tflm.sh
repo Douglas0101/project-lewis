@@ -17,18 +17,19 @@ FIRMWARE_DIR="${PROJECT_ROOT}/firmware"
 TFLM_DIR="${FIRMWARE_DIR}/third_party/tflite-micro"
 COMMIT_FILE="${FIRMWARE_DIR}/third_party/tflite-micro.commit"
 MAKEFILE="${FIRMWARE_DIR}/Makefile"
+INSTALLED_FLAG="${TFLM_DIR}/.tflm-installed"
 
 REPO_URL="https://github.com/tensorflow/tflite-micro.git"
 BUILD_JOBS="${TFLM_BUILD_JOBS:-1}"
 BUILD_TYPE="${TFLM_BUILD_TYPE:-release}"
 
 die() {
-    echo "[tflm-install] ERRO: $*" >&2
+    echo "[tflm-install] $(date '+%H:%M:%S') ERRO: $*" >&2
     exit 1
 }
 
 info() {
-    echo "[tflm-install] $*"
+    echo "[tflm-install] $(date '+%H:%M:%S') $*"
 }
 
 # ---------------------------------------------------------------------------
@@ -82,6 +83,21 @@ _expected_arm_lib() {
 }
 
 # ---------------------------------------------------------------------------
+# Fast path: cache restaurado contem tudo
+# ---------------------------------------------------------------------------
+NATIVE_LIB="$(_expected_native_lib)"
+ARM_LIB="$(_expected_arm_lib)"
+
+if [[ -f "${INSTALLED_FLAG}" ]] \
+    && [[ "$(cat "${INSTALLED_FLAG}" 2>/dev/null || true)" == "${COMMIT_SHA}" ]] \
+    && _is_valid_checkout \
+    && [[ -f "${NATIVE_LIB}" ]] \
+    && [[ -f "${ARM_LIB}" ]]; then
+    info "Cache hit: TFLM ja instalado e compilado no commit ${COMMIT_SHA}."
+    exit 0
+fi
+
+# ---------------------------------------------------------------------------
 # Clone / update
 # ---------------------------------------------------------------------------
 if _is_valid_checkout; then
@@ -98,8 +114,9 @@ else
     cd - >/dev/null
 fi
 
-# O TFLM ainda usa http://github.com em alguns scripts de download. Forçamos
-# https para evitar timeout/bloqueio em redes que não permitem HTTP.
+# O TFLM ainda usa http://github.com em alguns scripts de download. Forcamos
+# https para evitar timeout/bloqueio em redes que nao permitem HTTP.
+info "Aplicando patch http -> https nos scripts de download..."
 find "${TFLM_DIR}/tensorflow/lite/micro/tools/make" -type f -name "*.sh" \
     -exec sed -i 's|http://github.com|https://github.com|g' {} +
 
@@ -108,7 +125,6 @@ cd "${TFLM_DIR}"
 # ---------------------------------------------------------------------------
 # Build nativo (usado pelos testes qg7/qg8 em host)
 # ---------------------------------------------------------------------------
-NATIVE_LIB="$(_expected_native_lib)"
 if [[ -f "${NATIVE_LIB}" ]]; then
     info "Biblioteca nativa ja existe: ${NATIVE_LIB}"
 else
@@ -125,7 +141,6 @@ fi
 # ---------------------------------------------------------------------------
 # Build ARM (usado pelo firmware STM32F4)
 # ---------------------------------------------------------------------------
-ARM_LIB="$(_expected_arm_lib)"
 if [[ -f "${ARM_LIB}" ]]; then
     info "Biblioteca ARM ja existe: ${ARM_LIB}"
 else
@@ -143,4 +158,6 @@ if [[ ! -f "${ARM_LIB}" ]]; then
     die "Biblioteca ARM nao foi gerada em ${ARM_LIB}"
 fi
 
+# Marca instalacao como concluida para acelerar cache restore futuro.
+echo "${COMMIT_SHA}" > "${INSTALLED_FLAG}"
 info "TFLM instalado e compilado com sucesso."
