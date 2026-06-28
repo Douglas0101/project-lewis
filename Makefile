@@ -4,7 +4,8 @@
         docker-build docker-run docker-shell pre-commit-install lint format type-check \
         firmware-deps firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
         firmware-run firmware-test hard-gates hard-gates-ci check-strict-markers check-no-stub \
-        verify-renode
+        verify-renode \
+        knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate
 
 # Detecta ambiente virtual se existente; caso contrário usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
@@ -187,6 +188,31 @@ hard-gates: verify-renode
 	PYTEST=$(PYTEST) ALLOW_STUB=0 CI=1 $(PYTHON) scripts/run_hard_gates.py
 
 hard-gates-ci: check-strict-markers hard-gates check-no-stub
+
+# ---------------------------------------------------------------------------
+# Camada C11 — Knowledge Layer (RAG + sqlite-vec + MCP)
+# ---------------------------------------------------------------------------
+knowledge-index:
+	@echo "[C11] Reindexando knowledge base..."
+	$(UV) run python -m src.knowledge.cli reindex
+
+knowledge-query:
+	@read -p "Query: " q; $(UV) run python -m src.knowledge.cli query "$$q"
+
+knowledge-status:
+	$(UV) run python -m src.knowledge.cli status
+
+knowledge-test:
+	$(UV) run pytest tests/test_knowledge/ -v --tb=short
+
+knowledge-clean:
+	rm -f data/knowledge.db
+	rm -rf data/lineage/knowledge/
+	rm -f logs/knowledge_queries.jsonl
+	rm -f data/.dlq/knowledge_rejected.jsonl
+
+knowledge-validate:
+	$(UV) run python scripts/validate_knowledge_index.py
 
 all: env download-all catalog test quality-report
 

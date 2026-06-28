@@ -11,6 +11,11 @@
     "project-lewis-src": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-filesystem", "./src", "./firmware/src", "./tests", "./scripts"]
+    },
+    "project-lewis-knowledge": {
+      "command": "uv",
+      "args": ["run", "python", "-m", "src.knowledge.mcp_server"],
+      "env": { "PYTHONPATH": "." }
     }
   }
 }
