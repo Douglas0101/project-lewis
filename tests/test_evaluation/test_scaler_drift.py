@@ -31,9 +31,14 @@ def test_compute_drift_metrics_keys(fitted_scaler):
     rng = np.random.RandomState(3)
     batch = rng.normal(loc=0.0, scale=1.0, size=(100, 2))
     metrics = compute_drift_metrics(batch, fitted_scaler)
-    assert set(metrics.keys()) == {
-        "mean_drift",
-        "scale_drift",
-        "ks_statistic",
-        "ks_pvalue",
-    }
+    assert set(metrics.keys()) == {"mean_drift", "scale_drift"}
+
+
+def test_compute_drift_metrics_invalid_input(fitted_scaler):
+    with pytest.raises(ValueError, match="batch deve ser ndarray 2D não vazio"):
+        compute_drift_metrics(np.array([]), fitted_scaler)
+
+    valid_batch = np.random.RandomState(4).normal(loc=0.0, scale=1.0, size=(10, 2))
+    invalid_scaler = object()
+    with pytest.raises(ValueError, match="scaler deve ter mean_ e scale_"):
+        compute_drift_metrics(valid_batch, invalid_scaler)
