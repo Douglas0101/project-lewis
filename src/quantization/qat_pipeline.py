@@ -18,8 +18,11 @@ from tensorflow_model_optimization.python.core.quantization.keras.default_8bit i
     default_8bit_quantize_registry as _registry,
 )
 
-_QuantizeInfo = _registry._QuantizeInfo
-_no_quantize = _registry._no_quantize
+# tfmot 0.8.x não expõe API pública para estender o registry de camadas 1D.
+# Acessamos os atributos internos para registrar Conv1D/MaxPooling1D, o que é
+# um padrão conhecido da comunidade até que o upstream os inclua por padrão.
+_QuantizeInfo = _registry._QuantizeInfo  # noqa: SLF001
+_no_quantize = _registry._no_quantize  # noqa: SLF001
 
 
 LOGGER = logging.getLogger("lewis.camada05.qat")
@@ -33,7 +36,7 @@ def _register_qat_layers() -> None:
     levanta ``RuntimeError`` para modelos com convoluções 1D.
     """
     registry_cls = _registry.Default8BitQuantizeRegistry
-    info_list = registry_cls._LAYER_QUANTIZE_INFO
+    info_list = registry_cls._LAYER_QUANTIZE_INFO  # noqa: SLF001
     present = {info.layer_type for info in info_list}
 
     if tf_keras.layers.Conv1D not in present:
@@ -45,7 +48,7 @@ def _register_qat_layers() -> None:
 _register_qat_layers()
 
 
-def build_model(stage: int = 1, config: dict | None = None) -> tf.keras.Model:
+def build_model(stage: int = 1, config: dict | None = None) -> tf_keras.Model:
     """Constrói um modelo pequeno compatível com QAT INT8.
 
     ``tensorflow_model_optimization`` opera sobre o Keras "legacy"
@@ -63,7 +66,7 @@ def build_model(stage: int = 1, config: dict | None = None) -> tf.keras.Model:
 
     Returns
     -------
-    tf.keras.Model
+    tf_keras.Model
         Modelo Keras não compilado.
     """
     config = config or {}
@@ -103,23 +106,20 @@ def build_model(stage: int = 1, config: dict | None = None) -> tf.keras.Model:
 
 
 def quantize_model(
-    model: tf.keras.Model,
+    model: tf_keras.Model,
     representative_data: Callable,
     output_path: Path,
-    fallback: str = "mixed_precision",
 ) -> Path:
     """Aplica QAT e converte para TFLite INT8.
 
     Parameters
     ----------
-    model : keras.Model
+    model : tf_keras.Model
         Modelo FP32 treinado.
     representative_data : callable
         Generator que yielda listas de tensores float32.
     output_path : Path
         Caminho para salvar o .tflite.
-    fallback : str
-        Estratégia de fallback se ΔF1 for alto (reservado para uso futuro).
     """
     q_aware_model = tfmot.quantization.keras.quantize_model(model)
     q_aware_model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
@@ -133,9 +133,8 @@ def quantize_model(
     tflite_model = converter.convert()
     output_path.write_bytes(tflite_model)
     LOGGER.info(
-        "Modelo QAT INT8 salvo em %s (%.2f KB, fallback=%s)",
+        "Modelo QAT INT8 salvo em %s (%.2f KB)",
         output_path,
         len(tflite_model) / 1024,
-        fallback,
     )
     return output_path
