@@ -10,12 +10,14 @@ import json
 import logging
 import os
 import random
+import argparse
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 import numpy as np
 import tensorflow as tf
+import yaml
 
 from .backbone_1d import build_backbone_1d_multilabel, save_model_config
 
@@ -63,10 +65,6 @@ def _make_callbacks(
             save_best_only=True,
             verbose=1,
         ),
-        tf.keras.callbacks.TensorBoard(
-            log_dir=str(experiment_dir / "logs"),
-            histogram_freq=0,
-        ),
         tf.keras.callbacks.CSVLogger(
             filename=str(experiment_dir / "training.log"),
             separator=",",
@@ -76,8 +74,10 @@ def _make_callbacks(
 
 
 def pretrain_chapman(
-    data_generator: Callable,
+    data_generator: Optional[Callable] = None,
     val_generator: Optional[Callable] = None,
+    train_dataset: Optional[tf.data.Dataset] = None,
+    val_dataset: Optional[tf.data.Dataset] = None,
     steps_per_epoch: int = 1000,
     validation_steps: Optional[int] = None,
     epochs: int = 30,
@@ -93,10 +93,14 @@ def pretrain_chapman(
 
     Parameters
     ----------
-    data_generator : Callable
+    data_generator : Callable, optional
         Generator que yield (X_batch, y_batch).
     val_generator : Callable, optional
         Generator de validação.
+    train_dataset : tf.data.Dataset, optional
+        Dataset de treino (preferido, mais eficiente que generator).
+    val_dataset : tf.data.Dataset, optional
+        Dataset de validação (preferido).
     steps_per_epoch : int
         Passos por época.
     validation_steps : int, optional
@@ -121,6 +125,8 @@ def pretrain_chapman(
     tuple
         (model, history_dict)
     """
+    if train_dataset is None and data_generator is None:
+        raise ValueError("Forneça train_dataset ou data_generator")
     _set_seeds(seed)
 
     if experiment_dir is None:
@@ -164,8 +170,15 @@ def pretrain_chapman(
     # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
     if use_slha:
         slha = _maybe_import_slha()
-        gen = data_generator()
-        X_sample, y_sample = next(gen)
+        if train_dataset is not None:
+            for X_sample, y_sample in train_dataset.take(1):
+                X_sample = X_sample.numpy()
+                y_sample = y_sample.numpy()
+                break
+        else:
+            assert data_generator is not None
+            gen = data_generator()
+            X_sample, y_sample = next(gen)
         config = slha.auto_configure_training(
             X_sample=X_sample[:8],
             y_sample=y_sample[:8],
@@ -177,15 +190,22 @@ def pretrain_chapman(
         callbacks.append(slha.ResourceMonitor())
 
     # Treinar
-    history = model.fit(
-        data_generator(),
-        steps_per_epoch=steps_per_epoch,
-        epochs=epochs,
-        validation_data=val_generator() if val_generator else None,
-        validation_steps=validation_steps,
-        callbacks=callbacks,
-        verbose=2,
-    )
+    fit_kwargs = {
+        "steps_per_epoch": steps_per_epoch,
+        "epochs": epochs,
+        "validation_steps": validation_steps,
+        "callbacks": callbacks,
+        "verbose": 2,
+    }
+    if train_dataset is not None:
+        fit_kwargs["x"] = train_dataset
+        fit_kwargs["validation_data"] = val_dataset
+    else:
+        assert data_generator is not None
+        fit_kwargs["x"] = data_generator()
+        fit_kwargs["validation_data"] = val_generator() if val_generator else None
+
+    history = model.fit(**fit_kwargs)
 
     # Salvar config
     save_model_config(
@@ -257,3 +277,131 @@ def load_pretrained_backbone(
         LOGGER.info("Backbone carregado (todas as camadas treináveis)")
 
     return model
+
+
+def _load_config(config_path: Path) -> dict:
+    """Load YAML training config."""
+    with config_path.open("r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh)
+
+
+def main() -> int:
+    """CLI entry point for Chapman pre-training."""
+    parser = argparse.ArgumentParser(description="Pré-treino Project-Lewis em Chapman-Shaoxing")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("config/pretrain_v1.0.yaml"),
+        help="Caminho para config/pretrain_v*.yaml",
+    )
+    parser.add_argument(
+        "--use-slha",
+        action="store_true",
+        help="Ativar Self-Learning Hardware Adapter (auto batch size + monitor)",
+    )
+    parser.add_argument(
+        "--max-records",
+        type=int,
+        default=None,
+        help="Limitar número de registros Chapman (smoke test)",
+    )
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=None,
+        help="Sobrescrever número de épocas do config",
+    )
+    parser.add_argument(
+        "--steps-per-epoch",
+        type=int,
+        default=None,
+        help="Sobrescrever steps_per_epoch do config",
+    )
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(name)s | %(levelname)s | %(message)s",
+    )
+
+    cfg = _load_config(args.config)
+    model_cfg = cfg["model"]
+    train_cfg = cfg["training"]
+
+    from .chapman_dataset import chapman_train_val_split
+
+    train_ds, val_ds = chapman_train_val_split(
+        val_ratio=0.1,
+        batch_size=train_cfg["batch_size"],
+        segment_len=model_cfg["input_len"],
+        seed=train_cfg["seed"],
+    )
+
+    if args.max_records:
+        # Quick smoke test: limit catalog via environment override handled in dataset
+        LOGGER.warning("--max-records não implementado para tf.data; use com cautela")
+
+    # Estimate steps per epoch from dataset size if not in config
+    n_train = sum(1 for _ in train_ds)
+    n_val = sum(1 for _ in val_ds)
+    if args.steps_per_epoch is not None:
+        steps_per_epoch = args.steps_per_epoch
+    else:
+        steps_per_epoch = train_cfg.get("steps_per_epoch", n_train)
+    validation_steps = train_cfg.get("validation_steps", n_val)
+    epochs = args.epochs if args.epochs is not None else train_cfg["epochs"]
+    LOGGER.info(
+        "Steps per epoch: %d | Validation steps: %d | Epochs: %d",
+        steps_per_epoch,
+        validation_steps,
+        epochs,
+    )
+
+    experiment_dir = Path("experiments") / datetime.now(timezone.utc).strftime(
+        "%Y%m%d_%H%M%S_pretrain_chapman"
+    )
+
+    model, history = pretrain_chapman(
+        train_dataset=train_ds.repeat(),
+        val_dataset=val_ds.repeat(),
+        steps_per_epoch=steps_per_epoch,
+        validation_steps=validation_steps,
+        epochs=epochs,
+        batch_size=train_cfg["batch_size"],
+        input_len=model_cfg["input_len"],
+        num_classes=model_cfg["num_classes"],
+        learning_rate=train_cfg["learning_rate"],
+        seed=train_cfg["seed"],
+        experiment_dir=experiment_dir,
+        use_slha=args.use_slha,
+    )
+
+    # QG4 validation
+    final_val_auc = history.get("val_auc_roc", [np.nan])[-1]
+    final_val_loss = history.get("val_loss", [np.nan])[-1]
+    qg4_pass = (
+        final_val_auc > cfg["quality_gate"]["qg4"]["min_val_auc_roc_macro"]
+        and final_val_loss < cfg["quality_gate"]["qg4"]["max_val_loss"]
+    )
+    LOGGER.info(
+        "QG4 | val_auc_roc=%.4f | val_loss=%.4f | pass=%s",
+        final_val_auc,
+        final_val_loss,
+        qg4_pass,
+    )
+
+    if qg4_pass:
+        # Copy best model to canonical path
+        canonical = Path("models") / "backbone_pretrained_v1.0.keras"
+        canonical.parent.mkdir(parents=True, exist_ok=True)
+        import shutil
+
+        best_path = experiment_dir / "backbone_pretrained.keras"
+        shutil.copy(str(best_path), str(canonical))
+        LOGGER.info("Backbone copiado para %s", canonical)
+
+    return 0 if qg4_pass else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
