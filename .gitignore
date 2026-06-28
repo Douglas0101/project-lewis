@@ -29,12 +29,19 @@ reports/renode_*/
 log.html
 report.html
 robot_output.xml
-reports/*.html
-reports/*.json
+/logs/
+/experiments/
+/reports/*.html
+/reports/*.json
+/reports/*.log
+/reports/*.xml
+/reports/renode_*/
+/reports/tracking/
 !reports/.gitkeep
 
 # --- Python / venv ---
 __pycache__/
+*/__pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
@@ -59,13 +66,21 @@ firmware/tools/renode_*/
 .pytest_cache/
 .ruff_cache/
 
-# --- UV lock (gerado) ---
-uv.lock
+# --- UV lock (deve ser versionado para reprodutibilidade) ---
+# uv.lock
 
 # --- Dados e artefatos gerados ---
 /data/
 /build/
 /snapshots/
+
+# Modelos treinados, scalers e thresholds (gerados pelo treinamento)
+/models/*.keras
+/models/*.h5
+/models/*.pkl
+/models/*.tflite
+/models/stage*_threshold*.json
+/models/input_scaler_*.pkl
 /models/quantized/
 
 # --- Diretórios de ambiente / sessão ---
