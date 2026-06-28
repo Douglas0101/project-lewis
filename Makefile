@@ -7,7 +7,8 @@
         verify-renode \
         knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
         knowledge-reindex-if-docs-changed \
-        memory-commit
+        memory-commit \
+        test-e2e
 
 # Detecta ambiente virtual se existente; caso contrário usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
@@ -117,6 +118,9 @@ export:
 
 test:
 	$(PYTEST) tests/ -q --tb=short
+
+test-e2e:
+	$(PYTEST) tests/ -m "slow or integration" -v --tb=short
 
 quality-report:
 	$(UV) run python scripts/generate_quality_report.py
