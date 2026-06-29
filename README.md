@@ -445,7 +445,15 @@ project-lewis/
 
 ## 🚀 Como Executar
 
-### 1. Ambiente
+### 1. Primeiro acesso
+
+```bash
+make doctor    # verifica ambiente
+make setup     # instala dependências e hooks
+make help      # lista todos os comandos disponíveis
+```
+
+### 2. Ambiente
 
 ```bash
 # Usando uv (recomendado)
@@ -457,14 +465,14 @@ make docker-build
 make docker-run
 ```
 
-### 2. Pipeline de Dados
+### 3. Pipeline de Dados
 
 ```bash
 make download-all   # QG0
 make process        # QG1
 ```
 
-### 3. Features e Modelagem
+### 4. Features e Modelagem
 
 ```bash
 make features       # QG2/QG3
@@ -479,14 +487,14 @@ make pretrain       # QG4
 make finetune       # QG5
 ```
 
-### 4. Quantização e Exportação
+### 5. Quantização e Exportação
 
 ```bash
 make quantize       # QG6
 make export         # headers C
 ```
 
-### 5. Firmware, Harness e Simulação
+### 6. Firmware, Harness e Simulação
 
 ```bash
 cd firmware
@@ -596,3 +604,9 @@ Arquitetura de firmware embarcado, CI/CD, compliance e integração ML embarcado
 ## 📜 Licença
 
 MIT License — veja [`LICENSE`](LICENSE) para detalhes.
+
+---
+
+## 🤝 Contribuindo
+
+Quer contribuir com o Project-Lewis? Consulte o [CONTRIBUTING.md](CONTRIBUTING.md) para o workflow de equipe, convenções de código e processo de revisão.

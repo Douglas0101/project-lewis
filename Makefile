@@ -1,4 +1,4 @@
-.PHONY: env download-all download-chapman download-mitbih mirror mirror-restore \
+.PHONY: help env setup doctor dev download-all download-chapman download-mitbih mirror mirror-restore \
         catalog qg0 dlq-replay test clean clean-raw clean-mirrors \
         process pretrain finetune quantize export provenance all \
         docker-build docker-run docker-shell pre-commit-install lint format type-check \
@@ -10,7 +10,7 @@
         memory-commit \
         test-e2e
 
-# Detecta ambiente virtual se existente; caso contrário usa python3/pytest do sistema.
+# Detecta ambiente virtual se existente; caso contrario usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
     PYTHON  := python3
     PYTEST  := pytest
@@ -23,53 +23,71 @@ DATA    := data
 FIRMWARE_DIR := firmware
 
 # ---------------------------------------------------------------------------
-# Ambiente reprodutível (uv)
+# Help
 # ---------------------------------------------------------------------------
-env:
+help: ## Show this help message
+	@echo "Project-Lewis Makefile targets:"
+	@grep -E '^[a-zA-Z0-9_-]+:.*##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  %-24s %s\n", $$1, $$2}'
+
+# ---------------------------------------------------------------------------
+# Onboarding
+# ---------------------------------------------------------------------------
+setup: env pre-commit-install ## Setup completo para novo contribuinte
+
+doctor: ## Verifica se o ambiente local atende aos pre-requisitos
+	$(PYTHON) scripts/check_environment.py
+
+dev: ## Abre shell no container Docker de desenvolvimento
+	docker compose up -d app && docker compose exec app bash
+
+# ---------------------------------------------------------------------------
+# Ambiente reprodutivel (uv)
+# ---------------------------------------------------------------------------
+env: ## Create/sync the reproducible Python environment with uv
 	$(UV) sync --frozen
 
 # ---------------------------------------------------------------------------
 # Docker
 # ---------------------------------------------------------------------------
-docker-build:
+docker-build: ## Build the project Docker image
 	docker build -t project-lewis:latest .
 
-docker-run: docker-build
+docker-run: docker-build ## Build and run the project in a Docker container
 	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest
 
-docker-shell: docker-build
+docker-shell: docker-build ## Build and open a bash shell in the Docker container
 	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest bash
 
 # ---------------------------------------------------------------------------
-# Git hooks e qualidade de código
+# Git hooks e qualidade de codigo
 # ---------------------------------------------------------------------------
-pre-commit-install:
+pre-commit-install: ## Install pre-commit Git hooks
 	$(UV) run pre-commit install
 
-lint:
+lint: ## Run flake8, mypy and bandit checks
 	$(UV) run flake8 src tests --max-line-length=100
 	$(UV) run mypy src --ignore-missing-imports
 	$(UV) run bandit -c pyproject.toml -r src
 
-format:
+format: ## Format Python code with black and isort
 	$(UV) run black src tests
 	$(UV) run isort src tests
 
-type-check:
+type-check: ## Run static type checks with mypy
 	$(UV) run mypy src --ignore-missing-imports
 
 # ---------------------------------------------------------------------------
 # Pipeline de dados (Fase 1)
 # ---------------------------------------------------------------------------
-download-chapman:
+download-chapman: ## Download the Chapman ECG dataset
 	$(PYTHON) -m src.data.download_chapman
 
-download-mitbih:
+download-mitbih: ## Download MIT-BIH, SVDB, AFDB and INCART datasets
 	$(PYTHON) -m src.data.download_mitbih
 
-download-all: download-chapman download-mitbih
+download-all: download-chapman download-mitbih ## Download all ECG datasets
 
-mirror:
+mirror: ## Create compressed mirrors of raw datasets
 	mkdir -p $(DATA)/mirrors
 	tar czf $(DATA)/mirrors/chapman_mirror.tar.gz        -C $(DATA)/raw_chapman .
 	tar czf $(DATA)/mirrors/mitbih_family_mirror.tar.gz  -C $(DATA)/raw_mitbih . \
@@ -77,52 +95,52 @@ mirror:
 	                                                        -C $(DATA)/raw_afdb   . \
 	                                                        -C $(DATA)/raw_incart .
 
-mirror-restore:
+mirror-restore: ## Restore raw datasets from compressed mirrors
 	mkdir -p $(DATA)/raw_chapman $(DATA)/raw_mitbih $(DATA)/raw_svdb \
 	         $(DATA)/raw_afdb $(DATA)/raw_incart
 	tar xzf $(DATA)/mirrors/chapman_mirror.tar.gz        -C $(DATA)/raw_chapman/
 	tar xzf $(DATA)/mirrors/mitbih_family_mirror.tar.gz  -C $(DATA)/raw_mitbih/
 
-catalog:
+catalog: ## Build the dataset catalog
 	$(PYTHON) -c "from src.data._catalog import build_catalog; build_catalog()"
 
-qg0:
+qg0: ## Run QG0 download integrity tests
 	$(PYTEST) tests/test_download.py -v
 
-dlq-replay:
+dlq-replay: ## Replay dead-letter queue failed downloads
 	$(PYTHON) -m src.data._downloader_replay
 
-provenance:
+provenance: ## Write data provenance manifest
 	$(PYTHON) -c "from src.data._compliance import write_provenance; import json; from pathlib import Path; m = json.loads(Path('src/data/checksums.json').read_text()); write_provenance(m)"
 
-process:
+process: ## Run resample and preprocessing pipeline
 	$(PYTHON) -m src.data.aggregator
 
-features:
+features: ## Run feature engineering pipeline
 	$(PYTHON) -m src.features.pipeline
 
-audit-training-data:
+audit-training-data: ## Audit training data quality
 	$(PYTHON) scripts/audit_training_data.py
 
-pretrain:
+pretrain: ## Pre-train model on Chapman dataset
 	$(PYTHON) -m src.models.pretrain_chapman
 
-finetune:
+finetune: ## Fine-tune model on MIT-BIH family datasets
 	$(PYTHON) -m src.models.finetune_mitbih
 
-quantize:
+quantize: ## Run INT8 post-training quantization
 	$(PYTHON) -m src.quantization.ptq
 
-export:
+export: ## Export quantized model to TFLite FlatBuffer
 	$(PYTHON) -m src.quantization.export_tflite
 
-test:
+test: ## Run the Python test suite
 	$(PYTEST) tests/ -q --tb=short
 
-test-e2e:
+test-e2e: ## Run slow and integration tests
 	$(PYTEST) tests/ -m "slow or integration" -v --tb=short
 
-quality-report:
+quality-report: ## Generate project quality report
 	$(UV) run python scripts/generate_quality_report.py
 
 # ---------------------------------------------------------------------------
@@ -131,7 +149,7 @@ quality-report:
 RENOD_DIR := firmware/tools/renode-1.15.3
 RENODE_BIN := $(RENOD_DIR)/renode
 
-verify-renode:
+verify-renode: ## Verify Renode 1.15.3 installation
 	@if [ ! -x "$(RENODE_BIN)" ]; then \
 	    echo "ERROR: Renode nao encontrado em $(RENODE_BIN)"; \
 	    exit 1; \
@@ -145,41 +163,41 @@ verify-renode:
 	fi; \
 	echo "Renode 1.15.3 confirmed"
 
-firmware-deps:
+firmware-deps: ## Install firmware build dependencies
 	$(MAKE) -C firmware firmware-deps
 
-firmware-tflm:
+firmware-tflm: ## Install/cache TensorFlow Lite Micro
 	$(FIRMWARE_DIR)/scripts/install_tflm.sh
 
-firmware-tflm-lib:
+firmware-tflm-lib: ## Build TensorFlow Lite Micro library
 	$(MAKE) -C firmware tflm-lib
 
-firmware-build: firmware-tflm-lib
+firmware-build: firmware-tflm-lib ## Build STM32F4 firmware binary
 	$(MAKE) -C firmware stm32f4
 
-firmware-native:
+firmware-native: ## Build firmware native simulator
 	$(MAKE) -C firmware native
 
-firmware-native-tflm:
+firmware-native-tflm: ## Build native simulator with TFLM
 	$(MAKE) -C firmware native-tflm
 
-firmware-native-stub:
+firmware-native-stub: ## Build native simulator with TFLM stub
 	$(MAKE) -C firmware ALLOW_STUB=1 native
 
-firmware-run:
+firmware-run: ## Run firmware in Renode emulation
 	$(MAKE) -C firmware firmware-run
 
-firmware-test: firmware-tflm-lib
+firmware-test: firmware-tflm-lib ## Run firmware tests under Renode
 	$(MAKE) -C firmware LEWIS_USE_TFLM=1 RENODE_SIMULATION=1 firmware-test
 
 # ---------------------------------------------------------------------------
 # Hard Gates (HG-01..HG-06)
 # ---------------------------------------------------------------------------
-check-strict-markers:
+check-strict-markers: ## Verify --strict-markers is enabled in pytest
 	@echo "Verificando --strict-markers em pyproject.toml..."
 	@$(PYTHON) -c "import tomllib, pathlib, sys; cfg = tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8')); addopts = cfg.get('tool', {}).get('pytest', {}).get('ini_options', {}).get('addopts', ''); sys.exit(0 if '--strict-markers' in addopts.split() else (print('ERROR: --strict-markers nao encontrado em pyproject.toml') or 1))" && echo "OK: --strict-markers configurado"
 
-check-no-stub:
+check-no-stub: ## Verify TFLM stub is not present in firmware ELF
 	@if [ ! -f firmware/build/stm32f4/lewis.elf ]; then \
 	    echo "SKIP: firmware/build/stm32f4/lewis.elf ainda nao existe"; \
 	    exit 0; \
@@ -194,10 +212,10 @@ check-no-stub:
 	    echo "SKIP: binario strings nao disponivel"; \
 	fi
 
-hard-gates: verify-renode
+hard-gates: verify-renode ## Run hard quality gates (HG-01..HG-06)
 	PYTEST=$(PYTEST) ALLOW_STUB=0 CI=1 $(PYTHON) scripts/run_hard_gates.py
 
-hard-gates-ci: check-strict-markers hard-gates check-no-stub
+hard-gates-ci: check-strict-markers hard-gates check-no-stub ## Run CI hard gates including marker/stub checks
 
 # ---------------------------------------------------------------------------
 # Camada C11 — Knowledge Layer (RAG + sqlite-vec + MCP)
@@ -241,13 +259,13 @@ knowledge-reindex-if-docs-changed:
 memory-commit:
 	$(UV) run python scripts/memory_commit.py --run-id $(RUN_ID) --path $(ARTIFACT_PATH) --type $(ARTIFACT_TYPE)
 
-all: env download-all catalog test quality-report
+all: env download-all catalog test quality-report ## Run full pipeline: env, download, catalog, test and report
 
-clean:
+clean: ## Remove processed data, features and model artifacts
 	rm -rf $(DATA)/processed/* $(DATA)/features/* models/*.h5 models/*.keras models/*.tflite
 
-clean-raw:
+clean-raw: ## Remove all raw downloaded datasets
 	rm -rf $(DATA)/raw_*
 
-clean-mirrors:
+clean-mirrors: ## Remove dataset mirror archives
 	rm -rf $(DATA)/mirrors/*

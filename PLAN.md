@@ -22,7 +22,7 @@ Plano de execução de tasks decompostas. Atualizar a cada sessão.
 
 ### v3.0 — Plano de Engenharia ML + RAG + Memória (2026-06-28)
 
-Implementação concluída na branch `feature/plano-v3-rag-memory`:
+Implementação concluída na branch `feature/plano-v3-rag-memory` e mergeada na `develop`:
 
 - [x] **Fase 0 — Memória do Sistema**
   - RAG reindexado (`data/knowledge.db`, 2490 chunks).
@@ -33,7 +33,7 @@ Implementação concluída na branch `feature/plano-v3-rag-memory`:
 - [x] **Fase 2 — Reengenharia Arquitetural**
   - `ECGClassifierV3`, notebook de ablação, ensemble top-2 weighted.
 - [x] **Fase 3 — Quantização Robusta**
-  - Pipeline QAT INT8 e `StrifiedRepresentativeDataset`.
+  - Pipeline QAT INT8 e `StratifiedRepresentativeDataset`.
 - [x] **Fase 4 — Métricas e Quality Gates**
   - `bootstrap_ci`, matriz de confusão normalizada, drift de scaler.
 - [x] **Fase 5 — Manutenção da Memória**
@@ -48,6 +48,16 @@ Validação:
 
 ### Histórico
 
+- [x] 2026-06-21 — Conferência em engenharia aplicada do SLHA vs SDD v2.0
+  - Documento: `docs/superpowers/conferencias/2026-06-21-slha-applied-engineering-review.md`
+  - RF-01..RF-12 e RNF-01..RNF-08 revisados e rastreados
+  - Análise por camada, trade-offs, riscos e recomendações documentados
+- [x] 2026-06-21 — Onboarding e execução intuitiva em equipe
+  - Targets auto-documentados no Makefile (`make help`, `make setup`, `make doctor`, `make dev`)
+  - Script `scripts/check_environment.py` para checagem de ambiente
+  - `CONTRIBUTING.md` com workflow de equipe
+  - Dockerfile corrigido para Python 3.12 + dev dependencies
+  - README atualizado com fluxo de primeiro acesso
 - [x] 2026-06-20 — Auditoria de qualidade dos dados pré-treino (QG0–QG3 + dataset de features)
 - [x] 2026-06-20 — Correções finais no `docs/SDD_Project-Lewis_v3.md`
 - [x] 2026-06-20 — Criar `mcp.json`, `.kimi/sdd-context.md`, `.opencode/sdd-context.md`, `AGENTS.md`

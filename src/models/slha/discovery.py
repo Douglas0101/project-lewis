@@ -6,7 +6,8 @@ import logging
 import os
 import platform
 import socket
-from typing import List
+from pathlib import Path
+from typing import List, Optional
 
 import psutil
 import tensorflow as tf
@@ -92,10 +93,16 @@ def _read_disk() -> DiskInfo:
     )
 
 
-def discover_hardware() -> HardwareSpecs:
-    """Coleta especificações de hardware com graceful degradation."""
+def discover_hardware(log_path: Optional[Path] = None) -> HardwareSpecs:
+    """Coleta especificações de hardware com graceful degradation.
+
+    Parameters
+    ----------
+    log_path : Path, optional
+        Se informado, persiste as specs em JSON neste caminho.
+    """
     try:
-        return HardwareSpecs(
+        specs = HardwareSpecs(
             hostname=socket.gethostname(),
             os=f"{platform.system()} {platform.release()}",
             cpu=_read_cpu(),
@@ -103,6 +110,11 @@ def discover_hardware() -> HardwareSpecs:
             ram=_read_ram(),
             disk=_read_disk(),
         )
+        if log_path is not None:
+            log_path = Path(log_path)
+            log_path.parent.mkdir(parents=True, exist_ok=True)
+            log_path.write_text(specs.model_dump_json(indent=2), encoding="utf-8")
+        return specs
     except Exception as exc:
         LOGGER.exception("Discovery falhou")
         raise DiscoveryError(str(exc)) from exc

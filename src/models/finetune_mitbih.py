@@ -490,10 +490,13 @@ def finetune_mitbih(
             y_sample=y_train[:n_sample],
             model=model,
             reference_batch_size=batch_size,
+            log_dir=experiment_dir / "slha",
         )
         batch_size = config.batch_size
         LOGGER.info("SLHA config: %s", config.model_dump_json())
-        callbacks.append(slha.ResourceMonitor())
+        callbacks.append(
+            slha.ResourceMonitor(log_path=experiment_dir / "slha" / "resource_logs.jsonl")
+        )
 
     # Treinar
     history = model.fit(

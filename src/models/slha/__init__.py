@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+from typing import Optional
+
 import numpy as np
 import tensorflow as tf
 
@@ -25,6 +28,7 @@ def auto_configure_training(
     y_sample: np.ndarray,
     model: tf.keras.Model,
     reference_batch_size: int = 64,
+    log_dir: Optional[Path] = None,
 ) -> TrainingConfig:
     """Caminho feliz: discovery → warmup → decision.
 
@@ -38,16 +42,26 @@ def auto_configure_training(
         Modelo a ser treinado.
     reference_batch_size : int
         Batch size desejado quando a memória permitir.
+    log_dir : Path, optional
+        Se informado, persiste logs estruturados de discovery, warmup e decision.
 
     Returns
     -------
     TrainingConfig
     """
-    specs = discover_hardware()
-    warmup = warmup_model(model, X_sample, y_sample, batch_size=min(2, len(X_sample)))
+    log_dir = Path(log_dir) if log_dir else None
+    specs = discover_hardware(log_path=log_dir / "hardware_specs.json" if log_dir else None)
+    warmup = warmup_model(
+        model,
+        X_sample,
+        y_sample,
+        batch_size=min(2, len(X_sample)),
+        log_path=log_dir / "warmup_result.json" if log_dir else None,
+    )
     config = decide_training_config(
         specs,
         estimated_memory_per_sample_mb=warmup.estimated_memory_per_sample_mb,
         reference_batch_size=reference_batch_size,
+        log_path=log_dir / "training_config.json" if log_dir else None,
     )
     return config

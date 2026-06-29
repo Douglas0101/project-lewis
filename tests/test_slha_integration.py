@@ -1,3 +1,5 @@
+import json
+
 import numpy as np
 import tensorflow as tf
 
@@ -18,3 +20,27 @@ def test_auto_configure_returns_config():
     assert config.batch_size >= 1
     assert config.accelerator in {"cpu", "gpu"}
     assert config.precision in {"float32", "mixed_float16"}
+
+
+def test_auto_configure_persists_logs(tmp_path):
+    X = np.random.randn(8, 500, 1).astype("float32")
+    y = np.array([0, 1, 0, 1, 0, 1, 0, 1], dtype="int32")
+    model = tf.keras.Sequential(
+        [
+            tf.keras.layers.Input(shape=(500, 1)),
+            tf.keras.layers.GlobalAveragePooling1D(),
+            tf.keras.layers.Dense(2, activation="softmax"),
+        ]
+    )
+    config = auto_configure_training(X, y, model, reference_batch_size=32, log_dir=tmp_path)
+    assert config.batch_size >= 1
+
+    expected_files = [
+        tmp_path / "hardware_specs.json",
+        tmp_path / "warmup_result.json",
+        tmp_path / "training_config.json",
+    ]
+    for path in expected_files:
+        assert path.exists(), f"{path.name} não foi persistido"
+        data = json.loads(path.read_text(encoding="utf-8"))
+        assert data

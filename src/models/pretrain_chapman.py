@@ -184,10 +184,13 @@ def pretrain_chapman(
             y_sample=y_sample[:8],
             model=model,
             reference_batch_size=batch_size,
+            log_dir=experiment_dir / "slha",
         )
         batch_size = config.batch_size
         LOGGER.info("SLHA config: %s", config.model_dump_json())
-        callbacks.append(slha.ResourceMonitor())
+        callbacks.append(
+            slha.ResourceMonitor(log_path=experiment_dir / "slha" / "resource_logs.jsonl")
+        )
 
     # Treinar
     fit_kwargs = {
