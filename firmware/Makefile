@@ -8,7 +8,7 @@ PROJECT_ROOT := $(PROJECT_ROOT:%/=%)
 # Toolchain
 # ---------------------------------------------------------------------------
 TOOLS_DIR := $(PROJECT_ROOT)/tools
-ARM_DIR   := $(TOOLS_DIR)/xpack-arm-none-eabi-gcc-13.3.1-1.1
+ARM_DIR   := $(TOOLS_DIR)/arm-gnu-toolchain-13.3.rel1
 RENOD_DIR := $(TOOLS_DIR)/renode-1.15.3
 
 CC_ARM    := $(ARM_DIR)/bin/arm-none-eabi-gcc
@@ -70,7 +70,9 @@ OPT      := -O2
 LEWIS_USE_TFLM ?= 0
 RENODE_SIMULATION ?= 0
 ALLOW_STUB ?= 0
-LEWIS_ARENA_SIZE ?= 65536
+# Arena padrao 48 KB para cumprir QG9/QG12 (RAM < 64 KB).
+# Pode ser sobrescrito via linha de comando (ex: LEWIS_ARENA_SIZE=65536).
+LEWIS_ARENA_SIZE ?= 49152
 
 # Linker script padrao (192 KB de RAM); pode ser sobrescrito por alvo.
 LDSCRIPT ?= $(PROJECT_ROOT)/stm32f407vg.ld
@@ -85,15 +87,12 @@ ifeq ($(CI),1)
 endif
 
 # Host-native usa TFLM real por padrao; stub somente com ALLOW_STUB=1.
-ifneq ($(filter native,$(MAKECMDGOALS)),)
+ifneq ($(filter native native-tflm harness-native,$(MAKECMDGOALS)),)
   ifeq ($(ALLOW_STUB),0)
     LEWIS_USE_TFLM = 1
   else
     LEWIS_USE_TFLM = 0
   endif
-endif
-ifneq ($(filter native-tflm,$(MAKECMDGOALS)),)
-  LEWIS_USE_TFLM = 1
 endif
 
 # ---------------------------------------------------------------------------
@@ -155,13 +154,28 @@ $(BUILD_STM)/lewis.elf: $(OBJECTS_STM) $(OBJECTS_STM_CXX)
 $(BUILD_STM)/lewis.bin: $(BUILD_STM)/lewis.elf
 	$(OBJCOPY) -O binary $< $@
 
+# Quando TFLM esta ativo, o build do firmware depende da biblioteca ja gerada.
+ifeq ($(LEWIS_USE_TFLM),1)
+$(BUILD_STM)/lewis.elf: tflm-lib
+$(BUILD_STM)/lewis_48k.elf: tflm-lib
+endif
+
 # ---------------------------------------------------------------------------
 # TFLM
 # ---------------------------------------------------------------------------
+# CMSIS-NN acelera inferencia no Cortex-M4F, mas pode divergir ate alguns LSBs
+# dos kernels de referencia. Para validacao de bit-exatidao (QG8), use
+# USE_CMSIS_NN=0 na linha de comando.
+USE_CMSIS_NN ?= 1
+
 LDFLAGS_NAT := -lm
 TFLM_DIR        := $(PROJECT_ROOT)/third_party/tflite-micro
 TFLM_MAKEFILE   := $(TFLM_DIR)/tensorflow/lite/micro/tools/make/Makefile
+ifeq ($(USE_CMSIS_NN),1)
 TFLM_LIB_ARM    := $(TFLM_DIR)/gen/cortex_m_generic_cortex-m4+fp_release_cmsis_nn_gcc/lib/libtensorflow-microlite.a
+else
+TFLM_LIB_ARM    := $(TFLM_DIR)/gen/cortex_m_generic_cortex-m4+fp_release_gcc/lib/libtensorflow-microlite.a
+endif
 TFLM_LIB_NATIVE := $(TFLM_DIR)/gen/linux_x86_64_release_gcc/lib/libtensorflow-microlite.a
 TFLM_INCLUDE    := -I$(TFLM_DIR) \
                    -I$(TFLM_DIR)/tensorflow/lite/micro/tools/make/downloads/flatbuffers/include \
@@ -338,15 +352,20 @@ clean:
 
 clean-all: clean
 	$(MAKE) -f $(TFLM_MAKEFILE) TARGET=linux clean
-	$(MAKE) -f $(TFLM_MAKEFILE) TARGET=cortex_m_generic TARGET_ARCH=cortex-m4 OPTIMIZED_KERNEL_DIR=cmsis_nn clean
+	$(MAKE) -f $(TFLM_MAKEFILE) TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp OPTIMIZED_KERNEL_DIR=cmsis_nn clean
 
 firmware-deps:
-	$(PROJECT_ROOT)/scripts/install_deps.sh
+	$(PROJECT_ROOT)/../scripts/install_firmware_tools.sh
+
+TFLM_CMSIS_FLAG :=
+ifeq ($(USE_CMSIS_NN),1)
+TFLM_CMSIS_FLAG := OPTIMIZED_KERNEL_DIR=cmsis_nn
+endif
 
 tflm-lib:
-	cd $(TFLM_DIR) && make -f $(TFLM_MAKEFILE) TARGET=cortex_m_generic TARGET_ARCH=cortex-m4 \
-		OPTIMIZED_KERNEL_DIR=cmsis_nn TARGET_TOOLCHAIN_ROOT=$(ARM_DIR)/bin/ \
-		BUILD_TYPE=release -j$(shell nproc 2>/dev/null || echo 2)
+	cd $(TFLM_DIR) && make -f $(TFLM_MAKEFILE) TARGET=cortex_m_generic TARGET_ARCH=cortex-m4+fp \
+		$(TFLM_CMSIS_FLAG) TARGET_TOOLCHAIN_ROOT=$(ARM_DIR)/bin/ \
+		BUILD_TYPE=release microlite -j$(shell nproc 2>/dev/null || echo 2)
 
 firmware-run: stm32f4
 	$(RENOD_DIR)/renode --disable-xwt --console $(PROJECT_ROOT)/renode/stm32f4_discovery.resc

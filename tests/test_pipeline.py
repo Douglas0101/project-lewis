@@ -12,6 +12,17 @@ import pytest
 from src.data.aggregator import ECGAggregator
 
 
+RAW_DIRS = {
+    "mitdb": Path("data/raw_mitbih"),
+    "svdb": Path("data/raw_svdb"),
+    "incart": Path("data/raw_incart"),
+}
+
+
+def _raw_data_available() -> bool:
+    return all(d.exists() and any(d.iterdir()) for d in RAW_DIRS.values())
+
+
 @pytest.fixture
 def isolated_dirs(monkeypatch):
     """Provide temporary processed/lineage/DLQ directories."""
@@ -48,6 +59,7 @@ def isolated_dirs(monkeypatch):
     shutil.rmtree(tmp, ignore_errors=True)
 
 
+@pytest.mark.skipif(not _raw_data_available(), reason="raw datasets not available")
 @pytest.mark.qg1
 def test_pipeline_processes_mitbih_family(isolated_dirs):
     """Smoke test: process one record from each MIT-BIH-family dataset."""
@@ -76,9 +88,12 @@ def test_pipeline_processes_mitbih_family(isolated_dirs):
         assert lin["pipeline"][1]["step"] == "resample"
         assert lin["pipeline"][2]["step"] == "filter"
         assert lin["pipeline"][3]["step"] == "detrend"
-        assert lin["pipeline"][4]["step"] == "normalize"
+        assert lin["pipeline"][4]["step"] == "clip_outliers"
+        assert lin["pipeline"][5]["step"] == "normalize"
+        assert lin["pipeline"][6]["step"] == "post_normalize_clip"
 
 
+@pytest.mark.skipif(not _raw_data_available(), reason="raw datasets not available")
 @pytest.mark.qg1
 def test_pipeline_idempotency(isolated_dirs):
     """Second run must skip already processed records."""
@@ -92,6 +107,7 @@ def test_pipeline_idempotency(isolated_dirs):
     assert stats2["mitdb"]["skipped"] == 0
 
 
+@pytest.mark.skipif(not _raw_data_available(), reason="raw datasets not available")
 @pytest.mark.qg1
 def test_pipeline_dlq_empty_on_success(isolated_dirs):
     """DLQ must remain empty when processing succeeds."""

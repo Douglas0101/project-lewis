@@ -1,7 +1,7 @@
 {
   "input": {
-    "scale": 0.02972802333533764,
-    "zero_point": -4,
+    "scale": 0.0680587143,
+    "zero_point": -20,
     "dtype": "int8"
   },
   "output": {

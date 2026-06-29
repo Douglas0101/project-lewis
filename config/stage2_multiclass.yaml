@@ -1,0 +1,90 @@
+# Project-Lewis — Camada 04 v2.0: Estágio 2 — Subtipificador S vs V vs F
+
+model:
+  input_len: 500
+  num_classes: 3
+  embedding_dim: 64
+  dropout_rate: 0.3
+  activation: softmax
+  # Alinhado com backbone pré-treinado do Chapman (experiments/20260621_*_pretrain_chapman)
+  conv_filters: [16, 32, 64]
+  conv_kernels: [7, 5, 3]
+  dense_units: 64
+
+dataset:
+  name: stage2_multiclass
+  feature_parquet: data/features/stage2_multiclass.parquet
+  feature_npz: data/features/stage2_multiclass.npz
+  class_weight: balanced
+  max_class_weight: 8.0
+
+augmentation:
+  # Legado simples (mantido para compatibilidade):
+  # class: 2  # classe F
+  # factor: 5
+  per_class:
+    "0":  # S
+      factor: 1
+      methods: ["jitter", "time_warp"]
+      intensity: "low"
+    "1":  # V
+      factor: 1
+      methods: ["jitter", "time_warp"]
+      intensity: "low"
+    "2":  # F
+      factor: 8
+      methods: ["jitter", "baseline_wander", "powerline_noise", "time_warp", "amplitude_scale"]
+      intensity: "high"
+
+training:
+  epochs: 50
+  batch_size: 128
+  learning_rate: 0.001
+  optimizer: adam
+  loss: sparse_categorical_crossentropy  # ou focal_loss
+  focal_gamma: 1.5
+  focal_alpha: null  # vetor por classe ou null para usar class_weight
+  seed: 42
+  monitor: val_loss
+
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 15
+    restore_best_weights: true
+  reduce_lr_on_plateau:
+    monitor: val_loss
+    patience: 5
+    factor: 0.5
+    min_lr: 1.0e-6
+  csv_logger:
+    filename: training.log
+
+group_kfold:
+  n_splits: 5
+  seed: 42
+
+threshold_tuning:
+  enabled: true
+  search_step: 0.05
+
+normalization:
+  type: zscore_global
+  fit_on: train_only
+  scaler_filename: input_scaler_stage2_v2.0.pkl
+
+quality_gate:
+  qg5_stage2:
+    # Thresholds v2.2: metas realistas após augmentation da classe F.
+    min_acc: 0.60
+    min_f1_macro: 0.45
+    f1:
+      S: 0.55
+      V: 0.70
+      F: 0.15
+
+output:
+  experiment_dir_pattern: experiments/exp_{timestamp}_stage2_v2.0
+  model_filename: stage2_float32_v2.0.keras
+  scaler_filename: input_scaler_stage2_v2.0.pkl
+  summary_filename: summary.json

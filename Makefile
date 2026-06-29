@@ -2,11 +2,15 @@
         catalog qg0 dlq-replay test clean clean-raw clean-mirrors \
         process pretrain finetune quantize export provenance all \
         docker-build docker-run docker-shell pre-commit-install lint format type-check \
-        firmware-deps firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
+        firmware-deps firmware-tflm firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
         firmware-run firmware-test hard-gates hard-gates-ci check-strict-markers check-no-stub \
-        verify-renode
+        verify-renode \
+        knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
+        knowledge-reindex-if-docs-changed \
+        memory-commit \
+        test-e2e
 
-# Detecta ambiente virtual se existente; caso contrário usa python3/pytest do sistema.
+# Detecta ambiente virtual se existente; caso contrario usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
     PYTHON  := python3
     PYTEST  := pytest
@@ -16,6 +20,7 @@ else
 endif
 UV      := uv
 DATA    := data
+FIRMWARE_DIR := firmware
 
 # ---------------------------------------------------------------------------
 # Help
@@ -36,7 +41,7 @@ dev: ## Abre shell no container Docker de desenvolvimento
 	docker compose up -d app && docker compose exec app bash
 
 # ---------------------------------------------------------------------------
-# Ambiente reprodutível (uv)
+# Ambiente reprodutivel (uv)
 # ---------------------------------------------------------------------------
 env: ## Create/sync the reproducible Python environment with uv
 	$(UV) sync --frozen
@@ -54,7 +59,7 @@ docker-shell: docker-build ## Build and open a bash shell in the Docker containe
 	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest bash
 
 # ---------------------------------------------------------------------------
-# Git hooks e qualidade de código
+# Git hooks e qualidade de codigo
 # ---------------------------------------------------------------------------
 pre-commit-install: ## Install pre-commit Git hooks
 	$(UV) run pre-commit install
@@ -132,6 +137,9 @@ export: ## Export quantized model to TFLite FlatBuffer
 test: ## Run the Python test suite
 	$(PYTEST) tests/ -q --tb=short
 
+test-e2e: ## Run slow and integration tests
+	$(PYTEST) tests/ -m "slow or integration" -v --tb=short
+
 quality-report: ## Generate project quality report
 	$(UV) run python scripts/generate_quality_report.py
 
@@ -157,6 +165,9 @@ verify-renode: ## Verify Renode 1.15.3 installation
 
 firmware-deps: ## Install firmware build dependencies
 	$(MAKE) -C firmware firmware-deps
+
+firmware-tflm: ## Install/cache TensorFlow Lite Micro
+	$(FIRMWARE_DIR)/scripts/install_tflm.sh
 
 firmware-tflm-lib: ## Build TensorFlow Lite Micro library
 	$(MAKE) -C firmware tflm-lib
@@ -205,6 +216,48 @@ hard-gates: verify-renode ## Run hard quality gates (HG-01..HG-06)
 	PYTEST=$(PYTEST) ALLOW_STUB=0 CI=1 $(PYTHON) scripts/run_hard_gates.py
 
 hard-gates-ci: check-strict-markers hard-gates check-no-stub ## Run CI hard gates including marker/stub checks
+
+# ---------------------------------------------------------------------------
+# Camada C11 — Knowledge Layer (RAG + sqlite-vec + MCP)
+# ---------------------------------------------------------------------------
+knowledge-index:
+	@echo "[C11] Reindexando knowledge base..."
+	$(UV) run python -m src.knowledge.cli reindex
+
+knowledge-query:
+	@read -p "Query: " q; $(UV) run python -m src.knowledge.cli query "$$q"
+
+knowledge-status:
+	$(UV) run python -m src.knowledge.cli status
+
+knowledge-test:
+	$(UV) run pytest tests/test_knowledge/ -v --tb=short
+
+knowledge-clean:
+	rm -f data/knowledge.db
+	rm -rf data/lineage/knowledge/
+	rm -f logs/knowledge_queries.jsonl
+	rm -f data/.dlq/knowledge_rejected.jsonl
+
+knowledge-validate:
+	$(UV) run python scripts/validate_knowledge_index.py
+
+knowledge-reindex-if-docs-changed:
+	@mkdir -p data/lineage
+	@CURRENT=$$(find docs src/knowledge -type f \( -name '*.md' -o -name '*.py' \) | sort | xargs sha256sum | sha256sum | awk '{print $$1}'); \
+	if [ -f data/lineage/.knowledge_checksum ] && [ "$$(cat data/lineage/.knowledge_checksum)" = "$$CURRENT" ]; then \
+		echo "[C11] Knowledge sources unchanged; skipping reindex."; \
+	else \
+		echo "[C11] Knowledge sources changed; reindexing..."; \
+		$(UV) run python -m src.knowledge.cli reindex; \
+		echo "$$CURRENT" > data/lineage/.knowledge_checksum; \
+	fi
+
+# ---------------------------------------------------------------------------
+# Memory / ArtifactRegistry
+# ---------------------------------------------------------------------------
+memory-commit:
+	$(UV) run python scripts/memory_commit.py --run-id $(RUN_ID) --path $(ARTIFACT_PATH) --type $(ARTIFACT_TYPE)
 
 all: env download-all catalog test quality-report ## Run full pipeline: env, download, catalog, test and report
 

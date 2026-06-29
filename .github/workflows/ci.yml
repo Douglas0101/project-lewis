@@ -25,18 +25,10 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install uv
-        run: |
-          curl -LsSf https://astral.sh/uv/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
-
-      - name: Cache uv
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/uv
-          key: uv-${{ runner.os }}-${{ hashFiles('pyproject.toml', 'uv.lock') }}
-          restore-keys: |
-            uv-${{ runner.os }}-
+          enable-cache: true
 
       - name: Install system dependencies
         run: |
@@ -59,14 +51,20 @@ jobs:
       - name: Install firmware tooling
         run: uv run make firmware-deps
 
+      - name: Cache TFLM build
+        id: cache-tflm
+        uses: actions/cache@v4
+        with:
+          path: firmware/third_party/tflite-micro
+          key: tflm-${{ runner.os }}-${{ hashFiles('firmware/third_party/tflite-micro.commit', 'firmware/scripts/install_tflm.sh') }}
+          restore-keys: |
+            tflm-${{ runner.os }}-
+
+      - name: Install / cache TFLM
+        run: uv run make firmware-tflm
+
       - name: Verify Renode Version
         run: uv run make verify-renode
-
-      - name: Lint
-        run: uv run make lint
-
-      - name: Tests
-        run: uv run make test
 
       - name: Run hard gates
         run: uv run make hard-gates-ci

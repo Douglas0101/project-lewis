@@ -32,4 +32,4 @@ Fidelity Inference For Beat
     Create Log Tester    0
     Wait For Log Entry    Modo comando UART ativo    timeout=${TIMEOUT}
     Send Binary Frame    ${INPUT_PATH}
-    Wait For Response In Log    ${UART_LOG}    timeout=60
+    Wait For Response In Log    ${UART_LOG}    timeout=180

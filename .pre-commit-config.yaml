@@ -54,3 +54,19 @@ repos:
       - id: bandit
         args: ["-c", "pyproject.toml"]
         additional_dependencies: ["bandit[toml]"]
+
+  - repo: local
+    hooks:
+      - id: knowledge-lint
+        name: Knowledge Layer Type Check
+        entry: uv run mypy src/knowledge/
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: knowledge-test-smoke
+        name: Knowledge Smoke Test
+        entry: uv run pytest tests/test_knowledge/test_indexer.py -v
+        language: system
+        pass_filenames: false
+        always_run: false
+        stages: [pre-push]

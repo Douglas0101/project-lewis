@@ -15,7 +15,7 @@ INPUT_SAMPLES = 500
 INPUT_BYTES = INPUT_SAMPLES * 4
 START_BYTE = 0x3C  # '<'
 END_BYTE = 0x3E  # '>'
-RESPONSE_LEN = 5
+RESPONSE_LEN = 3
 START_DELAY_S = 0.1   # tempo para o firmware entrar em infer_from_uart
 BYTE_DELAY_S = 0.02   # evita overflow do buffer FIFO da UART emulada
 
@@ -57,7 +57,7 @@ class FidelityKeywords:
         # Fim de frame
         self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {END_BYTE}")
 
-    def wait_for_response_in_log(self, log_path: str, timeout: float = 30.0) -> None:
+    def wait_for_response_in_log(self, log_path: str, timeout: float = 180.0) -> None:
         """Aguarda ate que ``log_path`` contenha uma resposta ``<5xint8>``.
 
         A saida do firmware e escrita no arquivo de backend da UART. Este

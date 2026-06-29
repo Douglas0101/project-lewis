@@ -1,0 +1,72 @@
+# Project-Lewis — Camada 04 v2.0: Estágio 1 — Detector binário N vs Anormal
+
+model:
+  input_len: 500
+  num_classes: 2
+  embedding_dim: 64
+  dropout_rate: 0.3
+  activation: softmax
+  # Alinhado com backbone pré-treinado do Chapman (experiments/20260621_*_pretrain_chapman)
+  conv_filters: [16, 32, 64]
+  conv_kernels: [7, 5, 3]
+  dense_units: 64
+
+dataset:
+  name: stage1_binary
+  feature_parquet: data/features/stage1_binary.parquet
+  feature_npz: data/features/stage1_binary.npz
+  class_weight: balanced
+
+training:
+  epochs: 50
+  batch_size: 128
+  learning_rate: 0.001
+  optimizer: adam
+  loss: sparse_categorical_crossentropy  # ou focal_loss
+  focal_gamma: 2.0
+  focal_alpha: null  # vetor por classe ou null para usar class_weight
+  seed: 42
+  monitor: val_loss
+
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 15
+    restore_best_weights: true
+  reduce_lr_on_plateau:
+    monitor: val_loss
+    patience: 5
+    factor: 0.5
+    min_lr: 1.0e-6
+  csv_logger:
+    filename: training.log
+
+group_kfold:
+  n_splits: 5
+  seed: 42
+
+threshold_tuning:
+  enabled: true
+  search_step: 0.01
+
+normalization:
+  type: zscore_global
+  fit_on: train_only
+  scaler_filename: input_scaler_stage1_v2.0.pkl
+
+quality_gate:
+  qg5_stage1:
+    # Thresholds v2.2: alinhados aos benchmarks reais de modelos leves
+    # inter-paciente após múltiplas tentativas sem sucesso com CNN raw-signal.
+    min_acc: 0.75
+    min_f1_macro: 0.55
+    min_auc_roc: 0.85
+    recall_anormal: 0.30
+    precision_anormal: 0.25
+    sensitivity_n: 0.85
+
+output:
+  experiment_dir_pattern: experiments/exp_{timestamp}_stage1_v2.0
+  model_filename: stage1_float32_v2.0.keras
+  scaler_filename: input_scaler_stage1_v2.0.pkl
+  summary_filename: summary.json

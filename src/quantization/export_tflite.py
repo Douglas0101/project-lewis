@@ -272,7 +272,7 @@ def export_tflite(
     generate_c_header(
         tflite_model,
         header_path,
-        array_name=model_name.replace("-", "_"),
+        array_name=model_name.replace("-", "_").replace(".", "_"),
         version=version,
     )
     generate_quantization_header(

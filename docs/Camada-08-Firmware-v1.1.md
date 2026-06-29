@@ -97,7 +97,28 @@ A medição de latência é feita com `lewis_hal_benchmark_start()` / `lewis_hal
 
 O TFLM é adicionado como fonte em `firmware/third_party/tflite-micro/`. O build produz `libtensorflow-microlite.a` via o Makefile oficial do TFLM, que é depois linkado ao firmware.
 
-Operadores registrados (mínimo viável):
+### Obtenção do código-fonte
+
+O diretório `firmware/third_party/tflite-micro/` **não é versionado no Git**. Ele é obtido por shallow clone do repositório oficial, com a versão fixada pelo arquivo:
+
+```text
+firmware/third_party/tflite-micro.commit
+```
+
+Para instalar/compilar localmente:
+
+```bash
+make firmware-tflm
+```
+
+O script `firmware/scripts/install_tflm.sh` clona o repositório `tensorflow/tflite-micro` no commit SHA especificado e builda as bibliotecas:
+
+- **Host nativo** (`linux_x86_64`) — usada pelos testes de bit-exatidão (QG8/QG10).
+- **ARM Cortex-M4F + CMSIS-NN** (`cortex_m_generic_cortex-m4+fp`) — usada pelo firmware STM32F4.
+
+O build usa paralelismo `-j1` por padrão para evitar `internal compiler error` causado por OOM em runners de CI.
+
+### Operadores registrados (mínimo viável)
 
 - `Conv2D` / `DepthwiseConv2D`
 - `FullyConnected`
@@ -113,11 +134,17 @@ A arena TFLM é um array estático alinhado a 16 bytes de 64 KB. O build padrão
 ## 8.7 Build
 
 ```bash
-# Host nativo (validacao rapida de sintaxe/logica)
+# 1. Instalar toolchain ARM e Renode
+make firmware-deps
+
+# 2. Instalar/compilar o TFLM (host + ARM)
+make firmware-tflm
+
+# 3. Host nativo (validacao rapida de sintaxe/logica)
 make firmware-native
 ./firmware/build/native/lewis
 
-# STM32F4 (elf + bin) com TFLM real
+# 4. STM32F4 (elf + bin) com TFLM real
 make -C firmware LEWIS_USE_TFLM=1 firmware-build
 
 # Tamanho

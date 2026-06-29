@@ -19,7 +19,9 @@ import tensorflow as tf
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
-from .backbone_1d import build_backbone_1d, freeze_conv_layers
+from src.tracking.integrations import record_fold_results
+
+from .backbone_1d import build_backbone_1d
 from .evaluate import evaluate_fold
 from .finetune_mitbih import finetune_mitbih
 
@@ -71,7 +73,8 @@ def train_group_kfold(
     X: np.ndarray,
     y: np.ndarray,
     groups: np.ndarray,
-    backbone_weights: Path,
+    backbone_weights: Optional[Path] = None,
+    freeze_backbone: bool = True,
     n_splits: int = 5,
     epochs: int = 100,
     batch_size: int = 64,
@@ -79,6 +82,18 @@ def train_group_kfold(
     seed: int = 42,
     experiment_dir: Optional[Path] = None,
     monitor: str = "val_loss",
+    class_names: Optional[List[str]] = None,
+    thresholds: Optional[Dict[str, Any]] = None,
+    model_builder=None,
+    class_weight: Optional[Dict[int, float]] = None,
+    selection_metric: str = "F1_macro",
+    augment_class: Optional[int] = None,
+    augment_factor: int = 1,
+    augment_config: Optional[Dict[str, Any]] = None,
+    loss: str | tf.keras.losses.Loss = "sparse_categorical_crossentropy",
+    optimize_thresholds: bool = False,
+    tracking_experiment_id: Optional[int] = None,
+    tracking_stage_label: str = "",
 ) -> Dict[str, Any]:
     """Treinamento GroupKFold por paciente.
 
@@ -90,8 +105,12 @@ def train_group_kfold(
         Labels inteiros (shape: (n,)).
     groups : np.ndarray
         IDs de paciente (shape: (n,)).
-    backbone_weights : Path
-        Caminho para pesos do backbone pré-treinado.
+    backbone_weights : Path, optional
+        Caminho para pesos do backbone pré-treinado. Se None, o backbone é
+        treinado do zero (from scratch).
+    freeze_backbone : bool
+        Se True e ``backbone_weights`` for fornecido, congela as camadas
+        convolucionais para transfer learning. Ignorado quando não há pesos.
     n_splits : int
         Número de folds.
     epochs : int
@@ -106,6 +125,27 @@ def train_group_kfold(
         Diretório raiz dos experimentos.
     monitor : str
         Métrica para early stopping.
+    class_names : list[str], optional
+        Nomes das classes para avaliação AAMI.
+    thresholds : dict, optional
+        Thresholds configuráveis para ``evaluate_aami``.
+    model_builder : callable, optional
+        Função ``(input_len, num_classes) -> tf.keras.Model``. Se None, usa
+        ``build_backbone_1d``.
+    class_weight : dict, optional
+        Pesos por classe para ``model.fit``.
+    selection_metric : str
+        Métrica de seleção do melhor modelo no callback.
+    augment_class : int, optional
+        Classe a ser oversampled durante o treino (ex.: 2 para F no Estágio 2).
+    augment_factor : int
+        Fator de oversampling. factor=1 desativa.
+    augment_config : dict, optional
+        Configuração de oversampling por classe (class-specific augmentation).
+    loss : str or tf.keras.losses.Loss
+        Função de perda a ser passada para ``model.compile``.
+    optimize_thresholds : bool
+        Se True, aplica threshold tuning one-vs-rest na validação multiclasse.
 
     Returns
     -------
@@ -161,12 +201,21 @@ def train_group_kfold(
 
         joblib.dump(scaler, fold_dir / "input_scaler.pkl")
 
-        # 2. Carregar backbone pré-treinado
-        model = build_backbone_1d(input_len=X.shape[1], num_classes=len(np.unique(y)))
-        model.load_weights(str(backbone_weights))
-        model = freeze_conv_layers(model)
+        # 2. Construir/carregar backbone
+        if model_builder is None:
+            model = build_backbone_1d(input_len=X.shape[1], num_classes=len(np.unique(y)))
+        else:
+            model = model_builder(input_len=X.shape[1], num_classes=len(np.unique(y)))
+        if backbone_weights is not None:
+            model.load_weights(str(backbone_weights))
+            LOGGER.info("  Backbone weights loaded from %s", backbone_weights)
 
-        # 3. Fine-tuning
+        # 3. Fine-tuning (propaga freeze_backbone explicitamente)
+        if freeze_backbone:
+            LOGGER.info("  Freezing conv layers for transfer learning")
+        else:
+            LOGGER.info("  Training all layers (no backbone freezing)")
+
         model, history = finetune_mitbih(
             model=model,
             X_train=X_train_norm,
@@ -179,13 +228,42 @@ def train_group_kfold(
             seed=seed,
             experiment_dir=fold_dir,
             monitor=monitor,
+            freeze_backbone=freeze_backbone,
+            class_names=class_names,
+            thresholds=thresholds,
+            class_weight=class_weight,
+            selection_metric=selection_metric,
+            augment_class=augment_class,
+            augment_factor=augment_factor,
+            augment_config=augment_config,
+            loss=loss,
+            optimize_thresholds=optimize_thresholds,
         )
 
         # 4. Avaliação
-        eval_result = evaluate_fold(model, X_test_norm, y_test)
+        eval_result = evaluate_fold(
+            model,
+            X_test_norm,
+            y_test,
+            class_names=class_names,
+            thresholds=thresholds,
+            optimize_thresholds=optimize_thresholds,
+        )
         eval_result["fold"] = fold_idx
         eval_result["history"] = history
         fold_results.append(eval_result)
+
+        if tracking_experiment_id is not None:
+            try:
+                record_fold_results(
+                    experiment_id=tracking_experiment_id,
+                    fold_idx=fold_idx,
+                    eval_result=eval_result,
+                    artifact_dir=fold_dir,
+                    stage_label=tracking_stage_label,
+                )
+            except Exception:
+                LOGGER.exception("Falha ao registrar fold %d no tracking", fold_idx)
 
         f1_macro = eval_result["global"]["F1_macro"]
         LOGGER.info(

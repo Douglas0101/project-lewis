@@ -1,0 +1,81 @@
+# Project-Lewis — Camada 04: Fine-tuning em MIT-BIH+ (AAMI 5 classes)
+# Versão: 1.1.0 | From-scratch (sem pesos pré-treinados) + batch maior
+
+model:
+  input_len: 500
+  num_classes: 5
+  embedding_dim: 64
+  dropout_rate: 0.3
+  activation: softmax  # single-label AAMI
+
+dataset:
+  name: mitbih_family
+  datasets:
+    - mitdb
+    - svdb
+    - afdb
+    - incart
+  lead_mapping:
+    mitdb: MLII
+    svdb: ECG1
+    afdb: ECG1
+    incart: II
+  feature_parquet: data/features/finetuning_mitbih_family.parquet
+  feature_npz: data/features/finetuning_mitbih_family.npz
+  class_weight: balanced
+
+training:
+  epochs: 50
+  batch_size: 128
+  learning_rate: 0.001
+  optimizer: adam
+  loss: sparse_categorical_crossentropy
+  seed: 42
+  monitor: val_loss
+
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 10
+    restore_best_weights: true
+  reduce_lr_on_plateau:
+    monitor: val_loss
+    patience: 5
+    factor: 0.5
+    min_lr: 1.0e-6
+  model_checkpoint:
+    monitor: val_loss
+    save_best_only: true
+    filename: finetuned_float32.keras
+  csv_logger:
+    filename: training.log
+
+group_kfold:
+  n_splits: 5
+  seed: 42
+  # groups = record_id (patient identifier) — nunca misturar batimentos do mesmo paciente
+
+normalization:
+  type: zscore_global
+  fit_on: train_only
+  scaler_filename: input_scaler.pkl
+
+quality_gate:
+  qg5:
+    min_acc: 0.93
+    min_f1_macro: 0.85
+    min_mcc: 0.80
+    max_fpr_global: 0.05
+    max_std_f1_macro: 0.03
+    sensitivity:
+      N: 0.96
+      V: 0.90
+      S: 0.75
+      F: 0.60
+      Q: 0.70
+
+output:
+  experiment_dir_pattern: experiments/exp_{timestamp}_groupkfold
+  model_filename: finetuned_float32_v1.1.keras
+  scaler_filename: input_scaler_v1.1.pkl
+  summary_filename: summary.json

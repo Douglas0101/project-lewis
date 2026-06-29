@@ -15,11 +15,13 @@
 #define NUM_TEST_BEATS 3
 
 /* Buffers de inferencia alocados estaticamente para evitar consumo de stack.
- * O modelo atual opera com 500 amostras de entrada e 5 saidas int8. */
+ * Pipeline two-stage: 500 amostras de entrada, 2 saidas do Estagio 1
+ * e 3 saidas do Estagio 2. */
 static int8_t s_raw_input[LEWIS_INPUT_LEN];
 static float s_float_input[LEWIS_INPUT_LEN];
 static int8_t s_input[LEWIS_INPUT_LEN];
-static int8_t s_output[LEWIS_OUTPUT_LEN];
+static int8_t s_stage1_output[LEWIS_STAGE1_OUTPUT_LEN];
+static int8_t s_stage2_output[LEWIS_STAGE2_OUTPUT_LEN];
 
 static lewis_filter_chain_t s_filter_chain;
 
@@ -57,9 +59,20 @@ static void apply_dsp_pipeline(const int8_t* raw_input, int8_t* quantized_out, s
     quantize_beat(s_float_input, quantized_out, len);
 }
 
+static int argmax_int8(const int8_t* values, size_t len)
+{
+    int best = 0;
+    for (size_t i = 1; i < len; ++i) {
+        if (values[i] > values[best]) {
+            best = (int)i;
+        }
+    }
+    return best;
+}
+
 static void print_report(void)
 {
-    lewis_debug_print("Model size: ");
+    lewis_debug_print("Model size (stage1+stage2): ");
     lewis_debug_print_uint((uint32_t)lewis_inference_model_size());
     lewis_debug_print(" bytes\n");
     lewis_debug_print("Arena used: ");
@@ -74,25 +87,46 @@ static void run_demo_beats(void)
         apply_dsp_pipeline(s_raw_input, s_input, LEWIS_INPUT_LEN);
 
         uint32_t t0 = lewis_hal_benchmark_start();
-        if (!lewis_inference_run(s_input, s_output)) {
-            lewis_debug_print("[main] RUN FAIL\n");
+
+        if (!lewis_stage1_run(s_input, s_stage1_output)) {
+            lewis_debug_print("[main] STAGE1 RUN FAIL\n");
             lewis_hal_panic();
         }
+
+        int stage1_cls = argmax_int8(s_stage1_output, LEWIS_STAGE1_OUTPUT_LEN);
+        int final_cls = stage1_cls; /* 0=N, 1=S/V/F (Anormal) */
+
+        if (stage1_cls == 1) {
+            if (!lewis_stage2_init()) {
+                lewis_debug_print("[main] STAGE2 INIT FAIL\n");
+                lewis_hal_panic();
+            }
+            if (!lewis_stage2_run(s_input, s_stage2_output)) {
+                lewis_debug_print("[main] STAGE2 RUN FAIL\n");
+                lewis_hal_panic();
+            }
+            /* Mapeia S/V/F para indices 1/2/3 */
+            final_cls = 1 + argmax_int8(s_stage2_output, LEWIS_STAGE2_OUTPUT_LEN);
+        }
+
         uint32_t t1 = lewis_hal_benchmark_stop();
         uint32_t cycles = (t0 - t1) & 0x00FFFFFFUL;
         uint32_t us = lewis_hal_benchmark_delta_us(cycles);
         uint32_t ms = us / 1000U;
 
+        const char* class_names[] = {"N", "S", "V", "F"};
         lewis_debug_print("Beat ");
         lewis_debug_print_uint(beat);
         lewis_debug_print(": ");
         lewis_debug_print_uint(ms);
         lewis_debug_print(" ms (");
         lewis_debug_print_uint(us);
-        lewis_debug_print(" us), output [");
-        for (int i = 0; i < LEWIS_OUTPUT_LEN; ++i) {
-            lewis_debug_print_int((int32_t)s_output[i]);
-            if (i + 1 < LEWIS_OUTPUT_LEN) {
+        lewis_debug_print(" us), class=");
+        lewis_debug_print(class_names[final_cls]);
+        lewis_debug_print(", output=[");
+        for (int i = 0; i < LEWIS_STAGE2_OUTPUT_LEN; ++i) {
+            lewis_debug_print_int((int)s_stage2_output[i]);
+            if (i + 1 < LEWIS_STAGE2_OUTPUT_LEN) {
                 lewis_debug_print(", ");
             }
         }
@@ -111,7 +145,7 @@ static uint8_t uart_read_byte(void)
 }
 
 #define UART_BYTE_TIMEOUT_MS 100
-#define UART_FRAME_TIMEOUT_MS 60000
+#define UART_FRAME_TIMEOUT_MS 180000
 
 static bool uart_read_byte_timeout(uint8_t *out, uint32_t timeout_ms)
 {
@@ -128,7 +162,6 @@ static bool uart_read_byte_timeout(uint8_t *out, uint32_t timeout_ms)
 static void infer_from_uart(uint8_t start_byte)
 {
     static int8_t input_quantized[LEWIS_INPUT_LEN];
-    static int8_t output[LEWIS_OUTPUT_LEN];
     static float frame[LEWIS_INPUT_LEN];
     uint8_t byte;
 
@@ -180,16 +213,38 @@ static void infer_from_uart(uint8_t start_byte)
     /* Quantiza float32 -> int8 usando parametros do modelo. */
     quantize_beat(frame, input_quantized, LEWIS_INPUT_LEN);
 
-    /* Executa inferencia. */
-    if (!lewis_inference_run(input_quantized, output)) {
-        lewis_debug_print("[infer] RUN FAIL\n");
+    /* Pipeline two-stage. */
+    int8_t stage1_out[LEWIS_STAGE1_OUTPUT_LEN];
+    int8_t stage2_out[LEWIS_STAGE2_OUTPUT_LEN];
+    if (!lewis_stage1_run(input_quantized, stage1_out)) {
+        lewis_debug_print("[infer] STAGE1 RUN FAIL\n");
         return;
     }
 
-    /* Responde com '<' + 5 int8 + '>'. */
+    int stage1_cls = argmax_int8(stage1_out, LEWIS_STAGE1_OUTPUT_LEN);
+    int8_t final_out[LEWIS_STAGE2_OUTPUT_LEN];
+    for (int i = 0; i < LEWIS_STAGE2_OUTPUT_LEN; ++i) {
+        final_out[i] = 0;
+    }
+
+    if (stage1_cls == 1) {
+        if (!lewis_stage2_init()) {
+            lewis_debug_print("[infer] STAGE2 INIT FAIL\n");
+            return;
+        }
+        if (!lewis_stage2_run(input_quantized, stage2_out)) {
+            lewis_debug_print("[infer] STAGE2 RUN FAIL\n");
+            return;
+        }
+        for (int i = 0; i < LEWIS_STAGE2_OUTPUT_LEN; ++i) {
+            final_out[i] = stage2_out[i];
+        }
+    }
+
+    /* Responde com '<' + 3 int8 (S/V/F; zeros se N) + '>'. */
     lewis_hal_uart_tx('<');
-    for (int i = 0; i < LEWIS_OUTPUT_LEN; ++i) {
-        lewis_hal_uart_tx((uint8_t)output[i]);
+    for (int i = 0; i < LEWIS_STAGE2_OUTPUT_LEN; ++i) {
+        lewis_hal_uart_tx((uint8_t)final_out[i]);
     }
     lewis_hal_uart_tx('>');
 }
@@ -287,14 +342,14 @@ int main(void)
     lewis_hal_init();
     lewis_debug_init();
 
-    lewis_debug_print("=== Project-Lewis Firmware v1.2 ===\n");
+    lewis_debug_print("=== Project-Lewis Firmware v2.0 ===\n");
     print_report();
 
-    if (!lewis_inference_init()) {
-        lewis_debug_print("[main] INIT FAIL\n");
+    if (!lewis_stage1_init()) {
+        lewis_debug_print("[main] STAGE1 INIT FAIL\n");
         lewis_hal_panic();
     }
-    lewis_debug_print("Inference init OK\n");
+    lewis_debug_print("Stage1 inference init OK\n");
 
     lewis_filter_chain_init(&s_filter_chain);
     lewis_debug_print("DSP filters init OK\n");

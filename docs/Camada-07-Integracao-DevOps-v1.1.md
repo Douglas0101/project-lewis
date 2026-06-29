@@ -801,7 +801,72 @@ Falhas de CI/CD são logadas em `data/.dlq/devops_failures.jsonl`:
 
 ---
 
-## 7.13 Referências Verificadas
+## 7.13 Dependência do TensorFlow Lite Micro (TFLM)
+
+O código-fonte do TFLM **não é versionado no Git**. Ele é clonado sob demanda em `firmware/third_party/tflite-micro/` e compilado localmente para as plataformas host (`linux_x86_64`) e ARM (`cortex-m4+fp`).
+
+### Por que não submódulo
+
+- O repositório `tensorflow/tflite-micro` é grande e não publica releases/tags estáveis.
+- Shallow clone é difícil de configurar como submódulo.
+- Nem todos os desenvolvedores precisam trabalhar com firmware; o submódulo obrigaria todo mundo a baixar TFLM.
+
+### Pin por commit SHA
+
+A versão exata do TFLM é controlada por:
+
+```text
+firmware/third_party/tflite-micro.commit
+```
+
+Exemplo de conteúdo:
+
+```text
+348eed01b6485f6282b805672ebf1e2a88589830
+```
+
+Alterar esse arquivo invalida o cache do CI e força um novo build validado.
+
+### Script de instalação
+
+```bash
+# Local
+make firmware-tflm
+# ou
+./firmware/scripts/install_tflm.sh
+```
+
+O script `firmware/scripts/install_tflm.sh`:
+
+1. Lê o commit SHA de `firmware/third_party/tflite-micro.commit`.
+2. Faz shallow clone de `tensorflow/tflite-micro` no commit especificado.
+3. Builda a biblioteca nativa (`libtensorflow-microlite.a` para x86_64).
+4. Builda a biblioteca ARM com CMSIS-NN (`cortex_m_generic_cortex-m4+fp`).
+5. Usa `-j1` por padrão para evitar `internal compiler error` por OOM em runners com pouca RAM.
+
+### CI / GitHub Actions
+
+O workflow `ci.yml` possui um cache dedicado para TFLM:
+
+```yaml
+- name: Cache TFLM build
+  id: cache-tflm
+  uses: actions/cache@v4
+  with:
+    path: firmware/third_party/tflite-micro
+    key: tflm-${{ runner.os }}-${{ hashFiles('firmware/third_party/tflite-micro.commit', 'firmware/scripts/install_tflm.sh') }}
+    restore-keys: |
+      tflm-${{ runner.os }}-
+
+- name: Install / cache TFLM
+  run: uv run make firmware-tflm
+```
+
+A chave de cache leva em conta tanto o commit SHA quanto o script de instalação, garantindo invalidação quando qualquer um dos dois mudar.
+
+---
+
+## 7.14 Referências Verificadas
 
 - `uv` (Astral) — Python Package Manager 2026: https://cuttlesoft.com/blog/2026/01/27/python-dependency-management-in-2026/ — "uv is the most significant change to Python tooling in years... 75 million monthly downloads on PyPI, surpassing Poetry's approximately 66 million."citeweb_search:24#2
 - Poetry vs Conda vs Pip: https://www.geeksforgeeks.org/python/conda-vs-poetry-in-python/ — "Poetry provides deterministic dependency resolution... ensuring that dependency conflicts are minimized and builds are reproducible."citeweb_search:24#1

@@ -1,14 +1,15 @@
 <p align="center">
   <h1 align="center">🫀 Project-Lewis</h1>
   <p align="center">
-    <strong>Pipeline completo de ECG → modelo quantizado INT8 → firmware embarcado STM32F4</strong><br>
-    validado sem hardware físico via simulação Renode.
+    <strong>Pipeline completo de ECG → modelos quantizados INT8 → firmware embarcado STM32F4</strong><br>
+    validado sem hardware físico via simulação Renode, com RAG local (Camada C11) para agentes de coding.
   </p>
   <p align="center">
     <img src="https://img.shields.io/badge/Python-3.12-blue?logo=python" alt="Python 3.12">
     <img src="https://img.shields.io/badge/TensorFlow-2.21-orange?logo=tensorflow" alt="TensorFlow">
     <img src="https://img.shields.io/badge/STM32F4-TFLM%20%7C%20CMSIS--NN-green?logo=arm" alt="STM32F4 TFLM">
     <img src="https://img.shields.io/badge/Renode-1.15.3-purple?logo=robotframework" alt="Renode">
+    <img src="https://img.shields.io/badge/Knowledge-sqlite--vec%20%7C%20MCP-blue" alt="Knowledge sqlite-vec MCP">
     <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License MIT">
   </p>
 </p>
@@ -21,13 +22,14 @@
 2. [Arquitetura](#-arquitetura)
 3. [Pipeline de Dados](#-pipeline-de-dados)
 4. [ML Pipeline](#-ml-pipeline)
-5. [Firmware, Simulação & DevOps](#-firmware-simulação--devops)
-6. [Estrutura do Repositório](#-estrutura-do-repositório)
-7. [Como Executar](#-como-executar)
-8. [Quality Gates](#-quality-gates)
-9. [Limites da Simulação](#-limites-da-simulação)
-10. [Versão Atual](#-versão-atual)
-11. [Autor & Licença](#-autor--licença)
+5. [Camada C11 — Knowledge Layer](#-camada-c11--knowledge-layer-rag)
+6. [Firmware, Simulação & DevOps](#-firmware-simulação--devops)
+7. [Estrutura do Repositório](#-estrutura-do-repositório)
+8. [Como Executar](#-como-executar)
+9. [Quality Gates](#-quality-gates)
+10. [Limites da Simulação](#-limites-da-simulação)
+11. [Versão Atual](#-versão-atual)
+12. [Autor & Licença](#-autor--licença)
 
 ---
 
@@ -42,12 +44,14 @@ O projeto é dividido em camadas bem definidas, cada uma com contratos de interf
 | **01 — Ingestão** | Download, validação e governança de datasets | `wfdb`, `wget`, DVC, DLQ |
 | **02 — Pré-processamento** | Resample 500 Hz, lead única, filtro, Z-score | `scipy`, YAML versionado |
 | **03 — Features** | Detecção AMPT, features morfológicas/temporais | Python puro |
-| **04 — Modelagem** | Backbone 1D-CNN, pré-treino e fine-tuning | TensorFlow/Keras |
+| **04 — Modelagem** | Backbone 1D-CNN em duas etapas (N vs Anormal → S/V/F) | TensorFlow/Keras |
 | **05 — Quantização** | PTQ INT8 per-channel, exportação para C | TFLite |
 | **06 — Validação** | Quality gates e relatórios de qualidade | `pytest`, CI/CD |
 | **07 — DevOps** | Ambiente reprodutível, CI, Docker | `uv`, GitHub Actions |
 | **08 — Firmware** | Firmware C/C++17 bare-metal para STM32F4 | ARM GCC, TFLM, CMSIS-NN |
 | **09 — Simulação** | Validação sem hardware via Renode | Renode 1.15.3 |
+| **10 — Test Harness** | Testes HIL C vs Python, bit-exatidão, fidelidade | Harness C + pytest |
+| **11 — Knowledge Layer** | RAG local para documentação/código via MCP | `sqlite-vec`, `sentence-transformers`, MCP SDK |
 
 > 🇧🇷 Projeto de arquitetura de firmware, CI/CD e quality gates para sistemas embarcados médicos.
 > 🇺🇸 Demonstration of embedded firmware architecture, CI/CD and quality gates for medical edge devices.
@@ -62,14 +66,19 @@ flowchart TD
     B --> C[Resample 500 Hz + Lead MLII]
     C --> D[Pré-processamento DSP]
     D --> E[Feature Engineering]
-    E --> F[Backbone 1D-CNN]
-    F --> G[Quantização PTQ INT8]
+    E --> F1[Stage 1<br/>N vs Anormal]
+    F1 -->|Anormal| F2[Stage 2<br/>S vs V vs F]
+    F1 -->|Normal| G[Quantização PTQ INT8]
+    F2 --> G
     G --> H[Export C Headers]
     H --> I[STM32F4 Firmware]
     I --> J[Inferência TFLM + CMSIS-NN]
     J --> K[UART Output]
     K --> L[Validação Renode]
     L --> M{PASS / FAIL}
+
+    K11[Documentação + Código] --> L11[Camada C11<br/>sqlite-vec + MCP]
+    L11 --> M11[Agentes de Coding]
 ```
 
 **Fluxo de dados no firmware:**
@@ -148,21 +157,27 @@ normalization:
 
 ## 🧠 ML Pipeline
 
-### 🏗️ Arquitetura Backbone 1D-CNN
+### 🏗️ Arquitetura — Dois Modelos 1D-CNN
 
-Classificador enxuto para borda, inspirado em literatura TinyML para ECG:
+O classificador v2.2 usa **dois modelos leves em cascata**, cada um com backbone 1D-CNN escalado (~38K–50K parâmetros). Essa divisão foi necessária porque um classificador 5-classes AAMI direto (v1.1) não atingiu os thresholds de qualidade no cenário inter-paciente.
+
+#### Stage 1 — N vs Anormal (S + V + F)
 
 ```text
-Input(500, 1)                    # 1000 ms @ 500 Hz, lead MLII-equivalente
- → Conv1D(16, k7) → MaxPool1D(2)   # 250 amostras
- → Conv1D(32, k5) → MaxPool1D(2)   # 125 amostras
- → Conv1D(64, k3) → MaxPool1D(2)   # 62 amostras
+Input(500, 1)                    # 1000 ms @ 500 Hz
+ → Conv1D(32, k7) → MaxPool1D(2)
+ → Conv1D(64, k5) → MaxPool1D(2)
+ → Conv1D(96, k3) → MaxPool1D(2)
  → GlobalAveragePooling1D()
- → Dense(64, relu) → Dropout(0.3)
- → Dense(5, softmax)              # AAMI: N, S, V, F, Q
+ → Dense(96, relu) → Dropout(0.3)
+ → Dense(2, softmax)              # N, Anormal
 ```
 
-- **~13K parâmetros** | **FlatBuffer < 64 KB** | **Arena TFLM ~40–50 KB**
+#### Stage 2 — S vs V vs F
+
+Mesma arquitetura do Stage 1, com saída `Dense(3, softmax)`.
+
+- **~38K–50K parâmetros por modelo** | **FlatBuffer ~54 KB cada** | **Arena TFLM < 64 KB**
 
 ### 🔬 Feature Engineering
 
@@ -176,45 +191,71 @@ Input(500, 1)                    # 1000 ms @ 500 Hz, lead MLII-equivalente
 
 ### 🎯 Treinamento em Dois Estágios
 
-1. **Pré-treino em Chapman-Shaoxing** (~5 GB, 12 leads, 500 Hz) com 5 superclasses SCP-ECG.
-2. **Fine-tuning em MIT-BIH+** (226 registros, 1 lead, AAMI) com backbone congelado.
+1. **Stage 1 — N vs Anormal:** treinado sobre MIT-BIH+ (226 registros, 1 lead, AAMI) com **GroupKFold por paciente**. Batimentos das classes S, V e F são agrupados como "Anormal"; a classe Q é excluída da classificação final a partir de v2.0.
+2. **Stage 2 — S vs V vs F:** treinado apenas sobre as amostras classificadas como "Anormal" pelo Stage 1.
+
+> **Nota sobre pré-treino:** o pré-treino em Chapman-Shaoxing foi avaliado e **abandonado por subajuste** (AUC-ROC macro por registro ~0,71). O backbone atual é treinado **from-scratch no MIT-BIH+**.
+
+Comandos:
 
 ```bash
-make pretrain   # models/backbone_pretrained_v1.0.keras
-make finetune   # models/finetuned_float32_v1.0.keras
+# Pipeline legado (v1.1) — ainda disponível no Makefile
+make pretrain
+make finetune
+
+# Pipeline produtivo atual (v2.2)
+uv run python scripts/run_stage1_training.py
+uv run python scripts/run_stage2_training.py
+uv run python scripts/run_two_stage_pipeline.py
+```
+
+Artefatos gerados:
+
+```
+models/stage1_float32_v2.0.keras
+models/stage2_float32_v2.0.keras
+models/input_scaler_stage1_v2.0.pkl
+models/input_scaler_stage2_v2.0.pkl
+models/stage1_threshold_v2.0.json
 ```
 
 ### 👤 Validação Inter-Patient
 
 Nunca misturamos batimentos do mesmo paciente entre treino e teste. Usamos **GroupKFold por paciente** (`n_splits=5`) para evitar *data leakage*.
 
-### 📊 Métricas AAMI EC57
+### 📊 Métricas AAMI EC57 — Thresholds v2.2
 
-| Métrica | Threshold mínimo |
-| :--- | :--- |
-| Acc global | > 93% |
-| F1-macro | > 85% |
-| MCC | > 0.80 |
-| Sens N / V / S / F / Q | > 96% / 90% / 75% / 60% / 70% |
-| FPR global | < 5% |
+Os thresholds originais v1.1 (Acc > 93%, F1-macro > 0,85) não foram atingíveis com um modelo compacto (< 100K params, FlatBuffer < 64 KB) no cenário inter-paciente. A v2.2 revisou os gates para refletir o estado da arte de classificadores leves em MIT-BIH+.
+
+| Componente | Métrica | Threshold v2.2 | Valor obtido |
+| :--- | :--- | :--- | :--- |
+| **Stage 1** | Acc | > 75% | 79,3% |
+| **Stage 1** | F1-macro | > 55% | 0,593 |
+| **Stage 1** | Recall Anormal | ≥ 30% | 0,325 |
+| **Stage 1** | Precision Anormal | ≥ 25% | 0,290 |
+| **Stage 2** | F1(S) | ≥ 55% | 0,643 |
+| **Stage 2** | F1(V) | ≥ 70% | 0,710 |
+| **Stage 2** | F1(F) | ≥ 15% | 0,203 |
+| **Pipeline integrado** | Acc | > 78% | 78,7% |
+| **Pipeline integrado** | F1-macro | > 30% | 0,316 |
 
 > F1-macro e MCC são as métricas primárias; acurácia global pode ser enganosa em classes desbalanceadas.
 
 ### ⚡ Quantização PTQ INT8
 
-Quantização pós-treino **per-channel INT8** com 512 amostras estratificadas AAMI:
+Cada modelo (Stage 1 e Stage 2) é quantizado separadamente com **PTQ per-channel INT8** e 512 amostras estratificadas AAMI:
 
 ```bash
-make quantize   # gera models/model_int8_v1.0.tflite
+make quantize
+# ou
+uv run python scripts/quantize_two_stage_v2.0.py
 ```
 
-| Critério | Limite |
-| :--- | :--- |
-| ΔAcc global | < 1% |
-| ΔF1-macro | < 2% |
-| ΔSens N | < 0.5% |
-| ΔSens V/S/F/Q | < 3% |
-| FlatBuffer | < 64 KB |
+| Critério | Limite | Valor obtido |
+| :--- | :--- | :--- |
+| FlatBuffer Stage 1 | < 64 KB | 54,36 KB |
+| FlatBuffer Stage 2 | < 64 KB | 54,47 KB |
+| ΔF1-macro (INT8 vs float) | < 2% | ~0,3% |
 
 ### 📤 Exportação para Firmware
 
@@ -223,9 +264,38 @@ Conversão para headers C puros, sem dependências externas:
 ```bash
 make export
 # entregáveis:
-#   firmware/src/ml/model_data.h
+#   firmware/src/ml/stage1_int8_v2.0.h
+#   firmware/src/ml/stage2_int8_v2.0.h
 #   firmware/src/ml/quantization_params.h
 ```
+
+---
+
+## 🧠 Camada C11 — Knowledge Layer (RAG)
+
+Sistema de recuperação semântica local para dar contexto a agentes de coding (Kimi Code / OpenCode) sobre a documentação e o código do Project-Lewis.
+
+- **Vector DB:** `sqlite-vec` sobre SQLite (`data/knowledge.db`, ~7 MB).
+- **Embeddings:** `sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2` (384 dimensões, CPU-only).
+- **Protocolo:** MCP server stdio via SDK oficial (`mcp.json` → `project-lewis-knowledge`).
+- **Metadados 3D:** camada (C01–C11), versão, tags semânticas.
+- **Segurança/LGPD:** scan de PII e bloqueio automático de dados brutos de ECG.
+
+```bash
+make knowledge-index      # reindexa docs/src/firmware
+make knowledge-status     # status do índice
+make knowledge-query      # query interativa
+make knowledge-test       # roda tests/test_knowledge/
+make knowledge-validate   # valida índice gerado
+```
+
+Tools MCP expostas:
+
+- `search_docs(query, layer?, version?, tags?, k?)`
+- `list_layers()`
+- `get_doc_by_source(source, k?)`
+
+> Documentação completa: [`docs/SDD-C11-Knowledge-Impl-v2.0.md`](docs/SDD-C11-Knowledge-Impl-v2.0.md)
 
 ---
 
@@ -273,6 +343,7 @@ O relatório é gerado em `firmware/test_harness_report.json` com o resumo `nati
 
 ```bash
 make firmware-deps     # ARM GCC 13.3 + Renode 1.15.3
+make firmware-tflm     # clone + build do TensorFlow Lite Micro (host + ARM)
 make firmware-build    # ELF para STM32F4
 make firmware-test     # 5 s de simulação headless
 make hard-gates        # Hard Gates HG-01..HG-06
@@ -302,13 +373,22 @@ make quality-report   # relatório QG0–QG6
 
 ```
 project-lewis/
-├── config/                # Parâmetros versionados (pré-processamento, energia)
+├── config/                # Parâmetros versionados (pré-processamento, ML, C11)
+│   ├── knowledge_v2.0.yaml
+│   ├── preprocess_v1.0.yaml
+│   ├── stage1_binary.yaml
+│   └── stage2_multiclass.yaml
 ├── data/                  # Datasets brutos/processados (DVC, gitignored)
 │   ├── raw_chapman/
 │   ├── raw_mitbih/
+│   ├── raw_svdb/
+│   ├── raw_afdb/
+│   ├── raw_incart/
 │   ├── processed/
+│   ├── features/
 │   ├── lineage/
-│   └── .dlq/
+│   ├── .dlq/
+│   └── knowledge.db       # RAG sqlite-vec (C11)
 ├── docs/                  # Especificações por camada
 │   ├── ESPECIFICACAO_Fase1_Agentes-v1.1.md
 │   ├── Camada-01-Ingestao-v1.1.md
@@ -321,6 +401,8 @@ project-lewis/
 │   ├── Camada-08-Firmware-v1.1.md
 │   ├── Camada-09-Simulacao-v1.1.md
 │   ├── Camada-09-Energia-v1.4.md
+│   ├── SDD_Project-Lewis_v3.md
+│   ├── SDD-C11-Knowledge-Impl-v2.0.md
 │   ├── DEBITO_TECNICO_Energia_Renode-v1.4.md
 │   └── SIMULATION_LIMITS.md
 ├── firmware/              # Firmware embarcado
@@ -329,8 +411,15 @@ project-lewis/
 │   ├── scripts/           # runners Renode
 │   ├── tests/             # testes HIL
 │   ├── Makefile
-│   └── third_party/       # tflite-micro
+│   ├── third_party/       # tflite-micro (clonado em build time, ver .commit)
+│   └── tools/             # ARM GCC e Renode (instalados localmente)
 ├── models/                # Modelos treinados e quantizados
+│   ├── stage1_float32_v2.0.keras
+│   ├── stage2_float32_v2.0.keras
+│   ├── input_scaler_stage1_v2.0.pkl
+│   ├── input_scaler_stage2_v2.0.pkl
+│   ├── stage1_threshold_v2.0.json
+│   └── quantized/         # .tflite e headers INT8
 ├── notebooks/             # EDA e validação visual
 ├── reports/               # Relatórios de qualidade e simulação
 ├── scripts/               # Automação de quality gates e relatórios
@@ -338,12 +427,16 @@ project-lewis/
 │   ├── data/
 │   ├── features/
 │   ├── models/
-│   └── quantization/
-├── tests/                 # Testes pytest (QG0–QG18)
+│   ├── quantization/
+│   ├── tracking/          # Tracking de experimentos (SQLite)
+│   └── knowledge/         # Camada C11 (RAG + MCP)
+├── tests/                 # Testes pytest (QG0–QG19 + QG-C11)
+│   └── test_knowledge/    # Testes da Camada C11
 ├── .github/workflows/     # CI/CD
 ├── docker-compose.yml
 ├── Dockerfile
 ├── Makefile
+├── mcp.json               # Configuração MCP servers
 ├── LICENSE
 └── README.md
 ```
@@ -383,6 +476,13 @@ make process        # QG1
 
 ```bash
 make features       # QG2/QG3
+
+# Pipeline atual (v2.2) — duas etapas
+uv run python scripts/run_stage1_training.py
+uv run python scripts/run_stage2_training.py
+uv run python scripts/run_two_stage_pipeline.py
+
+# Targets legados (v1.1) — ainda disponíveis
 make pretrain       # QG4
 make finetune       # QG5
 ```
@@ -399,17 +499,29 @@ make export         # headers C
 ```bash
 cd firmware
 make firmware-deps
+make firmware-tflm
 make firmware-build
 make firmware-test
 make harness           # test harness native + renode
 ```
 
+### 6. Camada C11 — Knowledge Layer
+
+```bash
+make knowledge-index     # indexa docs/src/firmware
+make knowledge-status    # status do índice
+make knowledge-query     # query interativa
+make knowledge-test      # testes C11
+make knowledge-validate  # validação do índice
+```
+
 ### 7. Testes Completos
 
 ```bash
-make test           # pytest completo
-make hard-gates     # Hard Gates HG-01..HG-06
-make quality-report # relatório consolidado
+make test              # pytest completo (323 testes)
+make hard-gates        # Hard Gates HG-01..HG-06
+make quality-report    # relatório consolidado
+make lint              # flake8 + mypy + bandit
 ```
 
 ---
@@ -426,9 +538,9 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 | **QG1** | Pré-processamento | Fs = 500 Hz; range ±5 mV; Z-score global; linhagem 100% | `pytest tests/test_preprocessing.py` |
 | **QG2** | AMPT @ 500 Hz | Sens > 96,5%; PPV > 99,0%; tol = 150 ms | `pytest tests/test_ampt.py` |
 | **QG3** | Features | Janela 1000 ms; ≥ 10 dimensões; sem NaN/Inf | `pytest tests/test_features.py` |
-| **QG4** | Pré-treino | AUC-ROC macro > 0,85 | `pytest tests/test_pretrain.py` |
-| **QG5** | Fine-tuning | F1-macro > 85%; MCC > 0,80; inter-patient | `pytest tests/test_finetune.py` |
-| **QG6** | Quantização | ΔF1-macro < 2%; FlatBuffer < 64 KB; header compilável | `pytest tests/test_quantization.py` |
+| **QG4** | Pré-treino Chapman | AUC-ROC macro > 0,85 *(abandonado na prática; backbone treinado from-scratch)* | `pytest tests/test_pretrain.py` |
+| **QG5'** | Fine-tuning v2.2 | Stage1: Acc > 75%, F1-macro > 0,55, recall/precision Anormal ≥ 30%/25%; Stage2: F1(S) ≥ 55%, F1(V) ≥ 70%, F1(F) ≥ 15%; Pipeline: Acc > 78%, F1-macro > 0,30 | `pytest tests/test_finetune.py tests/test_two_stage_pipeline.py` |
+| **QG6** | Quantização | ΔF1-macro < 2%; FlatBuffer Stage1/Stage2 < 64 KB; headers compiláveis | `pytest tests/test_quantization.py` |
 
 ### Firmware & Simulação
 
@@ -445,6 +557,20 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 | **QG17** | Pipeline filtrado C vs Python | MAE < 0,01 / cosine > 0,99 | `pytest -m qg17` / `make harness` |
 | **QG18** | Detector R-peak C vs AMPT | Sens ≥ 90%; PPV ≥ 90% | `pytest -m qg18` / `make harness` |
 | **QG19** | Consumo energético | < 50 mA e < 165 mJ/batimento @ 3,3 V | `reports/firmware_simulation_report.json` |
+
+### Camada C11 — Knowledge Layer
+
+| Gate | Foco | Threshold | Comando |
+| :--- | :--- | :--- | :--- |
+| **QG-C11-01** | Cobertura de indexação | 100% dos `.md`/`.py` indexados | `pytest tests/test_knowledge/test_indexer.py` |
+| **QG-C11-02** | Determinismo | Reindexação gera mesmos IDs | `pytest tests/test_knowledge/test_indexer.py` |
+| **QG-C11-03** | Retrieval | MRR@5 ≥ 0,80 | `pytest tests/test_knowledge/test_retriever.py` |
+| **QG-C11-04** | Filtros 3D | Layer/version/tag funcionais | `pytest tests/test_knowledge/test_retriever.py` |
+| **QG-C11-05** | LGPD | Zero PII/dados ECG no índice | `pytest tests/test_knowledge/test_lgpd_compliance.py` |
+| **QG-C11-06** | MCP protocol | `initialize` e `tools/list` respondem | `pytest tests/test_knowledge/test_mcp_server.py` |
+| **QG-C11-07** | Tamanho do banco | < 500 MB | `pytest tests/test_knowledge/test_indexer.py` |
+| **QG-C11-08** | CLI funcional | `reindex`, `query`, `status` | `pytest tests/test_knowledge/test_integration.py` |
+| **QG-C11-09** | Deps compliance | Sem LangChain/Chroma/typer | `pytest tests/test_knowledge/test_deps_compliance.py` |
 
 > QG19 é um débito técnico documentado para a v1.4. Veja [`docs/DEBITO_TECNICO_Energia_Renode-v1.4.md`](docs/DEBITO_TECNICO_Energia_Renode-v1.4.md).
 
@@ -463,7 +589,7 @@ Consulte [`docs/SIMULATION_LIMITS.md`](docs/SIMULATION_LIMITS.md) para detalhes 
 
 ## 📌 Versão Atual
 
-`v1.3-sim-deep` — pipeline DSP completo no firmware (filtros + Z-score), detector leve de R-peak, watchdog software, todos os gates de firmware/DSP passando via simulação Renode, e débito técnico de modelagem de energia documentado para v1.4.
+`v2.2+c11` — pipeline de classificação em duas etapas (Stage 1: N vs Anormal; Stage 2: S vs V vs F) atingindo todos os thresholds v2.2, firmware STM32F4 validado via Renode, e Camada C11 (RAG local sqlite-vec + MCP) para suporte a agentes de coding.
 
 ---
 

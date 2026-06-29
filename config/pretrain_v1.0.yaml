@@ -1,0 +1,60 @@
+# Project-Lewis — Camada 04: Pré-treino do backbone em Chapman-Shaoxing
+# Versão: 1.0.0 | Superclasses SCP-ECG: NORM, CD, MI, HYP, STTC
+
+model:
+  input_len: 500
+  num_classes: 5
+  embedding_dim: 64
+  dropout_rate: 0.3
+  activation: sigmoid  # multi-label SCP-ECG
+
+dataset:
+  name: chapman
+  lead: II
+  label_type: scp-ecg-superclasses
+  superclass_map:
+    NORM: ["NORM"]
+    CD: ["CD", "LBBB", "RBBB", "IVCD", "CRBBB", "CLBBB", "AVB", "WPW", "ILBBB", "IRBBB"]
+    MI: ["MI", "ASMI", "ALMI", "LMI", "IPLMI", "IPMI", "PMI", "AMI", "IMI"]
+    HYP: ["HYP", "LVH", "RVH", "LAO", "RAO", "SEHYP", "LAA", "RAA"]
+    STTC: ["STTC", "ISC", "NST_", "STD", "STE", "LNGQT", "NDT", "NST"]
+
+training:
+  epochs: 30
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: adam
+  loss: binary_crossentropy
+  seed: 42
+  steps_per_epoch: 1000
+  validation_steps: 100
+
+callbacks:
+  early_stopping:
+    monitor: val_loss
+    patience: 5
+    restore_best_weights: true
+  reduce_lr_on_plateau:
+    monitor: val_loss
+    patience: 3
+    factor: 0.5
+    min_lr: 1.0e-6
+  model_checkpoint:
+    monitor: val_loss
+    save_best_only: true
+    filename: backbone_pretrained.keras
+  tensorboard:
+    log_dir: logs/pretrain_chapman
+  csv_logger:
+    filename: training.log
+
+quality_gate:
+  qg4:
+    min_val_auc_roc_macro: 0.85
+    max_val_loss: 0.15
+
+output:
+  experiment_dir_pattern: experiments/exp_{timestamp}_pretrain_chapman
+  model_filename: backbone_pretrained.keras
+  config_filename: config.json
+  metrics_filename: metrics.json

@@ -25,7 +25,7 @@ CHECKSUMS_SCHEMA: dict[str, Any] = {
     "type": "object",
     "required": ["version", "generated_at", "datasets"],
     "properties": {
-        "version": {"const": "1.0"},
+        "version": {"const": "1.1"},
         "generated_at": {"type": "string", "format": "date-time"},
         "datasets": {
             "type": "object",
@@ -40,18 +40,59 @@ CHECKSUMS_SCHEMA: dict[str, Any] = {
                 "incartdb": {"$ref": "#/$defs/entry"},
             },
         },
+        "mirrors": {"$ref": "#/$defs/mirrors"},
     },
     "$defs": {
         "entry": {
             "type": "object",
             "required": ["sha256", "size_bytes", "source", "verified_at"],
             "properties": {
-                "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
-                "size_bytes": {"type": "integer", "minimum": 0},
-                "source": {"enum": ["physionet", "kagglehub", "figshare", "mirror"]},
+                "sha256": {
+                    "oneOf": [
+                        {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                        {"type": "null"},
+                    ]
+                },
+                "size_bytes": {
+                    "oneOf": [
+                        {"type": "integer", "minimum": 0},
+                        {"type": "null"},
+                    ]
+                },
+                "source": {
+                    "enum": [
+                        "physionet",
+                        "kagglehub",
+                        "figshare",
+                        "mirror",
+                        "local_mirror",
+                    ]
+                },
                 "url": {"type": "string", "format": "uri"},
+                "path": {"type": "string"},
                 "verified_at": {"type": "string", "format": "date-time"},
                 "verified_by": {"type": "string"},
+                "note": {"type": "string"},
+            },
+        },
+        "mirror_entry": {
+            "type": "object",
+            "required": ["sha256", "size_bytes", "path"],
+            "properties": {
+                "sha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+                "size_bytes": {"type": "integer", "minimum": 0},
+                "path": {"type": "string"},
+            },
+        },
+        "mirrors": {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "chapman_shaoxing": {"$ref": "#/$defs/mirror_entry"},
+                "mitbih_family_zip": {
+                    "type": "object",
+                    "additionalProperties": {"$ref": "#/$defs/mirror_entry"},
+                },
             },
         },
     },

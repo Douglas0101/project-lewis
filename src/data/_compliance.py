@@ -81,6 +81,14 @@ def verify_all(
     mirror = project_root() / mirror_dir
     results: dict[str, bool] = {}
     for ds, entry in manifest.get("datasets", {}).items():
+        expected_hash = entry.get("sha256")
+        expected_size = entry.get("size_bytes")
+        # Entries marked with null sha256/size are documentation-only fallbacks
+        # (e.g., PTB-XL distributed as many files) and do not require a local archive.
+        if expected_hash is None or expected_size is None:
+            LOGGER.info("skipping archive checksum for %s (null manifest entry)", ds)
+            results[ds] = True
+            continue
         archive = _archive_for_dataset(ds, cache, mirror)
         if archive is None or not archive.exists():
             LOGGER.warning("no cached archive for %s under %s or %s", ds, cache, mirror)
@@ -88,13 +96,13 @@ def verify_all(
             continue
         actual_size = archive.stat().st_size
         actual_hash = sha256_of(archive)
-        expected_size = int(entry.get("size_bytes", 0))
-        expected_hash = entry.get("sha256", "")
+        expected_size_int = int(expected_size)
+        expected_hash_str = str(expected_hash)
         size_ok = (
-            expected_size == 0
-            or abs(actual_size - expected_size) / max(expected_size, 1) < _SIZE_TOLERANCE
+            expected_size_int == 0
+            or abs(actual_size - expected_size_int) / max(expected_size_int, 1) < _SIZE_TOLERANCE
         )
-        hash_ok = bool(expected_hash) and actual_hash == expected_hash
+        hash_ok = bool(expected_hash_str) and actual_hash == expected_hash_str
         results[ds] = size_ok and hash_ok
         if not results[ds]:
             LOGGER.warning(

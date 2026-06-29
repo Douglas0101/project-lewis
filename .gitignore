@@ -29,12 +29,19 @@ reports/renode_*/
 log.html
 report.html
 robot_output.xml
-reports/*.html
-reports/*.json
+/logs/
+/experiments/
+/reports/*.html
+/reports/*.json
+/reports/*.log
+/reports/*.xml
+/reports/renode_*/
+/reports/tracking/
 !reports/.gitkeep
 
 # --- Python / venv ---
 __pycache__/
+*/__pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
@@ -59,14 +66,25 @@ firmware/tools/renode_*/
 .pytest_cache/
 .ruff_cache/
 
-# --- UV lock (gerado) ---
-uv.lock
+# --- UV lock (deve ser versionado para reprodutibilidade) ---
+# uv.lock
 
 # --- Dados e artefatos gerados ---
 /data/
 /build/
 /snapshots/
+
+# Modelos treinados, scalers e thresholds (gerados pelo treinamento)
+/models/*.keras
+/models/*.h5
+/models/*.pkl
+/models/*.tflite
+/models/stage*_threshold*.json
+/models/input_scaler_*.pkl
 /models/quantized/
+!/models/quantized/stage1_int8_v2.0.tflite
+!/models/quantized/stage2_int8_v2.0.tflite
+!/models/quantized/quantization_params.json
 
 # --- Diretórios de ambiente / sessão ---
 .dvc/
@@ -74,9 +92,15 @@ uv.lock
 .opencode/
 .worktrees/
 
+# --- Notebooks ---
+notebooks/.ipynb_checkpoints/
+**/*.ipynb_checkpoints/
+*.nbconvert.ipynb
+
 # --- Firmware ---
 firmware/data/
 firmware/tools/
 firmware/third_party/
+!firmware/third_party/tflite-micro.commit
 firmware/test_harness_report.json
 

@@ -1,0 +1,42 @@
+# Configuração da Camada C11 — Knowledge Layer
+# Project-Lewis v2.0
+
+indexer:
+  embedding_model: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+  embedding_dim: 384
+  chunk_size: 512
+  chunk_overlap: 64
+  max_chunk_chars: 1024
+  collection_name: "project_lewis_knowledge"
+
+retriever:
+  default_k: 5
+  default_fetch_k: 20
+  distance_metric: "cosine"
+
+mcp:
+  transport: "stdio"
+  server_name: "project-lewis-knowledge"
+  server_version: "2.0.0"
+
+lgpd:
+  pii_scan_enabled: true
+  reject_on_pii_match: true
+  allowed_file_extensions:
+    - ".md"
+    - ".py"
+    - ".c"
+    - ".h"
+    - ".cpp"
+  forbidden_extensions:
+    - ".dat"
+    - ".mat"
+    - ".hea"
+    - ".atr"
+  forbidden_path_patterns:
+    - "raw_chapman/"
+    - "raw_mitbih/"
+    - "raw_svdb/"
+    - "raw_afdb/"
+    - "raw_incart/"
+    - "raw_ptbxl/"

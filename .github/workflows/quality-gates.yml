@@ -20,7 +20,6 @@ on:
 
 env:
   PYTHON_VERSION: "3.12"
-  LEWIS_REQUIRE_DATA: "1"
 
 jobs:
   lint:
@@ -35,27 +34,30 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Install lint tools
-        run: |
-          python -m pip install --upgrade pip
-          pip install black==24.4.2 isort==5.13.2 flake8==7.1.0 mypy==1.10.0 bandit==1.7.8
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install project dependencies
+        run: uv sync --frozen
 
       # Os comandos abaixo usam `|| true` enquanto o repo não passa por formatação
       # completa; assim o job reporta problemas sem bloquear o CI.
       - name: black
-        run: black --check src tests scripts || true
+        run: uv run black --check src tests scripts || true
 
       - name: isort
-        run: isort --check-only --profile black src tests scripts || true
+        run: uv run isort --check-only --profile black src tests scripts || true
 
       - name: flake8
-        run: flake8 src tests scripts || true
+        run: uv run flake8 src tests scripts --max-line-length=100 || true
 
       - name: mypy
-        run: mypy src || true
+        run: uv run mypy src --ignore-missing-imports || true
 
       - name: bandit
-        run: bandit -r src || true
+        run: uv run bandit -c pyproject.toml -r src || true
 
   unit-tests:
     runs-on: ubuntu-24.04
@@ -70,23 +72,17 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
+          enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest
+      - name: Install project dependencies
+        run: uv sync --frozen
 
       - name: Run unit tests (fast, no real datasets)
         run: |
-          pytest tests/ \
+          uv run pytest tests/ \
             -m "not slow and not qg4 and not qg5 and not qg6" \
             --tb=short
 
@@ -105,6 +101,8 @@ jobs:
       || github.event_name == 'schedule'
       || github.event_name == 'workflow_dispatch'
     timeout-minutes: 360
+    env:
+      LEWIS_REQUIRE_DATA: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -114,52 +112,72 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
+          enable-cache: true
 
-      - name: Install dependencies
+      - name: Install project dependencies
+        run: uv sync --frozen
+
+      - name: Check DVC remote availability
+        id: dvc-check
         run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest dvc
+          if [ -n "${{ secrets.DVC_REMOTE_URL }}" ] && [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+            echo "has_dvc=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_dvc=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::DVC remote não configurado (secrets DVC_REMOTE_URL/AWS ausentes); pulando gates que exigem datasets."
+          fi
 
       - name: Configure DVC remote (stub)
+        if: steps.dvc-check.outputs.has_dvc == 'true'
         run: |
-          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - name: Pull datasets via DVC
-        run: dvc pull
+        if: steps.dvc-check.outputs.has_dvc == 'true'
+        run: uv run dvc pull
 
       - name: QG0 — Download & catalog
-        run: pytest tests/test_download.py -m qg0 --tb=short
+        if: steps.dvc-check.outputs.has_dvc == 'true'
+        run: uv run pytest tests/test_download.py -m qg0 --tb=short
 
       - name: QG1 — Resample + Preprocessing
+        if: steps.dvc-check.outputs.has_dvc == 'true'
         run: |
-          pytest tests/test_loader.py tests/test_resampler.py tests/test_preprocessing.py \
+          uv run pytest tests/test_loader.py tests/test_resampler.py tests/test_preprocessing.py \
             -m qg1 --tb=short
 
       - name: QG2 — AMPT
-        run: pytest tests/test_ampt.py -m qg2 --tb=short
+        if: steps.dvc-check.outputs.has_dvc == 'true'
+        run: uv run pytest tests/test_ampt.py -m qg2 --tb=short
 
       - name: QG3 — Features & Segmentation
+        if: steps.dvc-check.outputs.has_dvc == 'true'
         run: |
-          pytest tests/test_features.py tests/test_segmenter.py \
+          uv run pytest tests/test_features.py tests/test_segmenter.py \
             -m qg3 --tb=short
 
       - name: QG6 — Quantization (light)
-        run: pytest tests/test_quantization.py -m qg6 --tb=short
+        if: steps.dvc-check.outputs.has_dvc == 'true'
+        run: uv run pytest tests/test_quantization.py -m qg6 --tb=short
 
       - name: Generate quality report
-        run: python scripts/generate_quality_report.py --output reports/quality_report.md
+        if: steps.dvc-check.outputs.has_dvc == 'true'
+        run: uv run python scripts/generate_quality_report.py --output reports/quality_report.md
+
+      - name: Generate skipped-quality report
+        if: steps.dvc-check.outputs.has_dvc != 'true'
+        run: |
+          mkdir -p reports
+          echo "# Quality Report" > reports/quality_report.md
+          echo "" >> reports/quality_report.md
+          echo "> Skipped: DVC remote não configurado. Gates QG0–QG3/QG6 não executados." >> reports/quality_report.md
 
       - name: Upload quality report
         if: always()
@@ -177,6 +195,8 @@ jobs:
        || github.event_name == 'workflow_dispatch')
       && github.event.inputs.run_qg4_qg5 == 'true'
     timeout-minutes: 360
+    env:
+      LEWIS_REQUIRE_DATA: "1"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -186,37 +206,31 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Cache pip
-        uses: actions/cache@v4
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
         with:
-          path: ~/.cache/pip
-          key: pip-${{ runner.os }}-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            pip-${{ runner.os }}-
+          enable-cache: true
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest dvc
+      - name: Install project dependencies
+        run: uv sync --frozen
 
       - name: Configure DVC remote (stub)
         run: |
-          dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
 
       - name: Pull datasets via DVC
-        run: dvc pull
+        run: uv run dvc pull
 
       - name: QG4 — Pretrain
-        run: pytest tests/test_pretrain.py -m qg4 --tb=short
+        run: uv run pytest tests/test_pretrain.py -m qg4 --tb=short
         timeout-minutes: 240
 
       - name: QG5 — Finetune
-        run: pytest tests/test_finetune.py -m qg5 --tb=short
+        run: uv run pytest tests/test_finetune.py -m qg5 --tb=short
         timeout-minutes: 180
 
       - name: Upload models

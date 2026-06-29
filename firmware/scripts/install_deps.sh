@@ -15,7 +15,7 @@ ARM_URL="https://github.com/xpack-dev-tools/arm-none-eabi-gcc-xpack/releases/dow
 ARM_DIR="${TOOLS_DIR}/xpack-arm-none-eabi-gcc-13.3.1-1.1"
 
 RENODE_URL="https://github.com/renode/renode/releases/download/v1.15.3/renode-1.15.3.linux-portable.tar.gz"
-RENODE_DIR="${TOOLS_DIR}/renode_1.15.3_portable"
+RENODE_DIR="${TOOLS_DIR}/renode-1.15.3"
 
 install_arm() {
     if [[ -d "${ARM_DIR}" ]]; then
@@ -39,12 +39,14 @@ install_renode() {
     curl -L -o renode.tar.gz "${RENODE_URL}"
     echo "[deps] Extraindo Renode..."
     tar -xzf renode.tar.gz
-    # O pacote portable cria uma pasta adicional com o nome da versao.
-    if [[ -d "renode_1.15.3_portable" ]]; then
-        mv renode_1.15.3_portable renode_1.15.3_portable_tmp
-        mv renode_1.15.3_portable_tmp "${RENODE_DIR}"
-    fi
-    rm renode.tar.gz
+    # O pacote portable cria uma pasta adicional; normaliza para renode-1.15.3.
+    for extracted in renode_1.15.3_portable renode-1.15.3_portable renode-1.15.3; do
+        if [[ -d "${extracted}" ]]; then
+            mv "${extracted}" "${RENODE_DIR}"
+            break
+        fi
+    done
+    rm -f renode.tar.gz
     echo "[deps] Renode instalado."
 }
 
