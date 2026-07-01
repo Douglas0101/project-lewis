@@ -11,6 +11,7 @@
     <img src="https://img.shields.io/badge/Renode-1.15.3-purple?logo=robotframework" alt="Renode">
     <img src="https://img.shields.io/badge/Knowledge-sqlite--vec%20%7C%20MCP-blue" alt="Knowledge sqlite-vec MCP">
     <img src="https://img.shields.io/badge/License-MIT-lightgrey" alt="License MIT">
+    <img src="https://github.com/douglas-souza/Project-Lewis/actions/workflows/stress-gate.yml/badge.svg" alt="Stress Tests">
   </p>
 </p>
 

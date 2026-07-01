@@ -1,0 +1,32 @@
+name: Stress Gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/knowledge/**'
+      - 'src/tracking/**'
+      - 'src/security/**'
+      - 'src/observability/**'
+      - 'tests/stress/**'
+      - '.github/workflows/stress-gate.yml'
+
+jobs:
+  stress-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --frozen
+      - name: Run stress tests
+        run: uv run pytest tests/stress/ -v -m stress --timeout=120 -x
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stress-metrics
+          path: stress-metrics.json
+          if-no-files-found: ignore
