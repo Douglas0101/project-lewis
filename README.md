@@ -318,11 +318,7 @@ Stack de métricas e health checks para acompanhar latência, throughput e dispo
 
 - **Métricas Prometheus:** coletadas em `src/observability/metrics.py` (`LatencyTracker`, contadores de queries, erros e duração).
 - **FastAPI `/metrics` e `/health`:** expõem métricas no formato Prometheus e health check via `make observability-up`.
-- **Docker Compose:** stack completo Prometheus + Grafana + app de métricas:
-  ```bash
-  make observability-up    # sobe Prometheus + Grafana + métricas
-  make observability-down  # derruba a stack
-  ```
+- **Docker Compose:** stack completo Prometheus + Grafana + app de métricas.
 - **Dashboards Grafana:** JSONs versionados em `observability/grafana/dashboards/` (provisionamento automático).
 
 ```bash

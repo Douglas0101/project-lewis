@@ -22,6 +22,7 @@ deste changelog.
   - Stack Docker Compose com Prometheus + Grafana e dashboard JSON em `observability/grafana/dashboards/lewis.json`.
 - **Busca Híbrida**
   - `src/knowledge/hybrid_search.py` combinando BM25 (FTS5), busca vetorial e RRF.
+  - Migration `src/knowledge/migrations/001_fts5_hybrid.sql` criando índice FTS5 para BM25.
   - Integração do hybrid search no retriever RAG, CLI e MCP server.
   - Conjunto de dados de referência para avaliação e `scripts/eval_hybrid.py`.
   - Novo target `make hybrid-eval`.
