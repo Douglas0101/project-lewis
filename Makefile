@@ -8,6 +8,7 @@
         knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
         knowledge-reindex-if-docs-changed \
         hybrid-eval \
+        ragas-eval \
         memory-commit \
         observability-up observability-down \
         test-e2e
@@ -269,6 +270,9 @@ knowledge-reindex-if-docs-changed:
 
 hybrid-eval: ## Avalia hybrid search no golden dataset
 	$(UV) run python scripts/eval_hybrid.py
+
+ragas-eval: ## Avalia qualidade do RAG com golden dataset
+	$(UV) run python -m src.observability.ragas_eval_cli data/eval/golden_dataset.json
 
 # ---------------------------------------------------------------------------
 # Memory / ArtifactRegistry
