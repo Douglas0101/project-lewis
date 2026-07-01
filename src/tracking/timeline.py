@@ -2,6 +2,9 @@
 
 A view `experiment_timeline` é criada pela migration 001 e une
 `experiment`, `run`, `metric` e `alert` em uma única linha por run.
+
+As consultas leem da tabela `experiment_timeline_materialized`, mantida
+atualizada por ``TimelineRefresher`` (``src/tracking/timeline_refresh.py``).
 """
 
 from __future__ import annotations
@@ -190,9 +193,11 @@ def get_timeline(
 
     where_clause = f"WHERE {where}" if where else ""
 
-    count_sql = f"SELECT COUNT(*) FROM experiment_timeline {where_clause}"  # nosec B608
+    count_sql = (
+        f"SELECT COUNT(*) FROM experiment_timeline_materialized {where_clause}"  # nosec B608
+    )
     rows_sql = f"""
-        SELECT * FROM experiment_timeline
+        SELECT * FROM experiment_timeline_materialized
         {where_clause}
         ORDER BY {sort_column} {direction}, run_id DESC
         LIMIT :limit OFFSET :offset
