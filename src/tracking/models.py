@@ -46,6 +46,7 @@ class Experiment(Base):
     config_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
     git_commit: Mapped[str | None] = mapped_column(String(40), nullable=True)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    owner_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
@@ -75,6 +76,7 @@ class Run(Base):
         comment="train, val, test, inference",
     )
     artifact_dir: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    owner_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     start_time: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)
     )
