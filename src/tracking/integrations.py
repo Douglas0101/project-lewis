@@ -14,7 +14,7 @@ from typing import Any, Dict, Generator, List, Optional, cast
 from sqlalchemy.orm import Session
 
 from src.tracking._git import git_commit_short
-from src.tracking.db import get_session, init_schema
+from src.tracking.db import get_db_path, get_session, init_schema
 from src.tracking.repositories import (
     AlertRepository,
     ExperimentRepository,
@@ -33,6 +33,7 @@ from src.tracking.schemas import (
     RunType,
     Status,
 )
+from src.tracking.timeline_refresh import TimelineRefresher
 
 LOGGER = logging.getLogger("lewis.tracking.integrations")
 
@@ -57,6 +58,11 @@ def _managed_session(session: Optional[Session] = None) -> Generator[Session, No
 def ensure_schema() -> None:
     """Garante que o banco e tabelas existem."""
     init_schema()
+
+
+def refresh_timeline_after_run() -> None:
+    """Atualiza a timeline materializada imediatamente após uma run."""
+    TimelineRefresher(db_path=get_db_path()).refresh_sync()
 
 
 def start_tracking_experiment(
