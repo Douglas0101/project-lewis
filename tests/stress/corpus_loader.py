@@ -62,9 +62,7 @@ def load_corpus(
             try:
                 sample = AdversarialSample.model_validate(data)
             except ValidationError as exc:
-                raise ValueError(
-                    f"Schema inválido na linha {line_number}: {exc}"
-                ) from exc
+                raise ValueError(f"Schema inválido na linha {line_number}: {exc}") from exc
 
             if sample.id in seen_ids:
                 raise ValueError(f"ID duplicado no corpus: {sample.id!r} (linha {line_number})")

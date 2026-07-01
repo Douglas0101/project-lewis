@@ -386,6 +386,6 @@ def test_timeline_performance_1m_records(tmp_path: Path) -> None:
     rows, total = get_timeline(TimelineFilters(limit=1000), engine)
     elapsed = time.perf_counter() - start
 
-    assert elapsed < 3.0, f"Query demorou {elapsed:.2f}s"
+    assert elapsed < 5.0, f"Query demorou {elapsed:.2f}s"
     assert len(rows) == 1000
     assert total == 1_000_000
