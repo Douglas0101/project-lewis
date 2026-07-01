@@ -12,11 +12,9 @@ class VectorIndexer(Protocol):
 
     def semantic_search(
         self, query: str, filters: Optional[Dict[str, Any]] = None, top_k: int = 10
-    ) -> List[Dict[str, Any]]:
-        ...
+    ) -> List[Dict[str, Any]]: ...
 
-    def get_doc(self, doc_id: str) -> Dict[str, Any]:
-        ...
+    def get_doc(self, doc_id: str) -> Dict[str, Any]: ...
 
 
 class HybridSearcher:
@@ -31,14 +29,12 @@ class HybridSearcher:
     def _ensure_fts5(self) -> None:
         conn = sqlite3.connect(self.db_path)
         try:
-            conn.execute(
-                """
+            conn.execute("""
                 CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_fts USING fts5(
                     content, run_id UNINDEXED, stage UNINDEXED, status UNINDEXED,
                     tokenize="porter"
                 )
-                """
-            )
+                """)
         finally:
             conn.close()
 
@@ -91,4 +87,4 @@ class HybridSearcher:
                 scores[run_id] = scores.get(run_id, 0.0) + 1.0 / (self.k + rank + 1)
 
         sorted_ids = sorted(scores, key=lambda doc_id: scores[doc_id], reverse=True)[:top_k]
-        return [self.vector_indexer.get_doc(doc_id) for doc_id in sorted_ids]
+        return [{"id": doc_id, "rrf_score": scores[doc_id]} for doc_id in sorted_ids]

@@ -12,14 +12,14 @@ from __future__ import annotations
 import functools
 import json
 import time
-from typing import List
+from typing import Any, Dict, List, Optional
 
 import sqlite_vec
 from sentence_transformers import SentenceTransformer
 
 from src.observability.metrics import LatencyTracker
 
-from .constants import EMBEDDING_MODEL, LOG_QUERIES
+from .constants import EMBEDDING_MODEL, KNOWLEDGE_DB, LOG_QUERIES
 from .db import get_connection
 from .schemas import QueryRequest, QueryResult
 from .utils import format_context_for_agent
@@ -124,6 +124,88 @@ def _log_query(req: QueryRequest, result_count: int) -> None:
     }
     with open(LOG_QUERIES, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+class _VectorIndexerAdapter:
+    """Adapta o retriever vetorial existente para o HybridSearcher."""
+
+    def __init__(self) -> None:
+        self.model = _get_model()
+
+    def semantic_search(
+        self, query: str, filters: Optional[Dict[str, Any]] = None, top_k: int = 10
+    ) -> List[Dict[str, Any]]:
+        query_emb = self.model.encode(
+            [query], normalize_embeddings=True, show_progress_bar=False
+        )[0]
+        conn = get_connection()
+        try:
+            rows = conn.execute(
+                """
+                SELECT chunk_id, source, layer, version, tags,
+                       header_1, header_2, content, distance
+                FROM knowledge_chunks
+                WHERE embedding MATCH ? AND k = ?
+                ORDER BY distance
+                """,
+                (sqlite_vec.serialize_float32(query_emb), top_k),
+            ).fetchall()
+            return [{"id": row["chunk_id"], **dict(row)} for row in rows]
+        finally:
+            conn.close()
+
+    def get_doc(self, doc_id: str) -> Dict[str, Any]:
+        conn = get_connection()
+        try:
+            row = conn.execute(
+                "SELECT * FROM knowledge_chunks WHERE chunk_id = ?", (doc_id,)
+            ).fetchone()
+            return dict(row) if row else {"id": doc_id}
+        finally:
+            conn.close()
+
+
+def hybrid_search(req: QueryRequest) -> List[QueryResult]:
+    """Busca híbrida BM25 + vector com filtros 3D em Python."""
+    from .hybrid_search import HybridSearcher
+
+    adapter = _VectorIndexerAdapter()
+    searcher = HybridSearcher(KNOWLEDGE_DB, adapter)
+    rows = searcher.search(req.query, top_k=req.k * 4)
+    results: List[QueryResult] = []
+    required_tags = set(req.tags or [])
+    for row in rows:
+        doc = adapter.get_doc(row["id"])
+        if req.layer and doc.get("layer") != req.layer:
+            continue
+        if req.version and doc.get("version") != req.version:
+            continue
+        raw_tags = doc.get("tags")
+        tags: List[str] = []
+        if isinstance(raw_tags, str):
+            try:
+                tags = json.loads(raw_tags)
+            except json.JSONDecodeError:
+                tags = []
+        elif isinstance(raw_tags, list):
+            tags = raw_tags
+        if required_tags and not required_tags.issubset(set(tags)):
+            continue
+        if len(results) >= req.k:
+            break
+        results.append(
+            QueryResult(
+                chunk_id=doc.get("chunk_id") or doc.get("id") or "",
+                source=doc.get("source", ""),
+                layer=doc.get("layer", "GENERAL"),
+                version=doc.get("version", "unversioned"),
+                tags=tags,
+                content=doc.get("content", ""),
+                score=float(row.get("rrf_score", 1.0)),
+                rank=len(results) + 1,
+            )
+        )
+    return results
 
 
 def get_context_for_agent(req: QueryRequest) -> str:

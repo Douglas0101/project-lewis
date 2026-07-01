@@ -36,6 +36,7 @@ def _build_parser() -> argparse.ArgumentParser:
     query_parser.add_argument("--layer", "-l", default=None, help="Filtro camada")
     query_parser.add_argument("--version", "-v", default=None, help="Filtro versão")
     query_parser.add_argument("--k", "-k", type=int, default=5, help="Número de resultados")
+    query_parser.add_argument("--hybrid", action="store_true", help="Usa busca híbrida BM25+vector")
 
     subparsers.add_parser("status", help="Exibe status do índice")
 
@@ -53,7 +54,12 @@ def _cmd_query(args: argparse.Namespace) -> int:
     req = QueryRequest(
         query=args.q, layer=args.layer, version=args.version, tags=None, k=args.k, fetch_k=20
     )
-    results = search(req)
+    if args.hybrid:
+        from .retriever import hybrid_search
+
+        results = hybrid_search(req)
+    else:
+        results = search(req)
     for r in results:
         print(f"\n[{r.rank}] {r.source} | {r.layer} | {r.version}")
         print(f"Tags: {', '.join(r.tags)}")
