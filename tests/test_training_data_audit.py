@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from scripts.audit_training_data import AuditConfig, DataQualityAuditor
 from src.data.training_schemas import BeatRecord, TrainingDataAuditReport, TrainingDatasetManifest
 from src.features.pipeline import (
     CATALOG_PATH,
@@ -24,7 +25,6 @@ from src.features.pipeline import (
     _load_catalog,
     _load_raw_annotations,
 )
-from scripts.audit_training_data import AuditConfig, DataQualityAuditor
 
 DATA_AVAILABLE = CATALOG_PATH.exists() and CATALOG_PATH.stat().st_size > 0
 MITDB_100_AVAILABLE = (

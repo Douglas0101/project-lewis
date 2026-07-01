@@ -7,6 +7,7 @@ int main(void) {
     suite_dsp_register();
     suite_r_peak_register();
     suite_inference_register();
+    suite_adaptive_skipping_register();
     /* TODO: reativar suite_pipeline_register quando os fixtures two-stage
      * (expected_output de 2 elementos do Estagio 1) forem gerados. */
 #if 0 && LEWIS_USE_TFLM

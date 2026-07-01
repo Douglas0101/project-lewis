@@ -1303,6 +1303,8 @@ Input shape: (500, 1) — 1000ms @ 500Hz, 1 canal...
 | `search_docs` | `query`, `layer?`, `version?`, `tags?`, `k?` | Contexto formatado | Busca semântica |
 | `list_layers` | — | `List[str]` | Camadas disponíveis |
 | `get_doc_by_source` | `source`, `k?` | Contexto formatado | Chunks por caminho |
+| `query_training_logs` | `question` | JSON (SQL + resultados) | NL → SQL sobre tracking |
+| `execute_validated_sql` | `sql`, `params?` | JSON (SQL + resultados) | SQL read-only validado |
 
 ### 8.3 Configuração `mcp.json` (Atualizada)
 
@@ -1329,6 +1331,62 @@ Input shape: (500, 1) — 1000ms @ 500Hz, 1 canal...
   }
 }
 ```
+
+### 8.4 Pontes RAG ↔ Banco Estruturado
+
+A Camada C11 integra-se ao banco relacional de tracking (`data/lewis_metrics.db`) por três pontes:
+
+| Ponte | Origem | Destino | Implementação |
+|-------|--------|---------|---------------|
+| **Ponte 1** | Runs/métricas/alertas | Markdown indexado no RAG | `src/knowledge/experiment_summarizer.py` |
+| **Ponte 2** | Pergunta em linguagem natural | SQL read-only sobre tracking | `src/knowledge/structured_query.py` |
+| **Ponte 3** | Tabelas de tracking | View consolidada `experiment_timeline` | `src/tracking/timeline.py` + migration |
+
+#### Ponte 1 — Resumos de Experimento
+
+Ao final de uma run, `generate_experiment_summary(experiment_id, run_id?)` coleta métricas finais, alertas, artefatos e tempo de execução; compara com baselines armazenados no `extra` do experimento; e gera um markdown estruturado em `data/lineage/experiments/<experiment_name>.md`. O conteúdo passa por sanitização (`bleach`) antes de ser persistido. O indexador (`src/knowledge/indexer.py`) carrega automaticamente esses resumos, atribuindo layer `SIMULATION` e tags enriquecidas (`experimento`, `<stage>`, `<status>`, `<health_status>`).
+
+Uso:
+```bash
+uv run python -m src.knowledge.experiment_summarizer 145
+```
+
+#### Ponte 2 — Consulta Natural → SQL
+
+`src.knowledge.structured_query` oferece um catálogo determinístico de queries comuns mapeadas para SQL parametrizado, mais validação rigorosa de SQL customizado:
+
+- Apenas `SELECT`/`WITH`/`EXPLAIN` são permitidos.
+- `DROP`, `DELETE`, `UPDATE`, `INSERT`, `REPLACE`, `TRUNCATE`, `ATTACH`, `DETACH`, `PRAGMA` são rejeitados.
+- Execução sempre em conexão SQLite read-only (`file:<path>?mode=ro`).
+- Limite de 1.000 linhas; truncamento reportado.
+- Audit trail em `logs/knowledge_structured_queries.jsonl`.
+
+Tools MCP expostas:
+- `query_training_logs(question)` — pergunta em linguagem natural.
+- `execute_validated_sql(sql, params?)` — SQL customizado validado.
+
+Exemplos de perguntas suportadas:
+- "últimas runs que falharam"
+- "runs do estágio stage1"
+- "alertas críticos"
+- "linha do tempo"
+- "métricas da run 147"
+
+#### Ponte 3 — Linha do Tempo Consolidada
+
+A migration `src/tracking/migrations/001_experiment_timeline.sql` cria a view `experiment_timeline`, que une `experiment`, `run`, `metric` e `alert` e calcula:
+
+- Métricas finais pivotadas: `final_accuracy`, `final_loss`, `final_f1_macro`, `final_auc_roc`.
+- Duração da run em segundos.
+- Contagem de alertas por severidade.
+- `health_status`: `HEALTHY`, `UNSTABLE`, `REGRESSION`, `FAILED`.
+
+A API `src/tracking.timeline.get_timeline(filters)` valida filtros via Pydantic, constrói WHERE parametrizado e suporta ordenação apenas por colunas allowlist.
+
+#### Segurança
+
+- 100% das queries são parametrizadas; nenhuma string é concatenada em SQL.
+- A camada de auth (JWT/RBAC) foi explicitamente **postergada**: o Project-Lewis opera local/offline sem API HTTP, conforme `AGENTS.md`.
 
 ---
 

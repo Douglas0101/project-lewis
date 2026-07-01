@@ -1,18 +1,30 @@
-from sqlalchemy import text
-
-from src.tracking.db import get_engine, init_schema
+from src.security.rls import RowLevelSecurity
 
 
-def test_owner_id_column_exists(tmp_path):
-    db_path = tmp_path / "rls.db"
-    engine = get_engine(db_path)
-    init_schema(engine)
-    with engine.connect() as conn:
-        cols_exp = {
-            r["name"] for r in conn.execute(text("PRAGMA table_info(experiment)")).mappings()
-        }
-        cols_run = {
-            r["name"] for r in conn.execute(text("PRAGMA table_info(run)")).mappings()
-        }
-        assert "owner_id" in cols_exp
-        assert "owner_id" in cols_run
+def test_rls_adds_where_clause():
+    rls = RowLevelSecurity()
+    sql, params = rls.apply_filter("SELECT * FROM run WHERE status = 'completed'", "user_a")
+    assert "owner_id = ?" in sql
+    assert params == ("user_a",)
+
+
+def test_rls_adds_where_without_existing_where():
+    rls = RowLevelSecurity()
+    sql, params = rls.apply_filter("SELECT * FROM run ORDER BY id", "user_a")
+    assert "WHERE owner_id = ?" in sql
+    assert "ORDER BY id" in sql
+    assert params == ("user_a",)
+
+
+def test_admin_bypass():
+    rls = RowLevelSecurity()
+    sql, params = rls.apply_filter("SELECT * FROM run", "admin", roles=["admin"])
+    assert "owner_id" not in sql
+    assert params == ()
+
+
+def test_rls_named_params():
+    rls = RowLevelSecurity()
+    sql, params = rls.apply_filter("SELECT * FROM run WHERE status = :status", "user_a")
+    assert "owner_id = :owner_id" in sql
+    assert params == {"owner_id": "user_a"}

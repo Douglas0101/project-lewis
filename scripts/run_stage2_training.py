@@ -13,6 +13,7 @@ from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import yaml
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -257,6 +258,7 @@ def main() -> int:
         freeze_backbone=args.freeze_backbone,
         tracking_experiment_id=tracking_experiment_id,
         tracking_stage_label="stage2",
+        instrumentation_config=cfg.get("instrumentation"),
     )
 
     LOGGER.info(

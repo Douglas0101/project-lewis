@@ -33,7 +33,5 @@ def test_refresh_timeline_after_run(tmp_path, monkeypatch):
     refresh_timeline_after_run()
 
     with engine.connect() as conn:
-        total = conn.execute(
-            text("SELECT COUNT(*) FROM experiment_timeline_materialized")
-        ).scalar()
+        total = conn.execute(text("SELECT COUNT(*) FROM experiment_timeline_materialized")).scalar()
         assert total == 1

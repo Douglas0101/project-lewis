@@ -218,9 +218,7 @@ def build_backbone_1d_with_features(
         name="output",
     )(x)
 
-    model = tf.keras.Model(
-        inputs=[signal_input, feature_input], outputs=outputs, name=name
-    )
+    model = tf.keras.Model(inputs=[signal_input, feature_input], outputs=outputs, name=name)
 
     info = TFLMConstraints.validate_model(model)
     LOGGER.info(

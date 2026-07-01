@@ -37,9 +37,7 @@ def test_refresh_sync_inserts_data(tmp_path):
     refresher = TimelineRefresher(str(db_path))
     refresher.refresh_sync()
     with engine.connect() as conn:
-        total = conn.execute(
-            text("SELECT COUNT(*) FROM experiment_timeline_materialized")
-        ).scalar()
+        total = conn.execute(text("SELECT COUNT(*) FROM experiment_timeline_materialized")).scalar()
         assert total == 1
 
 

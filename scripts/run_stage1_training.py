@@ -13,6 +13,7 @@ from typing import Any, Dict
 
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 import yaml
 from sklearn.utils.class_weight import compute_class_weight
 
@@ -253,6 +254,7 @@ def main() -> int:
         freeze_backbone=args.freeze_backbone,
         tracking_experiment_id=tracking_experiment_id,
         tracking_stage_label="stage1",
+        instrumentation_config=cfg.get("instrumentation"),
     )
 
     LOGGER.info(
@@ -267,9 +269,11 @@ def main() -> int:
         summary=summary,
         stage_label="stage1",
     )
+    # O experimento sempre termina como "completed"; o não atendimento do QG5
+    # já está registrado como alerta e em passes_qg5 da run summary.
     finish_tracking_experiment(
         experiment_id=tracking_experiment_id,
-        status="completed" if summary["passes_qg5"] else "failed",
+        status="completed",
     )
 
     lineage = {

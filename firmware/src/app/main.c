@@ -3,6 +3,7 @@
 #include "ml/inference.h"
 #include "ml/quantization_params.h"
 #include "dsp/adc_stub.h"
+#include "dsp/adaptive_skipping.h"
 #include "dsp/filter.h"
 #include "dsp/normalizer.h"
 #include "dsp/r_peak_detector.h"
@@ -24,6 +25,10 @@ static int8_t s_stage1_output[LEWIS_STAGE1_OUTPUT_LEN];
 static int8_t s_stage2_output[LEWIS_STAGE2_OUTPUT_LEN];
 
 static lewis_filter_chain_t s_filter_chain;
+static lewis_adaptive_skipping_t s_adaptive_skipping;
+
+#define ADAPTIVE_SKIP_THRESHOLD_MS 10U
+#define ADAPTIVE_SKIP_THRESHOLD_RATIO 0.05f
 
 static void dequantize_beat(const int8_t* quantized, float* float_out, size_t len)
 {
@@ -82,9 +87,28 @@ static void print_report(void)
 
 static void run_demo_beats(void)
 {
+    /* Intervalos RR simulados para demonstrar skipping em ritmo estavel. */
+    const uint32_t rr_simulated[NUM_TEST_BEATS] = {800U, 800U, 800U};
+
     for (uint32_t beat = 0; beat < NUM_TEST_BEATS; ++beat) {
         lewis_adc_stub_get_beat(beat, s_raw_input);
         apply_dsp_pipeline(s_raw_input, s_input, LEWIS_INPUT_LEN);
+
+        /* O watchdog e decrementado por ISR; a decisao de skipping e rapida
+         * e nao bloqueia o sistema. */
+        if (lewis_adaptive_skipping_should_skip(
+                &s_adaptive_skipping,
+                rr_simulated[beat],
+                ADAPTIVE_SKIP_THRESHOLD_MS,
+                ADAPTIVE_SKIP_THRESHOLD_RATIO)) {
+            const char* class_names[] = {"N", "S", "V", "F"};
+            lewis_debug_print("[SKIP] beat ");
+            lewis_debug_print_uint(beat);
+            lewis_debug_print(" class=");
+            lewis_debug_print(class_names[s_adaptive_skipping.last_class]);
+            lewis_debug_print("\n");
+            continue;
+        }
 
         uint32_t t0 = lewis_hal_benchmark_start();
 
@@ -108,6 +132,8 @@ static void run_demo_beats(void)
             /* Mapeia S/V/F para indices 1/2/3 */
             final_cls = 1 + argmax_int8(s_stage2_output, LEWIS_STAGE2_OUTPUT_LEN);
         }
+
+        lewis_adaptive_skipping_update_class(&s_adaptive_skipping, (uint32_t)final_cls);
 
         uint32_t t1 = lewis_hal_benchmark_stop();
         uint32_t cycles = (t0 - t1) & 0x00FFFFFFUL;
@@ -163,10 +189,41 @@ static void infer_from_uart(uint8_t start_byte)
 {
     static int8_t input_quantized[LEWIS_INPUT_LEN];
     static float frame[LEWIS_INPUT_LEN];
+    static uint32_t s_last_infer_ms;
+    static bool s_has_last_infer_ms;
     uint8_t byte;
 
     if (start_byte != '<') {
         lewis_debug_print("[infer] FRAME ERR\n");
+        return;
+    }
+
+    /* Estima RR como tempo decorrido desde a ultima inferencia via UART.
+     * Na primeira chamada nao ha historico, entao nunca pula. */
+    uint32_t now = lewis_hal_millis();
+    uint32_t rr_ms = s_has_last_infer_ms ? (now - s_last_infer_ms) : 0U;
+
+    uint32_t skipped_class;
+    if (s_has_last_infer_ms && lewis_command_adaptive_skipping_should_skip(rr_ms, &skipped_class)) {
+        const char* class_names[] = {"N", "S", "V", "F"};
+        lewis_debug_print("[SKIP] class=");
+        lewis_debug_print(class_names[skipped_class]);
+        lewis_debug_print("\n");
+        /* Responde com a classe anterior para manter o protocolo UART. */
+        int8_t final_out[LEWIS_STAGE2_OUTPUT_LEN];
+        for (int i = 0; i < LEWIS_STAGE2_OUTPUT_LEN; ++i) {
+            final_out[i] = 0;
+        }
+        if (skipped_class > 0U) {
+            /* S=0, V=1, F=2 no output do Estagio 2; skipped_class ja e 1/2/3. */
+            final_out[skipped_class - 1U] = 127;
+        }
+        lewis_hal_uart_tx('<');
+        for (int i = 0; i < LEWIS_STAGE2_OUTPUT_LEN; ++i) {
+            lewis_hal_uart_tx((uint8_t)final_out[i]);
+        }
+        lewis_hal_uart_tx('>');
+        s_last_infer_ms = now;
         return;
     }
 
@@ -247,6 +304,12 @@ static void infer_from_uart(uint8_t start_byte)
         lewis_hal_uart_tx((uint8_t)final_out[i]);
     }
     lewis_hal_uart_tx('>');
+
+    s_last_infer_ms = lewis_hal_millis();
+    s_has_last_infer_ms = true;
+
+    uint32_t final_class = (uint32_t)(stage1_cls == 1 ? (1 + argmax_int8(final_out, LEWIS_STAGE2_OUTPUT_LEN)) : 0);
+    lewis_command_adaptive_skipping_update_class(final_class);
 }
 
 static void run_peak_demo(void)
@@ -289,6 +352,7 @@ static void command_loop(void)
 {
     lewis_debug_print("Modo comando UART ativo\n");
     lewis_command_reset();
+    lewis_command_adaptive_skipping_reset();
 
     for (;;) {
         uint8_t byte = uart_read_byte();
@@ -353,6 +417,9 @@ int main(void)
 
     lewis_filter_chain_init(&s_filter_chain);
     lewis_debug_print("DSP filters init OK\n");
+
+    lewis_adaptive_skipping_init(&s_adaptive_skipping);
+    lewis_debug_print("Adaptive skipping init OK\n");
 
     run_demo_beats();
 

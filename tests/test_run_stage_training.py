@@ -100,16 +100,14 @@ def _run_stage_script(script_module: str, extra_argv: list[str]):
         else "scripts.run_stage2_training.train_group_kfold"
     )
 
-    with patch("yaml.safe_load", return_value=patched_cfg), patch(
-        load_features_module, return_value=(X, y, df)
-    ), patch(train_module, return_value=summary) as mock_train, patch(
-        "pathlib.Path.mkdir", MagicMock()
-    ), patch(
-        "pathlib.Path.open", MagicMock()
-    ), patch(
-        "json.dump", MagicMock()
-    ), patch(
-        "shutil.copy", MagicMock()
+    with (
+        patch("yaml.safe_load", return_value=patched_cfg),
+        patch(load_features_module, return_value=(X, y, df)),
+        patch(train_module, return_value=summary) as mock_train,
+        patch("pathlib.Path.mkdir", MagicMock()),
+        patch("pathlib.Path.open", MagicMock()),
+        patch("json.dump", MagicMock()),
+        patch("shutil.copy", MagicMock()),
     ):
         argv = [
             "prog",

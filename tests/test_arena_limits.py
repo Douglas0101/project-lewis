@@ -106,9 +106,7 @@ def test_arena_48k_init_fail() -> None:
                 "BLOCKED: firmware gerou hard fault/CPU abort em vez de INIT FAIL "
                 f"com 48 KB RAM.\nSaida do Renode:\n{tail}"
             )
-        raise RuntimeError(
-            f"renode-test falhou para arena 48 KB (rc={result.returncode}):\n{tail}"
-        )
+        raise RuntimeError(f"renode-test falhou para arena 48 KB (rc={result.returncode}):\n{tail}")
 
     if not UART_LOG.exists():
         raise RuntimeError("Log UART nao foi criado pela simulacao QG12")

@@ -60,6 +60,18 @@ callbacks:
   csv_logger:
     filename: training.log
 
+instrumentation:
+  gradient_monitor:
+    enabled: true
+    log_path: logs/gradients_stage2.json
+    layer_names: null  # auto-detecta camadas Dense
+    max_samples: 2048
+  calibration_monitor:
+    enabled: true
+    log_path: logs/calibration_stage2.json
+    n_bins: 15
+    max_samples: 2048
+
 group_kfold:
   n_splits: 5
   seed: 42

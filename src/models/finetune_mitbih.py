@@ -262,11 +262,7 @@ class F1MacroCheckpoint(tf.keras.callbacks.Callback):
         threshold_str = (
             f"{threshold:.2f}"
             if threshold is not None
-            else (
-                str(thresholds_dict)
-                if thresholds_dict is not None
-                else "argmax"
-            )
+            else (str(thresholds_dict) if thresholds_dict is not None else "argmax")
         )
         LOGGER.info(
             "Epoch %d | val_%s=%.4f | QG=%s | threshold=%s",
@@ -333,6 +329,7 @@ def finetune_mitbih(
     augment_config: Optional[Dict[str, Any]] = None,
     loss: str | tf.keras.losses.Loss = "sparse_categorical_crossentropy",
     optimize_thresholds: bool = False,
+    extra_callbacks: Optional[List[tf.keras.callbacks.Callback]] = None,
 ) -> Tuple[tf.keras.Model, dict]:
     """Fine-tuning com backbone opcionalmente congelado.
 
@@ -386,6 +383,10 @@ def finetune_mitbih(
     optimize_thresholds : bool
         Se True, realiza threshold tuning one-vs-rest na validação para
         classificação multiclasse.
+    extra_callbacks : list[tf.keras.callbacks.Callback], optional
+        Callbacks adicionais a serem incluídos junto aos callbacks padrão.
+        Útil para instrumentação (gradiente, calibração) sem alterar o
+        pipeline principal.
 
     Returns
     -------
@@ -419,9 +420,7 @@ def finetune_mitbih(
             augment_config,
             len(X_train),
         )
-        X_train, y_train = oversample_per_class(
-            X_train, y_train, config=augment_config, seed=seed
-        )
+        X_train, y_train = oversample_per_class(X_train, y_train, config=augment_config, seed=seed)
         LOGGER.info("Train size after class-specific augmentation=%d", len(X_train))
     elif augment_class is not None and augment_factor > 1:
         LOGGER.info(
@@ -456,7 +455,7 @@ def finetune_mitbih(
 
     # Callbacks: usar F1-macro AAMI como critério principal de seleção
     # (val_loss é distorcido pelos class weights).
-    callbacks = [
+    callbacks: List[tf.keras.callbacks.Callback] = [
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor=monitor,
             factor=0.5,
@@ -480,6 +479,10 @@ def finetune_mitbih(
             append=False,
         ),
     ]
+
+    if extra_callbacks:
+        callbacks = extra_callbacks + callbacks
+        LOGGER.info("Adicionados %d callbacks extras", len(extra_callbacks))
 
     # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
     if use_slha:

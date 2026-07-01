@@ -15,8 +15,8 @@ from src.tracking.integrations import (
     record_summary_metrics,
     record_two_stage_results,
 )
-from src.tracking.schemas import RunCreate
 from src.tracking.repositories import AlertRepository, MetricRepository, RunRepository
+from src.tracking.schemas import RunCreate
 
 
 @pytest.fixture
@@ -34,9 +34,7 @@ def test_record_evaluation_metrics(session: Session) -> None:
     result = evaluate_aami(y_true, y_pred, class_names=["N", "S", "V"], verbose=False)
 
     run_repo = RunRepository(session)
-    run = run_repo.create(
-        RunCreate(experiment_id=1, run_type="test")
-    )
+    run = run_repo.create(RunCreate(experiment_id=1, run_type="test"))
     # Criar experimento manualmente para FK
     from src.tracking.models import Experiment
 

@@ -19,7 +19,13 @@ import tensorflow as tf
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
-from src.tracking.integrations import record_fold_results
+from src.callbacks.calibration_monitor import CalibrationMonitor
+from src.callbacks.gradient_monitor import GradientMonitor
+from src.callbacks.metric_tracker import MetricTracker
+from src.tracking.integrations import (
+    finish_tracking_run,
+    start_tracking_run,
+)
 
 from .backbone_1d import build_backbone_1d
 from .evaluate import evaluate_fold
@@ -69,6 +75,85 @@ def _normalize_fold(
     return X_train_norm, X_test_norm, scaler
 
 
+def _build_instrumentation_callbacks(
+    instrumentation_config: Optional[Dict[str, Any]],
+    X_val_norm: np.ndarray,
+    y_val: np.ndarray,
+    class_names: Optional[List[str]] = None,
+    fold_idx: int = 0,
+) -> List[tf.keras.callbacks.Callback]:
+    """Constrói callbacks de instrumentação para um fold específico.
+
+    Os callbacks são instanciados APÓS a normalização do fold, garantindo que
+    as estatísticas de gradiente e calibração sejam computadas nos mesmos dados
+    em escala de treino. Os caminhos de log recebem o sufixo ``fold_{idx}``.
+
+    Parameters
+    ----------
+    instrumentation_config : dict, optional
+        Configuração com as chaves ``gradient_monitor`` e ``calibration_monitor``.
+    X_val_norm : np.ndarray
+        Dados de validação normalizados do fold atual.
+    y_val : np.ndarray
+        Labels de validação do fold atual.
+    class_names : list[str], optional
+        Nomes das classes para o CalibrationMonitor.
+    fold_idx : int
+        Índice do fold atual.
+
+    Returns
+    -------
+    list
+        Lista de callbacks extras (vazia se config ausente, vazia ou desabilitada).
+    """
+    if not instrumentation_config:
+        return []
+
+    callbacks: List[tf.keras.callbacks.Callback] = []
+    grad_cfg = instrumentation_config.get("gradient_monitor", {})
+    if grad_cfg.get("enabled", False):
+        base_path = Path(grad_cfg.get("log_path", "logs/gradients_stage1.json"))
+        fold_path = base_path.parent / f"fold_{fold_idx}" / base_path.name
+        callbacks.append(
+            GradientMonitor(
+                val_data=X_val_norm,
+                val_labels=y_val,
+                log_path=str(fold_path),
+                layer_names=grad_cfg.get("layer_names"),
+                max_samples=grad_cfg.get("max_samples"),
+                class_names=class_names,
+            )
+        )
+        LOGGER.info(
+            "GradientMonitor habilitado | fold=%d | log_path=%s",
+            fold_idx,
+            fold_path,
+        )
+
+    cal_cfg = instrumentation_config.get("calibration_monitor", {})
+    if cal_cfg.get("enabled", False):
+        base_path = Path(cal_cfg.get("log_path", "logs/calibration_stage1.json"))
+        fold_path = base_path.parent / f"fold_{fold_idx}" / base_path.name
+        callbacks.append(
+            CalibrationMonitor(
+                val_data=X_val_norm,
+                val_labels=y_val,
+                n_bins=cal_cfg.get("n_bins", 15),
+                log_path=str(fold_path),
+                class_names=class_names,
+                max_samples=cal_cfg.get("max_samples"),
+            )
+        )
+        LOGGER.info(
+            "CalibrationMonitor habilitado | fold=%d | log_path=%s | n_bins=%d",
+            fold_idx,
+            fold_path,
+            cal_cfg.get("n_bins", 15),
+        )
+
+    return callbacks
+
+
 def train_group_kfold(
     X: np.ndarray,
     y: np.ndarray,
@@ -94,6 +179,7 @@ def train_group_kfold(
     optimize_thresholds: bool = False,
     tracking_experiment_id: Optional[int] = None,
     tracking_stage_label: str = "",
+    instrumentation_config: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
     """Treinamento GroupKFold por paciente.
 
@@ -146,6 +232,11 @@ def train_group_kfold(
         Função de perda a ser passada para ``model.compile``.
     optimize_thresholds : bool
         Se True, aplica threshold tuning one-vs-rest na validação multiclasse.
+    instrumentation_config : dict, optional
+        Configuração para construção de callbacks de instrumentação
+        (GradientMonitor, CalibrationMonitor) dentro de cada fold, usando os
+        dados de validação normalizados do fold atual. Se None ou vazio, nenhum
+        callback extra é criado.
 
     Returns
     -------
@@ -196,6 +287,30 @@ def train_group_kfold(
         # 1. Normalização global (fit no treino)
         X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
 
+        # Criar run de tracking no início do fold para possibilitar métricas por época
+        fold_run_id: Optional[int] = None
+        if tracking_experiment_id is not None:
+            try:
+                fold_run_id = start_tracking_run(
+                    experiment_id=tracking_experiment_id,
+                    run_type="train",
+                    fold_idx=fold_idx,
+                    artifact_dir=fold_dir,
+                )
+            except Exception:
+                LOGGER.exception("Falha ao criar run de tracking para fold %d", fold_idx)
+
+        # Callbacks de instrumentação devem usar dados normalizados do fold
+        fold_callbacks = _build_instrumentation_callbacks(
+            instrumentation_config=instrumentation_config,
+            X_val_norm=X_test_norm,
+            y_val=y_test,
+            class_names=class_names,
+            fold_idx=fold_idx,
+        )
+        if fold_run_id is not None:
+            fold_callbacks.append(MetricTracker(run_id=fold_run_id))
+
         # Salvar scaler
         import joblib
 
@@ -238,6 +353,7 @@ def train_group_kfold(
             augment_config=augment_config,
             loss=loss,
             optimize_thresholds=optimize_thresholds,
+            extra_callbacks=fold_callbacks,
         )
 
         # 4. Avaliação
@@ -253,17 +369,17 @@ def train_group_kfold(
         eval_result["history"] = history
         fold_results.append(eval_result)
 
-        if tracking_experiment_id is not None:
+        if fold_run_id is not None:
             try:
-                record_fold_results(
-                    experiment_id=tracking_experiment_id,
-                    fold_idx=fold_idx,
+                finish_tracking_run(
+                    run_id=fold_run_id,
+                    status="completed",
                     eval_result=eval_result,
-                    artifact_dir=fold_dir,
+                    experiment_id=tracking_experiment_id,
                     stage_label=tracking_stage_label,
                 )
             except Exception:
-                LOGGER.exception("Falha ao registrar fold %d no tracking", fold_idx)
+                LOGGER.exception("Falha ao finalizar run do fold %d no tracking", fold_idx)
 
         f1_macro = eval_result["global"]["F1_macro"]
         LOGGER.info(

@@ -1,6 +1,9 @@
+import pytest
+
 from src.observability.ragas_eval import LocalRAGASEvaluator
 
 
+@pytest.mark.observability
 def test_local_context_precision():
     queries = [
         {
@@ -15,3 +18,16 @@ def test_local_context_precision():
     assert 0.0 <= result["context_recall"] <= 1.0
     assert "faithfulness" in result
     assert "answer_relevancy" in result
+
+
+@pytest.mark.observability
+def test_local_evaluator_string_ground_truth():
+    queries = [
+        {
+            "question": "q1",
+            "contexts": ["Run run_001 completado. Accuracy final: 0.92."],
+            "ground_truth": "run_001 0.92",
+        }
+    ]
+    result = LocalRAGASEvaluator().evaluate_batch(queries)
+    assert result["context_recall"] > 0.0

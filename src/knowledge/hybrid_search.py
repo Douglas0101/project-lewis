@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
@@ -58,6 +59,18 @@ class HybridSearcher:
         finally:
             conn.close()
 
+    @staticmethod
+    def _sanitize_fts5(query: str) -> str:
+        """Limpa uma query para uso seguro no operador FTS5 MATCH.
+
+        Remove pontuação e operadores FTS5 (?, -, *, ", etc.), deixando
+        apenas tokens alfanuméricos separados por espaço. Isso evita erros
+        de sintaxe quando a query contém caracteres especiais ou stopwords
+        que o tokenizer do porter trata como operadores.
+        """
+        cleaned = re.sub(r"[^\w\s]", " ", query, flags=re.UNICODE)
+        return " ".join(cleaned.split())
+
     def search(self, query: str, top_k: int = 10) -> List[Dict[str, Any]]:
         """Executa busca híbrida e retorna documentos ordenados por RRF."""
         vector_results = self.vector_indexer.semantic_search(query, top_k=top_k * 2)
@@ -67,24 +80,26 @@ class HybridSearcher:
             if doc_id:
                 scores[doc_id] = scores.get(doc_id, 0.0) + 1.0 / (self.k + rank + 1)
 
-        conn = sqlite3.connect(self.db_path)
-        try:
-            rows = conn.execute(
-                """
-                SELECT run_id, rank
-                FROM knowledge_fts
-                WHERE knowledge_fts MATCH ?
-                ORDER BY rank
-                LIMIT ?
-                """,
-                (query, top_k * 2),
-            ).fetchall()
-        finally:
-            conn.close()
+        sanitized = self._sanitize_fts5(query)
+        if sanitized:
+            conn = sqlite3.connect(self.db_path)
+            try:
+                rows = conn.execute(
+                    """
+                    SELECT run_id, rank
+                    FROM knowledge_fts
+                    WHERE knowledge_fts MATCH ?
+                    ORDER BY rank
+                    LIMIT ?
+                    """,
+                    (sanitized, top_k * 2),
+                ).fetchall()
+            finally:
+                conn.close()
 
-        for rank, (run_id, _) in enumerate(rows):
-            if run_id:
-                scores[run_id] = scores.get(run_id, 0.0) + 1.0 / (self.k + rank + 1)
+            for rank, (run_id, _) in enumerate(rows):
+                if run_id:
+                    scores[run_id] = scores.get(run_id, 0.0) + 1.0 / (self.k + rank + 1)
 
         sorted_ids = sorted(scores, key=lambda doc_id: scores[doc_id], reverse=True)[:top_k]
         return [{"id": doc_id, "rrf_score": scores[doc_id]} for doc_id in sorted_ids]

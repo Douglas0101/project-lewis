@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-
 import tensorflow as tf
 
 from src.models.backbone_1d import build_backbone_1d, freeze_conv_layers

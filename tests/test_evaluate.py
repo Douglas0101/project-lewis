@@ -60,9 +60,7 @@ def test_evaluate_multiclass_at_thresholds_selects_single_above_threshold():
         dtype=np.float32,
     )
     thresholds = {"S": 0.5, "V": 0.5, "F": 0.5}
-    result = evaluate_multiclass_at_thresholds(
-        y_true, y_score, thresholds, class_names=class_names
-    )
+    result = evaluate_multiclass_at_thresholds(y_true, y_score, thresholds, class_names=class_names)
 
     assert result["y_pred"] == [0, 1, 2]
     assert result["global"]["Acc"] == 1.0
@@ -74,9 +72,7 @@ def test_find_best_thresholds_multiclass_improves_f1_macro():
     y_true = np.array([1] * 80 + [0] * 15 + [2] * 5)
     # Modelo confuso: tende a prever V para todos
     y_score = np.array(
-        [[0.2, 0.7, 0.1]] * 80
-        + [[0.5, 0.4, 0.1]] * 15
-        + [[0.2, 0.6, 0.2]] * 5,
+        [[0.2, 0.7, 0.1]] * 80 + [[0.5, 0.4, 0.1]] * 15 + [[0.2, 0.6, 0.2]] * 5,
         dtype=np.float32,
     )
 

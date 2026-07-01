@@ -200,8 +200,7 @@ class TestTflmBitexact:
         with tempfile.TemporaryDirectory(prefix="lewis_qg8_") as tmpdir:
             bin_path = _build_c_dsp_pipeline(Path(tmpdir))
             quantized_inputs = [
-                _run_c_dsp_pipeline(bin_path, i)
-                for i in range(firmware_report["beat_count"])
+                _run_c_dsp_pipeline(bin_path, i) for i in range(firmware_report["beat_count"])
             ]
         py_outputs = _run_python_inference(quantized_inputs)
 

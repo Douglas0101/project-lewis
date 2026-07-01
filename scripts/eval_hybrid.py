@@ -69,7 +69,7 @@ def context_recall(queries: List[Dict[str, Any]]) -> float:
         expected_sources = set(q.get("expected_sources", []))
         if not expected_chunks and not expected_sources:
             continue
-        retrieved = {r for r in results}
+        retrieved = list(results)
         relevant = sum(
             1 for r in retrieved if _result_matches(r, expected_chunks, expected_sources)
         )

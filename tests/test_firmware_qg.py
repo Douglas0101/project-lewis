@@ -14,7 +14,6 @@ from pathlib import Path
 
 import pytest
 
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_ROOT = PROJECT_ROOT / "firmware"
 MAKEFILE = FIRMWARE_ROOT / "Makefile"
