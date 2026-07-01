@@ -29,6 +29,8 @@ class TimelineRefresher:
     def refresh_sync(self) -> None:
         conn = sqlite3.connect(self.db_path)
         try:
+            conn.execute("PRAGMA synchronous = OFF")
+            conn.execute("PRAGMA cache_size = -1048576")
             conn.execute("BEGIN TRANSACTION")
             conn.execute("DELETE FROM experiment_timeline_materialized")
             conn.execute(
