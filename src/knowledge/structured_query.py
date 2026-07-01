@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import Engine, create_engine, text
 
 from src.observability.metrics import LatencyTracker
+from src.security.rls import RowLevelSecurity
 from src.tracking.db import get_db_path
 
 logger = logging.getLogger(__name__)
@@ -219,10 +220,11 @@ _QUERY_CATALOG: List[QueryPattern] = [
             r"run (\d+) m[ée]tricas",
         ],
         sql="""
-            SELECT namespace, name, value, class_name, step, recorded_at
-            FROM metric
-            WHERE run_id = :run_id
-            ORDER BY namespace, name, step
+            SELECT m.namespace, m.name, m.value, m.class_name, m.step, m.recorded_at
+            FROM metric m
+            JOIN run r ON r.id = m.run_id
+            WHERE m.run_id = :run_id
+            ORDER BY m.namespace, m.name, m.step
             LIMIT :max_rows
         """,
         param_schema={"run_id": "int"},
@@ -336,6 +338,9 @@ def _table_description(table_name: str) -> str:
 def validate_sql(sql: str, allowed_tables: Optional[set[str]] = None) -> Tuple[bool, str]:
     """Valida SQL customizado contra regras de segurança.
 
+    Aceita aliases de tabela (ex.: ``FROM run r``) desde que o nome da
+    tabela subjacente esteja na allowlist.
+
     Returns
     -------
     tuple[bool, str]
@@ -366,31 +371,14 @@ def validate_sql(sql: str, allowed_tables: Optional[set[str]] = None) -> Tuple[b
         if re.search(r"\bunion\b", flat_lower):
             return False, "Palavra-chave proibida detectada: union"
 
-        # Verifica tabelas/views referenciadas
-        referenced_tables: set[str] = set()
-        for token in statement.tokens:
-            if token.ttype is sqlparse.tokens.Name:
-                name = token.value.strip('"').strip("'")
-                if name.lower() in allowed_lower:
-                    referenced_tables.add(name.lower())
-                elif name.lower() in {"from", "join", "into", "where", "on", "as"}:
-                    continue
-                elif any(c.isalnum() or c == "_" for c in name):
-                    # Pode ser alias/columna; verificamos se é tabela via contexto
-                    pass
-
-        # Heurística adicional: extrair tokens que parecem tabelas de FROM/JOIN
-        for idx, token in enumerate(tokens):
-            if token.lower() in {"from", "join"}:
-                next_idx = idx + 1
-                while next_idx < len(tokens) and tokens[next_idx].lower() in {",", "(", "as"}:
-                    next_idx += 1
-                    if next_idx < len(tokens) and tokens[next_idx].lower() == "select":
-                        break
-                if next_idx < len(tokens):
-                    candidate = tokens[next_idx].strip('"').strip("'")
-                    if candidate.lower() not in allowed_lower | {"(", ")", ","}:
-                        return False, f"Tabela não permitida: {candidate}"
+    # Extrai referências de tabela de FROM/JOIN, ignorando aliases opcionais.
+    for match in re.finditer(
+        r"\b(from|join)\s+(\w+)(?:\s+(?:as\s+)?(\w+))?",
+        flat_lower,
+    ):
+        table_name = match.group(2)
+        if table_name.lower() not in allowed_lower:
+            return False, f"Tabela não permitida: {table_name}"
 
     return True, ""
 
@@ -407,7 +395,7 @@ def _extract_param_from_question(question: str, param_name: str) -> Optional[str
                 return "critical" if sev in {"critical", "crítico"} else sev
     if param_name == "health_status":
         for hs in ["HEALTHY", "UNSTABLE", "REGRESSION", "FAILED"]:
-            if hs.lower() in q_lower:
+            if re.search(rf"\b{hs}\b", q_lower, re.IGNORECASE):
                 return hs
     if param_name == "run_id":
         m = re.search(r"run\s+(\d+)", question, re.IGNORECASE)
@@ -422,7 +410,7 @@ def _match_catalog(question: str) -> Optional[Tuple[QueryPattern, Dict[str, Any]
     for pattern in _QUERY_CATALOG:
         matched = False
         for regex in pattern.patterns:
-            if re.search(regex, q_lower):
+            if re.search(regex, q_lower, re.IGNORECASE):
                 matched = True
                 break
 
@@ -451,9 +439,44 @@ def _match_catalog(question: str) -> Optional[Tuple[QueryPattern, Dict[str, Any]
     return None
 
 
+def _catalog_owner_alias(pattern_name: str) -> str | None:
+    """Retorna o alias de tabela para aplicar RLS em queries do catálogo."""
+    return {
+        "last_failed_runs": "e",
+        "runs_by_stage": "e",
+        "alerts_by_severity": "e",
+        "metrics_for_run": "r",
+        "timeline": None,
+        "timeline_health": None,
+    }.get(pattern_name)
+
+
+def _merge_rls_params(
+    params: Dict[str, Any] | Tuple[Any, ...] | None,
+    rls_params: Dict[str, Any] | Tuple[str, ...],
+) -> Dict[str, Any] | Tuple[Any, ...]:
+    """Mescla parâmetros originais com os gerados pelo RLS.
+
+    Preserva o estilo de bind: quando o RLS gera binds posicionais (?),
+    o resultado é uma tupla; quando gera binds nomeados, o resultado é dict.
+    Para binds posicionais, os parâmetros RLS vêm primeiro porque o filtro
+    owner_id é injetado no início da cláusula WHERE.
+    """
+    if params is None:
+        return rls_params
+    if isinstance(rls_params, tuple):
+        if isinstance(params, tuple):
+            return rls_params + params
+        return rls_params + tuple(params.values())
+    if isinstance(params, dict):
+        return {**params, **rls_params}
+    # rls_params é dict e params é tuple
+    return {**rls_params, **{f"param_{i}": v for i, v in enumerate(params)}}
+
+
 def _execute_sql(
     sql: str,
-    params: Dict[str, Any],
+    params: Dict[str, Any] | Tuple[Any, ...],
     max_rows: int,
     db_path: Path | None = None,
 ) -> Tuple[List[str], List[Dict[str, Any]], int, float]:
@@ -462,7 +485,17 @@ def _execute_sql(
     start = time.perf_counter()
 
     try:
-        cursor = conn.execute(sql, {**params, "max_rows": max_rows + 1})
+        if isinstance(params, dict):
+            merged: Dict[str, Any] | Tuple[Any, ...] = {**params, "max_rows": max_rows + 1}
+            exec_sql = sql
+        else:
+            merged = tuple(params)
+            if ":max_rows" in sql:
+                exec_sql = sql.replace(":max_rows", "?")
+            else:
+                exec_sql = f"{sql.rstrip(';').strip()} LIMIT ?"
+            merged = merged + (max_rows + 1,)
+        cursor = conn.execute(exec_sql, merged)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         all_rows = [dict(row) for row in cursor.fetchall()]
     finally:
@@ -476,8 +509,13 @@ def _execute_sql(
 def answer_question(
     req: NaturalQueryRequest,
     db_path: Path | None = None,
+    user_id: str | None = None,
+    roles: Sequence[str] = (),
 ) -> StructuredQueryResult:
     """Responde pergunta em linguagem natural via catálogo determinístico.
+
+    Se ``user_id`` for informado e o usuário não for admin, aplica filtro
+    RLS baseado no dono do experimento/run.
 
     Se nenhum padrão for encontrado, retorna ajuda do schema em vez de
     executar SQL não validado.
@@ -514,20 +552,27 @@ def answer_question(
         )
 
     pattern, extracted_params = matched
-    params = {**extracted_params, **(req.params or {}), "max_rows": req.max_rows}
+    params: Dict[str, Any] = {**extracted_params, **(req.params or {}), "max_rows": req.max_rows}
+    sql = pattern.sql
 
-    ok, reason = validate_sql(pattern.sql)
+    ok, reason = validate_sql(sql)
     if not ok:
         raise ValueError(f"SQL do catálogo rejeitado pela validação: {reason}")
 
+    if user_id is not None and "admin" not in roles:
+        alias = _catalog_owner_alias(pattern.name)
+        sql, rls_params = RowLevelSecurity().apply_filter(sql, user_id, roles, table_alias=alias)
+        if rls_params:
+            params = _merge_rls_params(params, rls_params)  # type: ignore[assignment]
+
     with LatencyTracker("sql", "answer_question"):
-        columns, rows, total, elapsed = _execute_sql(pattern.sql, params, req.max_rows, db_path)
+        columns, rows, total, elapsed = _execute_sql(sql, params, req.max_rows, db_path)
 
     _log_audit(
         {
             "audit_id": audit_id,
             "question": req.question,
-            "sql": pattern.sql,
+            "sql": sql,
             "params": params,
             "row_count": len(rows),
             "source": "catalog",
@@ -537,7 +582,7 @@ def answer_question(
 
     return StructuredQueryResult(
         question=req.question,
-        sql=pattern.sql,
+        sql=sql,
         params=params,
         columns=columns,
         rows=rows,
@@ -549,11 +594,52 @@ def answer_question(
     )
 
 
+def _extract_owner_alias(sql: str) -> str | None:
+    """Extrai o alias de tabela usado em FROM run/experiment/experiment_timeline."""
+    sql_lower = sql.lower()
+    sql_keywords = {
+        "where",
+        "group",
+        "order",
+        "having",
+        "limit",
+        "join",
+        "union",
+        "select",
+        "from",
+        "on",
+        "and",
+        "or",
+        "not",
+        "in",
+        "is",
+        "null",
+        "as",
+        "by",
+        "for",
+        "with",
+    }
+    match = re.search(
+        r"\bfrom\s+(run|experiment|experiment_timeline)\b(?:\s+as\b)?\s+(\w+)",
+        sql_lower,
+    )
+    if match:
+        alias = match.group(2)
+        if alias not in sql_keywords:
+            return alias
+    for table_name in ("experiment_timeline", "experiment", "run"):
+        if re.search(rf"\bfrom\s+{table_name}\b", sql_lower):
+            return table_name
+    return None
+
+
 def execute_custom_sql(
     sql: str,
     params: Optional[Dict[str, Any]] = None,
     max_rows: int = _MAX_ROWS,
     db_path: Path | None = None,
+    user_id: str | None = None,
+    roles: Sequence[str] = (),
 ) -> StructuredQueryResult:
     """Executa SQL customizado após validação rigorosa.
 
@@ -575,15 +661,34 @@ def execute_custom_sql(
         )
         raise ValueError(f"SQL rejeitado: {reason}")
 
-    merged_params = {**(params or {}), "max_rows": max_rows}
+    user_params = params or {}
+    is_positional = isinstance(user_params, (tuple, list))
+
+    if is_positional:
+        exec_params: Dict[str, Any] | Tuple[Any, ...] = tuple(user_params)
+        result_params: Dict[str, Any] = {f"param_{i}": v for i, v in enumerate(user_params)}
+    else:
+        exec_params = dict(user_params)
+        result_params = {**user_params, "max_rows": max_rows}
+
+    if user_id is not None and "admin" not in roles:
+        alias = _extract_owner_alias(sql)
+        sql, rls_params = RowLevelSecurity().apply_filter(sql, user_id, roles, table_alias=alias)
+        if rls_params:
+            exec_params = _merge_rls_params(exec_params, rls_params)
+            if isinstance(rls_params, dict):
+                result_params["owner_id"] = rls_params["owner_id"]
+            else:
+                result_params["owner_id"] = rls_params[0]
+
     with LatencyTracker("sql", "execute_custom_sql"):
-        columns, rows, total, elapsed = _execute_sql(sql, merged_params, max_rows, db_path)
+        columns, rows, total, elapsed = _execute_sql(sql, exec_params, max_rows, db_path)
 
     _log_audit(
         {
             "audit_id": audit_id,
             "sql": sql,
-            "params": merged_params,
+            "params": result_params,
             "row_count": len(rows),
             "source": "custom_sql",
         }
@@ -592,7 +697,7 @@ def execute_custom_sql(
     return StructuredQueryResult(
         question="",
         sql=sql,
-        params=merged_params,
+        params=result_params,
         columns=columns,
         rows=rows,
         row_count=len(rows),

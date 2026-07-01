@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy.orm import Session
 
@@ -20,31 +21,46 @@ from src.tracking.models import Alert, Experiment, Metric, Run
 
 @pytest.fixture
 def query_db(tmp_path):
-    """Banco temporário com dados para testar queries."""
+    """Banco temporário com dados para testar queries (dois usuários)."""
     db_path = tmp_path / "query_test.db"
     engine = get_engine(db_path)
     init_schema(engine)
 
     with Session(engine) as session:
-        exp = Experiment(name="exp_query", stage="stage1", status="completed")
-        session.add(exp)
+        exp_a = Experiment(
+            name="exp_query_a", stage="stage1", status="completed", owner_id="user_a"
+        )
+        exp_b = Experiment(
+            name="exp_query_b", stage="stage2", status="completed", owner_id="user_b"
+        )
+        session.add_all([exp_a, exp_b])
         session.flush()
 
         run_ok = Run(
-            experiment_id=exp.id,
+            experiment_id=exp_a.id,
             run_type="train",
             status="completed",
+            owner_id="user_a",
             start_time=datetime(2026, 6, 30, 10, 0, 0, tzinfo=timezone.utc),
             end_time=datetime(2026, 6, 30, 10, 1, 0, tzinfo=timezone.utc),
         )
         run_fail = Run(
-            experiment_id=exp.id,
+            experiment_id=exp_a.id,
             run_type="test",
             status="failed",
+            owner_id="user_a",
             start_time=datetime(2026, 6, 30, 11, 0, 0, tzinfo=timezone.utc),
             end_time=datetime(2026, 6, 30, 11, 2, 0, tzinfo=timezone.utc),
         )
-        session.add_all([run_ok, run_fail])
+        run_fail_b = Run(
+            experiment_id=exp_b.id,
+            run_type="test",
+            status="failed",
+            owner_id="user_b",
+            start_time=datetime(2026, 6, 30, 12, 0, 0, tzinfo=timezone.utc),
+            end_time=datetime(2026, 6, 30, 12, 2, 0, tzinfo=timezone.utc),
+        )
+        session.add_all([run_ok, run_fail, run_fail_b])
         session.flush()
 
         session.add(Metric(run_id=run_ok.id, namespace="global", name="f1_macro", value=0.7))
@@ -60,8 +76,9 @@ def query_db(tmp_path):
 
         run_ok_id = run_ok.id
         run_fail_id = run_fail.id
+        run_fail_b_id = run_fail_b.id
 
-    yield engine, db_path, run_ok_id, run_fail_id
+    yield engine, db_path, run_ok_id, run_fail_id, run_fail_b_id
 
 
 def test_validate_sql_rejects_drop():
@@ -115,14 +132,14 @@ def test_answer_question_timeline(query_db):
     req = NaturalQueryRequest(question="linha do tempo")
     result = answer_question(req, db_path=db_path)
     assert result.source == "catalog:timeline"
-    assert result.row_count == 2
+    assert result.row_count == 3
 
 
 def test_answer_question_failed_runs(query_db):
-    """Query de runs falhadas deve retornar apenas a run failed."""
-    engine, db_path, _, run_fail_id = query_db
+    """Query de runs falhadas deve retornar apenas a run failed do usuário."""
+    engine, db_path, _, run_fail_id, _ = query_db
     req = NaturalQueryRequest(question="runs que falharam")
-    result = answer_question(req, db_path=db_path)
+    result = answer_question(req, db_path=db_path, user_id="user_a")
     assert result.source == "catalog:last_failed_runs"
     assert result.row_count == 1
     assert result.rows[0]["run_id"] == run_fail_id
@@ -139,7 +156,7 @@ def test_answer_question_unknown_returns_schema(query_db):
 
 def test_execute_custom_sql_readonly(query_db):
     """SQL customizado SELECT deve funcionar em modo read-only."""
-    engine, db_path, run_ok_id, _ = query_db
+    engine, db_path, run_ok_id, _, _ = query_db
     result = execute_custom_sql(
         "SELECT * FROM run WHERE id = :run_id",
         {"run_id": run_ok_id},
@@ -162,3 +179,129 @@ def test_build_schema_context_includes_allowed_tables(query_db):
     assert "run" in context.tables
     assert "metric" in context.tables
     assert "alert" in context.tables
+
+
+def test_answer_question_rls_filters_by_user(query_db):
+    """RLS deve filtrar runs falhadas apenas do usuário solicitante."""
+    engine, db_path, _, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs que falharam")
+
+    result_a = answer_question(req, db_path=db_path, user_id="user_a")
+    assert result_a.row_count == 1
+    assert result_a.rows[0]["run_id"] == run_fail_id
+    assert result_a.params.get("owner_id") == "user_a"
+
+    result_b = answer_question(req, db_path=db_path, user_id="user_b")
+    assert result_b.row_count == 1
+    assert result_b.rows[0]["run_id"] == run_fail_b_id
+    assert result_b.params.get("owner_id") == "user_b"
+
+
+def test_answer_question_admin_bypass(query_db):
+    """Admin deve ignorar RLS e ver runs de todos os usuários."""
+    engine, db_path, _, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs que falharam")
+    result = answer_question(req, db_path=db_path, user_id="admin", roles=["admin"])
+    assert result.row_count == 2
+    run_ids = {row["run_id"] for row in result.rows}
+    assert run_ids == {run_fail_id, run_fail_b_id}
+    assert "owner_id" not in result.params
+
+
+def test_execute_custom_sql_rls(query_db):
+    """RLS deve ser aplicado em SQL customizado com alias de tabela."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    sql = """
+        SELECT r.id AS run_id, r.status
+        FROM run r
+        JOIN experiment e ON e.id = r.experiment_id
+        WHERE r.status = 'failed'
+        ORDER BY r.id
+    """
+    result = execute_custom_sql(sql, db_path=db_path, user_id="user_a")
+    assert result.row_count == 1
+    assert result.rows[0]["run_id"] == run_fail_id
+    assert "r.owner_id = ?" in result.sql
+    assert result.params.get("owner_id") == "user_a"
+
+
+def test_answer_question_timeline_rls(query_db):
+    """Timeline deve filtrar runs pelo owner_id."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="linha do tempo")
+    result = answer_question(req, db_path=db_path, user_id="user_a")
+    assert result.source == "catalog:timeline"
+    assert result.row_count == 2
+    run_ids = {row["run_id"] for row in result.rows}
+    assert run_ids == {run_ok_id, run_fail_id}
+    assert result.params.get("owner_id") == "user_a"
+
+
+def test_answer_question_timeline_health_pattern(query_db):
+    """Deve reconhecer pergunta sobre status de saúde de forma case-insensitive."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs healthy")
+    result = answer_question(req, db_path=db_path, user_id="user_a")
+    assert result.source == "catalog:timeline_health"
+    assert result.row_count == 1
+    assert result.rows[0]["run_id"] == run_ok_id
+
+
+def test_answer_question_empty_user_id_bypasses_rls(query_db):
+    """user_id vazio deve ignorar RLS e retornar todas as runs falhadas."""
+    engine, db_path, _, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs que falharam")
+    result = answer_question(req, db_path=db_path, user_id="")
+    assert result.row_count == 2
+    run_ids = {row["run_id"] for row in result.rows}
+    assert run_ids == {run_fail_id, run_fail_b_id}
+
+
+def test_answer_question_admin_bypass_exact_role(query_db):
+    """Somente a role exata 'admin' (case-insensitive) deve bypassar RLS."""
+    engine, db_path, _, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs que falharam")
+    result = answer_question(req, db_path=db_path, user_id="user_a", roles=["superadmin"])
+    assert result.row_count == 1
+    assert result.rows[0]["run_id"] == run_fail_id
+
+
+def test_execute_custom_sql_positional_binds(query_db):
+    """SQL customizado com binds posicionais ? deve funcionar com RLS."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    sql = "SELECT id AS run_id, status FROM run WHERE status = ?"
+    result = execute_custom_sql(sql, ("failed",), db_path=db_path, user_id="user_a")
+    assert result.row_count == 1
+    assert result.rows[0]["run_id"] == run_fail_id
+    assert "owner_id = ?" in result.sql
+    assert result.params.get("owner_id") == "user_a"
+
+
+def test_execute_custom_sql_non_standard_alias(query_db):
+    """RLS deve detectar alias não padrão após FROM."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    sql = """
+        SELECT myrun.id AS run_id
+        FROM run AS myrun
+        JOIN experiment AS myexp ON myexp.id = myrun.experiment_id
+        WHERE myrun.status = 'failed'
+    """
+    result = execute_custom_sql(sql, db_path=db_path, user_id="user_a")
+    assert result.row_count == 1
+    assert result.rows[0]["run_id"] == run_fail_id
+    assert "myrun.owner_id = ?" in result.sql
+    assert result.params.get("owner_id") == "user_a"
+
+
+def test_execute_custom_sql_group_by_rls(query_db):
+    """RLS deve injetar WHERE antes de GROUP BY em SQL customizado."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    sql = """
+        SELECT status, COUNT(*) AS cnt
+        FROM run
+        GROUP BY status
+    """
+    result = execute_custom_sql(sql, db_path=db_path, user_id="user_a")
+    assert result.row_count == 2  # completed, failed
+    assert "WHERE run.owner_id = ? GROUP BY status" in result.sql
+    assert result.params.get("owner_id") == "user_a"
