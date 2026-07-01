@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from sqlalchemy.orm import Session
 
+import src.knowledge.structured_query as structured_query_module
 from src.knowledge.structured_query import (
     NaturalQueryRequest,
     _match_catalog,
@@ -17,6 +20,14 @@ from src.knowledge.structured_query import (
 )
 from src.tracking.db import get_engine, init_schema
 from src.tracking.models import Alert, Experiment, Metric, Run
+
+
+@pytest.fixture
+def audit_log_path(tmp_path, monkeypatch):
+    """Redireciona o audit log para arquivo temporário isolado por teste."""
+    path = tmp_path / "knowledge_structured_queries.jsonl"
+    monkeypatch.setattr(structured_query_module, "_AUDIT_LOG", path)
+    return path
 
 
 @pytest.fixture
@@ -305,3 +316,77 @@ def test_execute_custom_sql_group_by_rls(query_db):
     assert result.row_count == 2  # completed, failed
     assert "WHERE run.owner_id = ? GROUP BY status" in result.sql
     assert result.params.get("owner_id") == "user_a"
+
+
+def _load_audit_entries(audit_log_path: Path) -> list[dict]:
+    """Carrega entradas JSONL do audit log."""
+    if not audit_log_path.exists():
+        return []
+    with open(audit_log_path, encoding="utf-8") as f:
+        return [json.loads(line) for line in f if line.strip()]
+
+
+def test_audit_log_catalog_contains_user_id_sql_params(query_db, audit_log_path):
+    """Audit log de consulta catalog deve conter user_id, SQL e parâmetros."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs que falharam")
+    result = answer_question(req, db_path=db_path, user_id="user_a")
+
+    entries = _load_audit_entries(audit_log_path)
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["user_id"] == "user_a"
+    assert entry["audit_id"] == result.audit_id
+    assert entry["source"] == "catalog"
+    assert entry["sql"] is not None
+    assert "owner_id" in entry["sql"]
+    assert entry["params"]["owner_id"] == "user_a"
+    assert "max_rows" in entry["params"]
+
+
+def test_audit_log_rls_applied_sql(query_db, audit_log_path):
+    """SQL final auditado deve conter o filtro RLS owner_id."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    req = NaturalQueryRequest(question="runs que falharam")
+    result = answer_question(req, db_path=db_path, user_id="user_b")
+
+    entry = _load_audit_entries(audit_log_path)[0]
+    assert "e.owner_id = :owner_id" in entry["sql"] or "owner_id = ?" in entry["sql"]
+    assert entry["params"]["owner_id"] == "user_b"
+    assert entry["sql"] == result.sql
+
+
+def test_audit_log_rejected_custom_sql(query_db, audit_log_path):
+    """SQL customizado rejeitado deve ser auditado com source custom_sql_rejected."""
+    engine, db_path, *_ = query_db
+    with pytest.raises(ValueError):
+        execute_custom_sql(
+            "DROP TABLE run",
+            db_path=db_path,
+            user_id="user_a",
+        )
+
+    entries = _load_audit_entries(audit_log_path)
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["user_id"] == "user_a"
+    assert entry["source"] == "custom_sql_rejected"
+    assert entry["sql"] == "DROP TABLE run"
+    assert entry["reason"]
+
+
+def test_audit_log_schema_help(query_db, audit_log_path):
+    """Pergunta fora do catálogo deve gerar audit entry de schema_help."""
+    engine, db_path, *_ = query_db
+    req = NaturalQueryRequest(question="qual a cor do cavalo branco de napoleão")
+    result = answer_question(req, db_path=db_path, user_id="user_a")
+
+    entries = _load_audit_entries(audit_log_path)
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["user_id"] == "user_a"
+    assert entry["audit_id"] == result.audit_id
+    assert entry["source"] == "schema_help"
+    assert entry["sql"] is None
+    assert entry["params"] == req.params
+    assert entry["question"] == req.question

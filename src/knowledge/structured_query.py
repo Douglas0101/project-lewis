@@ -238,10 +238,12 @@ def _audit_id() -> str:
     return f"{time.time():.6f}"
 
 
-def _log_audit(entry: Dict[str, Any]) -> None:
+def _log_audit(entry: Dict[str, Any], user_id: str | None = None) -> None:
     """Registra entrada de audit trail."""
     _AUDIT_LOG.parent.mkdir(parents=True, exist_ok=True)
     entry["timestamp"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    if user_id is not None:
+        entry["user_id"] = user_id
     with open(_AUDIT_LOG, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False, default=str) + "\n")
 
@@ -536,7 +538,8 @@ def answer_question(
                 "row_count": 0,
                 "source": "schema_help",
                 "allowed_custom_sql": req.allow_custom_sql,
-            }
+            },
+            user_id=user_id,
         )
         return StructuredQueryResult(
             question=req.question,
@@ -577,7 +580,8 @@ def answer_question(
             "row_count": len(rows),
             "source": "catalog",
             "pattern": pattern.name,
-        }
+        },
+        user_id=user_id,
     )
 
     return StructuredQueryResult(
@@ -657,7 +661,8 @@ def execute_custom_sql(
                 "row_count": 0,
                 "source": "custom_sql_rejected",
                 "reason": reason,
-            }
+            },
+            user_id=user_id,
         )
         raise ValueError(f"SQL rejeitado: {reason}")
 
@@ -691,7 +696,8 @@ def execute_custom_sql(
             "params": result_params,
             "row_count": len(rows),
             "source": "custom_sql",
-        }
+        },
+        user_id=user_id,
     )
 
     return StructuredQueryResult(
