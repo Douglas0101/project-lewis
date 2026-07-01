@@ -1,0 +1,282 @@
+[
+  {
+    "question": "Qual a accuracy do run_001 no Estágio 1?",
+    "expected_chunk_ids": ["run_001_stage1"],
+    "expected_sources": ["data/lineage/experiments/run_001_stage1.md"]
+  },
+  {
+    "question": "Como funciona a Camada C01 de ingestão de dados?",
+    "expected_chunk_ids": ["camada_01_ingestao"],
+    "expected_sources": ["docs/Camada-01-Ingestao-v1.1.md"]
+  },
+  {
+    "question": "Quais datasets são usados no pré-treino do modelo?",
+    "expected_chunk_ids": ["c01_datasets_pretrain"],
+    "expected_sources": ["docs/Camada-01-Ingestao-v1.1.md"]
+  },
+  {
+    "question": "Qual a frequência de amostragem padrão após o resample?",
+    "expected_chunk_ids": ["c02_resample_500hz"],
+    "expected_sources": ["docs/Camada-02-Resample-Preprocessamento-v1.1.md"]
+  },
+  {
+    "question": "Como é feita a normalização do sinal ECG?",
+    "expected_chunk_ids": ["c02_zscore_normalization"],
+    "expected_sources": ["docs/Camada-02-Resample-Preprocessamento-v1.1.md"]
+  },
+  {
+    "question": "O que é o detector AMPT e qual banda de frequência ele usa?",
+    "expected_chunk_ids": ["c03_ampt_detector"],
+    "expected_sources": ["docs/Camada-03-Feature-Engineering-v1.1.md"]
+  },
+  {
+    "question": "Qual a tolerância temporal aceita para detecção de picos R?",
+    "expected_chunk_ids": ["c03_ampt_tolerance"],
+    "expected_sources": ["docs/Camada-03-Feature-Engineering-v1.1.md"]
+  },
+  {
+    "question": "Quantas dimensões de features são extraídas por batimento?",
+    "expected_chunk_ids": ["c03_features_dimensions"],
+    "expected_sources": ["docs/Camada-03-Feature-Engineering-v1.1.md"]
+  },
+  {
+    "question": "Qual a arquitetura da rede neural usada no Estágio 1?",
+    "expected_chunk_ids": ["c04_stage1_architecture"],
+    "expected_sources": ["docs/Camada-04-Modelagem-v1.1.md"]
+  },
+  {
+    "question": "Como é feita a validação cruzada no treinamento?",
+    "expected_chunk_ids": ["c04_groupkfold"],
+    "expected_sources": ["docs/Camada-04-Modelagem-v1.1.md"]
+  },
+  {
+    "question": "Por que o GroupKFold por paciente é obrigatório?",
+    "expected_chunk_ids": ["c04_groupkfold_patient"],
+    "expected_sources": ["docs/Camada-04-Modelagem-v1.1.md"]
+  },
+  {
+    "question": "Qual o threshold de AUC-ROC macro para o pré-treino Chapman?",
+    "expected_chunk_ids": ["c04_pretrain_auc"],
+    "expected_sources": ["docs/Camada-04-Modelagem-v1.1.md"]
+  },
+  {
+    "question": "Como funciona a quantização pós-treino PTQ?",
+    "expected_chunk_ids": ["c05_ptq_quantization"],
+    "expected_sources": ["docs/Camada-05-Quantizacao-Exportacao-v1.1.md"]
+  },
+  {
+    "question": "Qual o tamanho máximo permitido para o FlatBuffer TFLite?",
+    "expected_chunk_ids": ["c05_flatbuffer_size"],
+    "expected_sources": ["docs/Camada-05-Quantizacao-Exportacao-v1.1.md"]
+  },
+  {
+    "question": "O que é o QG6 e quais métricas ele avalia?",
+    "expected_chunk_ids": ["c06_qg6_quantization"],
+    "expected_sources": ["docs/Camada-06-Validacao-Quality-Gates-v1.1.md"]
+  },
+  {
+    "question": "Quais são os critérios do QG5 de fine-tuning?",
+    "expected_chunk_ids": ["c06_qg5_finetune"],
+    "expected_sources": ["docs/Camada-06-Validacao-Quality-Gates-v1.1.md"]
+  },
+  {
+    "question": "Qual a latência máxima aceita por batimento no firmware?",
+    "expected_chunk_ids": ["c06_qg9_latency"],
+    "expected_sources": ["docs/Camada-06-Validacao-Quality-Gates-v1.1.md"]
+  },
+  {
+    "question": "Como o pipeline CI/CD é organizado no projeto?",
+    "expected_chunk_ids": ["c07_devops_pipeline"],
+    "expected_sources": ["docs/Camada-07-Integracao-DevOps-v1.1.md"]
+  },
+  {
+    "question": "Quais ferramentas de lint são executadas no Makefile?",
+    "expected_chunk_ids": ["c07_lint_tools"],
+    "expected_sources": ["docs/Camada-07-Integracao-DevOps-v1.1.md"]
+  },
+  {
+    "question": "Qual o compilador C usado no firmware bare-metal?",
+    "expected_chunk_ids": ["c08_compiler"],
+    "expected_sources": ["docs/Camada-08-Firmware-v1.1.md"]
+  },
+  {
+    "question": "Como o TensorFlow Lite Micro é integrado ao firmware?",
+    "expected_chunk_ids": ["c08_tflm_integration"],
+    "expected_sources": ["docs/Camada-08-Firmware-v1.1.md"]
+  },
+  {
+    "question": "Qual o tamanho da arena TFLM configurada?",
+    "expected_chunk_ids": ["c08_arena_size"],
+    "expected_sources": ["docs/Camada-08-Firmware-v1.1.md"]
+  },
+  {
+    "question": "Como funciona o watchdog no firmware STM32?",
+    "expected_chunk_ids": ["c08_watchdog"],
+    "expected_sources": ["docs/Camada-08-Firmware-v1.1.md"]
+  },
+  {
+    "question": "Qual versão do Renode é usada na simulação?",
+    "expected_chunk_ids": ["c09_renode_version"],
+    "expected_sources": ["docs/Camada-09-Simulacao-v1.1.md"]
+  },
+  {
+    "question": "Quais são os limites de consumo energético por batimento?",
+    "expected_chunk_ids": ["c09_energy_limits"],
+    "expected_sources": ["docs/Camada-09-Energia-v1.4.md"]
+  },
+  {
+    "question": "Como é feita a injeção de falhas na comunicação SPI?",
+    "expected_chunk_ids": ["c09_fault_injection"],
+    "expected_sources": ["docs/Camada-09-Simulacao-v1.1.md"]
+  },
+  {
+    "question": "O que é o Test Harness do projeto?",
+    "expected_chunk_ids": ["c10_test_harness"],
+    "expected_sources": ["docs/SDD_Project-Lewis_v3.md"]
+  },
+  {
+    "question": "Como funciona a Camada C11 de Knowledge?",
+    "expected_chunk_ids": ["c11_knowledge_layer"],
+    "expected_sources": ["docs/SDD-C11-Knowledge-Impl-v2.0.md"]
+  },
+  {
+    "question": "Qual banco de dados é usado pelo RAG local?",
+    "expected_chunk_ids": ["c11_sqlite_vec"],
+    "expected_sources": ["docs/SDD-C11-Knowledge-Impl-v2.0.md"]
+  },
+  {
+    "question": "O que é a busca híbrida na Camada C11?",
+    "expected_chunk_ids": ["c11_hybrid_search"],
+    "expected_sources": ["docs/SDD-C11-Knowledge-Impl-v2.0.md"]
+  },
+  {
+    "question": "Quais são os filtros 3D do retriever?",
+    "expected_chunk_ids": ["c11_filters_3d"],
+    "expected_sources": ["docs/SDD-C11-Knowledge-Impl-v2.0.md"]
+  },
+  {
+    "question": "Qual o MRR mínimo esperado para o índice de knowledge?",
+    "expected_chunk_ids": ["c11_qg_mrr"],
+    "expected_sources": ["docs/SDD-C11-Knowledge-Impl-v2.0.md"]
+  },
+  {
+    "question": "Quais camadas arquiteturais compõem o pipeline SDD?",
+    "expected_chunk_ids": ["sdd_layers"],
+    "expected_sources": ["docs/SDD_Project-Lewis_v3.md"]
+  },
+  {
+    "question": "Qual o hardware alvo do projeto Lewis?",
+    "expected_chunk_ids": ["sdd_hardware"],
+    "expected_sources": ["docs/SDD_Project-Lewis_v3.md"]
+  },
+  {
+    "question": "O que são os Quality Gates QG0 a QG19?",
+    "expected_chunk_ids": ["sdd_quality_gates"],
+    "expected_sources": ["docs/SDD_Project-Lewis_v3.md"]
+  },
+  {
+    "question": "Qual a arquitetura final do modelo CNN-LSTM?",
+    "expected_chunk_ids": ["sdd_cnn_lstm"],
+    "expected_sources": ["reports/final_architecture_v2.0.md"]
+  },
+  {
+    "question": "Quais os limites de simulação numérica do sistema?",
+    "expected_chunk_ids": ["simulation_limits"],
+    "expected_sources": ["docs/SIMULATION_LIMITS.md"]
+  },
+  {
+    "question": "O que está especificado na Fase 1 para os agentes?",
+    "expected_chunk_ids": ["especificacao_fase1"],
+    "expected_sources": ["docs/ESPECIFICACAO_Fase1_Agentes-v1.1.md"]
+  },
+  {
+    "question": "Por que a classe Q é excluída da classificação final?",
+    "expected_chunk_ids": ["adr_stage1_q_class"],
+    "expected_sources": ["docs/adr_stage1_thresholds_v2.1.md"]
+  },
+  {
+    "question": "Qual a decisão sobre QAT versus PTQ no projeto?",
+    "expected_chunk_ids": ["adr_qat_ptq"],
+    "expected_sources": ["docs/adr_qat_ptq_v2.0.md"]
+  },
+  {
+    "question": "Como é feito o versionamento de datasets com DVC?",
+    "expected_chunk_ids": ["c01_dvc_versioning"],
+    "expected_sources": ["docs/Camada-01-Ingestao-v1.1.md"]
+  },
+  {
+    "question": "Qual o propósito do SMOTE no pipeline de features?",
+    "expected_chunk_ids": ["c03_smote_features"],
+    "expected_sources": ["docs/Camada-03-Feature-Engineering-v1.1.md"]
+  },
+  {
+    "question": "Por que padding com zeros é proibido no preprocessamento?",
+    "expected_chunk_ids": ["c02_no_zero_padding"],
+    "expected_sources": ["docs/Camada-02-Resample-Preprocessamento-v1.1.md"]
+  },
+  {
+    "question": "Quais bibliotecas de ML embarcado são utilizadas?",
+    "expected_chunk_ids": ["c08_cmsis_nn"],
+    "expected_sources": ["docs/Camada-08-Firmware-v1.1.md"]
+  },
+  {
+    "question": "Como é garantida a bit-exatidão entre firmware e Python?",
+    "expected_chunk_ids": ["c08_qg8_bitexact"],
+    "expected_sources": ["docs/Camada-08-Firmware-v1.1.md"]
+  },
+  {
+    "question": "Qual o consumo médio máximo de corrente no hardware?",
+    "expected_chunk_ids": ["c09_current_limit"],
+    "expected_sources": ["docs/Camada-09-Energia-v1.4.md"]
+  },
+  {
+    "question": "Quantas horas de autonomia mínima o dispositivo deve ter?",
+    "expected_chunk_ids": ["c09_autonomy"],
+    "expected_sources": ["docs/Camada-09-Energia-v1.4.md"]
+  },
+  {
+    "question": "O que é o débito técnico de energia no Renode?",
+    "expected_chunk_ids": ["debito_tecnico_energia"],
+    "expected_sources": ["docs/DEBITO_TECNICO_Energia_Renode-v1.4.md"]
+  },
+  {
+    "question": "Quais as regras de ouro do projeto?",
+    "expected_chunk_ids": ["sdd_golden_rules"],
+    "expected_sources": ["docs/SDD_Project-Lewis_v3.md"]
+  },
+  {
+    "question": "Como é calculado o checksum dos artefatos de memória?",
+    "expected_chunk_ids": ["memory_checksum"],
+    "expected_sources": ["docs/SDD_Project-Lewis_v3.md"]
+  },
+  {
+    "question": "Qual o pipeline de duas etapas para classificação de arritmias?",
+    "expected_chunk_ids": ["c04_two_stage_pipeline"],
+    "expected_sources": ["docs/Camada-04-Modelagem-v1.1.md"]
+  },
+  {
+    "question": "Como o sistema lida com dados ausentes ou corrompidos na ingestão?",
+    "expected_chunk_ids": ["c01_dlq"],
+    "expected_sources": ["docs/Camada-01-Ingestao-v1.1.md"]
+  },
+  {
+    "question": "Qual o propósito do dataset PTB-XL no projeto?",
+    "expected_chunk_ids": ["c01_ptbxl_fallback"],
+    "expected_sources": ["docs/Camada-01-Ingestao-v1.1.md"]
+  },
+  {
+    "question": "Como é feita a compressão dos mirrors de datasets?",
+    "expected_chunk_ids": ["c01_mirrors"],
+    "expected_sources": ["docs/Camada-01-Ingestao-v1.1.md"]
+  },
+  {
+    "question": "Quais as métricas de qualidade do detector AMPT?",
+    "expected_chunk_ids": ["c03_ampt_metrics"],
+    "expected_sources": ["docs/Camada-03-Feature-Engineering-v1.1.md"]
+  },
+  {
+    "question": "Qual o input shape esperado pelo modelo?",
+    "expected_chunk_ids": ["c04_input_shape"],
+    "expected_sources": ["docs/Camada-04-Modelagem-v1.1.md"]
+  }
+]

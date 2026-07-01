@@ -7,6 +7,7 @@
         verify-renode \
         knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
         knowledge-reindex-if-docs-changed \
+        hybrid-eval \
         memory-commit \
         observability-up observability-down \
         test-e2e
@@ -265,6 +266,9 @@ knowledge-reindex-if-docs-changed:
 		$(UV) run python -m src.knowledge.cli reindex; \
 		echo "$$CURRENT" > data/lineage/.knowledge_checksum; \
 	fi
+
+hybrid-eval: ## Avalia hybrid search no golden dataset
+	$(UV) run python scripts/eval_hybrid.py
 
 # ---------------------------------------------------------------------------
 # Memory / ArtifactRegistry

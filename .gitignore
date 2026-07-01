@@ -70,7 +70,9 @@ firmware/tools/renode_*/
 # uv.lock
 
 # --- Dados e artefatos gerados ---
-/data/
+/data/*
+!data/eval/
+!data/eval/golden_dataset.json
 /build/
 /snapshots/
 
