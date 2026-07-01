@@ -318,6 +318,65 @@ def test_execute_custom_sql_group_by_rls(query_db):
     assert result.params.get("owner_id") == "user_a"
 
 
+def test_execute_custom_sql_max_rows_named_binds(query_db):
+    """max_rows deve ser aplicado automaticamente em SQL com binds nomeados."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    result = execute_custom_sql(
+        "SELECT id AS run_id FROM run ORDER BY id",
+        {},
+        max_rows=2,
+        db_path=db_path,
+    )
+    assert result.row_count == 2
+    assert result.truncated is True
+    assert "LIMIT :max_rows" in result.sql
+
+
+def test_execute_custom_sql_existing_limit_not_duplicated(query_db):
+    """SQL que já possui LIMIT no nível top-level não deve receber outro LIMIT."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    result = execute_custom_sql(
+        "SELECT id AS run_id FROM run ORDER BY id LIMIT 1",
+        {},
+        max_rows=1000,
+        db_path=db_path,
+    )
+    assert result.row_count == 1
+    assert result.truncated is False
+    assert result.sql.count("LIMIT") == 1
+
+
+def test_execute_custom_sql_rls_named_binds(query_db):
+    """RLS deve funcionar com binds nomeados em SQL customizado."""
+    engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
+    sql = """
+        SELECT r.id AS run_id, r.status
+        FROM run r
+        JOIN experiment e ON e.id = r.experiment_id
+        WHERE r.status = :status
+        ORDER BY r.id
+    """
+    result = execute_custom_sql(
+        sql,
+        {"status": "failed"},
+        db_path=db_path,
+        user_id="user_a",
+    )
+    assert result.row_count == 1
+    assert result.rows[0]["run_id"] == run_fail_id
+    assert "r.owner_id = :owner_id" in result.sql
+    assert result.params.get("owner_id") == "user_a"
+    assert result.params.get("status") == "failed"
+
+
+def test_audit_id_unique():
+    """IDs de auditoria devem ser únicos mesmo gerados em sequência rápida."""
+    from src.knowledge.structured_query import _audit_id
+
+    ids = {_audit_id() for _ in range(1000)}
+    assert len(ids) == 1000
+
+
 def _load_audit_entries(audit_log_path: Path) -> list[dict]:
     """Carrega entradas JSONL do audit log."""
     if not audit_log_path.exists():

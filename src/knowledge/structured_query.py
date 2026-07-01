@@ -17,6 +17,7 @@ import logging
 import re
 import sqlite3
 import time
+import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -234,8 +235,36 @@ _QUERY_CATALOG: List[QueryPattern] = [
 
 
 def _audit_id() -> str:
-    """Gera ID simples de auditoria baseado em timestamp."""
-    return f"{time.time():.6f}"
+    """Gera ID único de auditoria."""
+    return uuid.uuid4().hex
+
+
+def _is_admin(roles: Sequence[str]) -> bool:
+    """Retorna True se alguma role for 'admin' (case-insensitive, strip)."""
+    return any(str(role).strip().lower() == "admin" for role in roles)
+
+
+def _has_top_level_limit(sql: str) -> bool:
+    """Verifica se existe uma cláusula LIMIT no nível top-level do SQL.
+
+    Ignora ocorrências dentro de parênteses e literais de string.
+    """
+    # Remove literais de string, preservando comprimento.
+    stripped = re.sub(r"'[^']*'", lambda m: " " * len(m.group()), sql)
+    masked = []
+    depth = 0
+    for ch in stripped:
+        if ch == "(":
+            depth += 1
+            masked.append(" ")
+        elif ch == ")":
+            depth = max(0, depth - 1)
+            masked.append(" ")
+        elif depth > 0:
+            masked.append(" ")
+        else:
+            masked.append(ch)
+    return re.search(r"\bLIMIT\b", "".join(masked), re.IGNORECASE) is not None
 
 
 def _log_audit(entry: Dict[str, Any], user_id: str | None = None) -> None:
@@ -481,22 +510,32 @@ def _execute_sql(
     params: Dict[str, Any] | Tuple[Any, ...],
     max_rows: int,
     db_path: Path | None = None,
-) -> Tuple[List[str], List[Dict[str, Any]], int, float]:
-    """Executa SQL validado em conexão read-only do SQLite."""
+) -> Tuple[str, List[str], List[Dict[str, Any]], int, float]:
+    """Executa SQL validado em conexão read-only do SQLite.
+
+    Retorna o SQL efetivamente executado (pode incluir LIMIT anexado),
+    colunas, linhas visíveis, total de linhas retornadas e tempo de execução.
+    """
     conn = _get_readonly_connection(db_path)
     start = time.perf_counter()
 
     try:
+        exec_sql = sql
+        merged: Dict[str, Any] | Tuple[Any, ...]
         if isinstance(params, dict):
-            merged: Dict[str, Any] | Tuple[Any, ...] = {**params, "max_rows": max_rows + 1}
-            exec_sql = sql
+            merged = {**params}
+            if ":max_rows" not in exec_sql and not _has_top_level_limit(exec_sql):
+                exec_sql = f"{exec_sql.rstrip(';').strip()} LIMIT :max_rows"
+            if ":max_rows" in exec_sql:
+                merged["max_rows"] = max_rows + 1
         else:
             merged = tuple(params)
-            if ":max_rows" in sql:
-                exec_sql = sql.replace(":max_rows", "?")
-            else:
-                exec_sql = f"{sql.rstrip(';').strip()} LIMIT ?"
-            merged = merged + (max_rows + 1,)
+            if ":max_rows" in exec_sql:
+                exec_sql = exec_sql.replace(":max_rows", "?")
+                merged = merged + (max_rows + 1,)
+            elif not _has_top_level_limit(exec_sql):
+                exec_sql = f"{exec_sql.rstrip(';').strip()} LIMIT ?"
+                merged = merged + (max_rows + 1,)
         cursor = conn.execute(exec_sql, merged)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         all_rows = [dict(row) for row in cursor.fetchall()]
@@ -505,7 +544,7 @@ def _execute_sql(
 
     elapsed = (time.perf_counter() - start) * 1000
     rows = all_rows[:max_rows]
-    return columns, rows, len(all_rows), elapsed
+    return exec_sql, columns, rows, len(all_rows), elapsed
 
 
 def answer_question(
@@ -562,20 +601,20 @@ def answer_question(
     if not ok:
         raise ValueError(f"SQL do catálogo rejeitado pela validação: {reason}")
 
-    if user_id is not None and "admin" not in roles:
+    if user_id is not None and not _is_admin(roles):
         alias = _catalog_owner_alias(pattern.name)
         sql, rls_params = RowLevelSecurity().apply_filter(sql, user_id, roles, table_alias=alias)
         if rls_params:
             params = _merge_rls_params(params, rls_params)  # type: ignore[assignment]
 
     with LatencyTracker("sql", "answer_question"):
-        columns, rows, total, elapsed = _execute_sql(sql, params, req.max_rows, db_path)
+        exec_sql, columns, rows, total, elapsed = _execute_sql(sql, params, req.max_rows, db_path)
 
     _log_audit(
         {
             "audit_id": audit_id,
             "question": req.question,
-            "sql": sql,
+            "sql": exec_sql,
             "params": params,
             "row_count": len(rows),
             "source": "catalog",
@@ -586,7 +625,7 @@ def answer_question(
 
     return StructuredQueryResult(
         question=req.question,
-        sql=sql,
+        sql=exec_sql,
         params=params,
         columns=columns,
         rows=rows,
@@ -676,7 +715,7 @@ def execute_custom_sql(
         exec_params = dict(user_params)
         result_params = {**user_params, "max_rows": max_rows}
 
-    if user_id is not None and "admin" not in roles:
+    if user_id is not None and not _is_admin(roles):
         alias = _extract_owner_alias(sql)
         sql, rls_params = RowLevelSecurity().apply_filter(sql, user_id, roles, table_alias=alias)
         if rls_params:
@@ -687,12 +726,12 @@ def execute_custom_sql(
                 result_params["owner_id"] = rls_params[0]
 
     with LatencyTracker("sql", "execute_custom_sql"):
-        columns, rows, total, elapsed = _execute_sql(sql, exec_params, max_rows, db_path)
+        exec_sql, columns, rows, total, elapsed = _execute_sql(sql, exec_params, max_rows, db_path)
 
     _log_audit(
         {
             "audit_id": audit_id,
-            "sql": sql,
+            "sql": exec_sql,
             "params": result_params,
             "row_count": len(rows),
             "source": "custom_sql",
@@ -702,7 +741,7 @@ def execute_custom_sql(
 
     return StructuredQueryResult(
         question="",
-        sql=sql,
+        sql=exec_sql,
         params=result_params,
         columns=columns,
         rows=rows,
