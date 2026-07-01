@@ -20,6 +20,39 @@ services:
     stdin_open: true
     tty: true
 
+  observability:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ["uv", "run", "python", "-m", "src.observability.api"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - lewis-venv:/app/.venv
+      - lewis-data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - observability
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus
+
 volumes:
   lewis-venv:
   lewis-data:
