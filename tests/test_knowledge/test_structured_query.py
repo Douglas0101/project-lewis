@@ -332,6 +332,25 @@ def test_execute_custom_sql_max_rows_named_binds(query_db):
     assert "LIMIT :max_rows" in result.sql
 
 
+def test_answer_question_max_rows_enforcement(query_db):
+    """Query de catálogo deve respeitar max_rows e reportar truncamento."""
+    engine, db_path, *_ = query_db
+    req = NaturalQueryRequest(question="linha do tempo", max_rows=2)
+    result = answer_question(req, db_path=db_path)
+    assert result.source == "catalog:timeline"
+    assert result.row_count == 2
+    assert result.truncated is True
+
+
+def test_execute_custom_sql_max_rows_validation(query_db):
+    """max_rows fora do range [1, _MAX_ROWS] deve ser rejeitado."""
+    engine, db_path, *_ = query_db
+    with pytest.raises(ValueError, match="max_rows"):
+        execute_custom_sql("SELECT id FROM run", {}, max_rows=0, db_path=db_path)
+    with pytest.raises(ValueError, match="max_rows"):
+        execute_custom_sql("SELECT id FROM run", {}, max_rows=1001, db_path=db_path)
+
+
 def test_execute_custom_sql_existing_limit_not_duplicated(query_db):
     """SQL que já possui LIMIT no nível top-level não deve receber outro LIMIT."""
     engine, db_path, run_ok_id, run_fail_id, run_fail_b_id = query_db
@@ -449,3 +468,33 @@ def test_audit_log_schema_help(query_db, audit_log_path):
     assert entry["sql"] is None
     assert entry["params"] == req.params
     assert entry["question"] == req.question
+
+
+def test_answer_question_missing_table_fallback(tmp_path, audit_log_path):
+    """Catalog pattern que JOINa tabela inexistente deve cair em schema_help."""
+    import sqlite3
+
+    db_path = tmp_path / "run_only.db"
+    conn = sqlite3.connect(str(db_path))
+    conn.execute("CREATE TABLE run (id INTEGER PRIMARY KEY, status TEXT, experiment_id INTEGER)")
+    conn.executemany(
+        "INSERT INTO run (status, experiment_id) VALUES (?, ?)",
+        [("failed", 1), ("completed", 1)],
+    )
+    conn.commit()
+    conn.close()
+
+    req = NaturalQueryRequest(question="runs que falharam")
+    result = answer_question(req, db_path=db_path, user_id="user_a")
+
+    assert result.source == "schema_help"
+    assert "schema_context" in result.rows[0]
+
+    entries = _load_audit_entries(audit_log_path)
+    assert len(entries) == 1
+    entry = entries[0]
+    assert entry["source"] == "schema_help_fallback"
+    assert entry["question"] == req.question
+    assert entry["sql"] is not None
+    assert "experiment" in entry["sql"]
+    assert "error" in entry

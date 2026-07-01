@@ -607,8 +607,40 @@ def answer_question(
         if rls_params:
             params = _merge_rls_params(params, rls_params)  # type: ignore[assignment]
 
-    with LatencyTracker("sql", "answer_question"):
-        exec_sql, columns, rows, total, elapsed = _execute_sql(sql, params, req.max_rows, db_path)
+    try:
+        with LatencyTracker("sql", "answer_question"):
+            exec_sql, columns, rows, total, elapsed = _execute_sql(
+                sql, params, req.max_rows, db_path
+            )
+    except sqlite3.OperationalError as exc:
+        context = build_schema_context(
+            create_engine(f"sqlite:///{db_path or get_db_path()}", future=True)
+        )
+        _log_audit(
+            {
+                "audit_id": audit_id,
+                "question": req.question,
+                "sql": sql,
+                "params": params,
+                "row_count": 0,
+                "source": "schema_help_fallback",
+                "pattern": pattern.name,
+                "error": str(exc),
+            },
+            user_id=user_id,
+        )
+        return StructuredQueryResult(
+            question=req.question,
+            sql=sql,
+            params=params,
+            columns=["schema_context"],
+            rows=[{"schema_context": context.model_dump()}],
+            row_count=0,
+            truncated=False,
+            execution_time_ms=0.0,
+            source="schema_help",
+            audit_id=audit_id,
+        )
 
     _log_audit(
         {
@@ -690,6 +722,21 @@ def execute_custom_sql(
     expõe essa funcionalidade de forma controlada.
     """
     audit_id = _audit_id()
+    if not isinstance(max_rows, int) or not 1 <= max_rows <= _MAX_ROWS:
+        reason = f"max_rows deve ser inteiro entre 1 e {_MAX_ROWS}, recebido {max_rows!r}"
+        _log_audit(
+            {
+                "audit_id": audit_id,
+                "sql": sql,
+                "params": params,
+                "row_count": 0,
+                "source": "custom_sql_rejected",
+                "reason": reason,
+            },
+            user_id=user_id,
+        )
+        raise ValueError(reason)
+
     ok, reason = validate_sql(sql)
     if not ok:
         _log_audit(
