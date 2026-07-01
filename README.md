@@ -24,13 +24,16 @@
 3. [Pipeline de Dados](#-pipeline-de-dados)
 4. [ML Pipeline](#-ml-pipeline)
 5. [Camada C11 — Knowledge Layer](#-camada-c11--knowledge-layer-rag)
-6. [Firmware, Simulação & DevOps](#-firmware-simulação--devops)
-7. [Estrutura do Repositório](#-estrutura-do-repositório)
-8. [Como Executar](#-como-executar)
-9. [Quality Gates](#-quality-gates)
-10. [Limites da Simulação](#-limites-da-simulação)
-11. [Versão Atual](#-versão-atual)
-12. [Autor & Licença](#-autor--licença)
+6. [Observabilidade](#-observabilidade)
+7. [Row-Level Security & Audit](#-row-level-security--audit)
+8. [Stress & Adversarial Testing](#-stress--adversarial-testing)
+9. [Firmware, Simulação & DevOps](#-firmware-simulação--devops)
+10. [Estrutura do Repositório](#-estrutura-do-repositório)
+11. [Como Executar](#-como-executar)
+12. [Quality Gates](#-quality-gates)
+13. [Limites da Simulação](#-limites-da-simulação)
+14. [Versão Atual](#-versão-atual)
+15. [Autor & Licença](#-autor--licença)
 
 ---
 
@@ -110,6 +113,7 @@ A camada de dados unifica sinais de ECG de múltiplas fontes públicas em um for
 | **MIT-BIH SVDB** | 78 | 250 Hz | ~75 MB | Fine-tuning (supraventricular) |
 | **MIT-BIH AFDB** | 25 (23 c/ sinal) | 250 Hz | ~606 MB | Fine-tuning (fibrilação atrial) |
 | **INCART** | 75 | 257 Hz | ~795 MB | Fine-tuning (diversidade russa) |
+| **PTB-XL** | 43.598 | Variável | ~22 GB | Fallback adicional para pré-treino / backbone alternativo |
 
 > **Total MIT-BIH+:** 226 registros • ~1.1 GB
 
@@ -281,6 +285,9 @@ Sistema de recuperação semântica local para dar contexto a agentes de coding 
 - **Protocolo:** MCP server stdio via SDK oficial (`mcp.json` → `project-lewis-knowledge`).
 - **Metadados 3D:** camada (C01–C11), versão, tags semânticas.
 - **Segurança/LGPD:** scan de PII e bloqueio automático de dados brutos de ECG.
+- **Hybrid Search:** combinação de `BM25` via FTS5 + busca vetorial + RRF, ativada pela flag `--hybrid` no CLI/API.
+- **RAGAS Evaluation:** avaliação da qualidade do RAG com `make ragas-eval` (requer o grupo opcional de dependências `eval` e `OPENAI_API_KEY`).
+- **NL → SQL:** respostas a perguntas estruturadas sobre runs/experimentos com RLS e audit log.
 
 ```bash
 make knowledge-index      # reindexa docs/src/firmware
@@ -288,15 +295,65 @@ make knowledge-status     # status do índice
 make knowledge-query      # query interativa
 make knowledge-test       # roda tests/test_knowledge/
 make knowledge-validate   # valida índice gerado
+make hybrid-eval          # avaliação do hybrid search
+make ragas-eval           # avaliação RAGAS (requer OPENAI_API_KEY)
 ```
 
 Tools MCP expostas:
 
 - `search_docs(query, layer?, version?, tags?, k?)`
+- `search_docs_hybrid(query, layer?, version?, tags?, k?)`
 - `list_layers()`
 - `get_doc_by_source(source, k?)`
+- `answer_question(question, owner_id?, query?)`
+- `execute_custom_sql(sql, owner_id?, params?)`
 
 > Documentação completa: [`docs/SDD-C11-Knowledge-Impl-v2.0.md`](docs/SDD-C11-Knowledge-Impl-v2.0.md)
+
+---
+
+## 📊 Observabilidade
+
+Stack de métricas e health checks para acompanhar latência, throughput e disponibilidade dos componentes Python, especialmente a Camada C11 e os endpoints de consulta.
+
+- **Métricas Prometheus:** coletadas em `src/observability/metrics.py` (`LatencyTracker`, contadores de queries, erros e duração).
+- **FastAPI `/metrics` e `/health`:** expõem métricas no formato Prometheus e health check via `make observability-up`.
+- **Docker Compose:** stack completo Prometheus + Grafana + app de métricas:
+  ```bash
+  make observability-up    # sobe Prometheus + Grafana + métricas
+  make observability-down  # derruba a stack
+  ```
+- **Dashboards Grafana:** JSONs versionados em `observability/grafana/dashboards/` (provisionamento automático).
+
+```bash
+make observability-up     # sobe Prometheus + Grafana + app de métricas
+make observability-down   # derruba a stack
+```
+
+---
+
+## 🔐 Row-Level Security & Audit
+
+A Camada C11 e o tracking de experimentos implementam isolamento por `owner_id` e auditoria de queries estruturadas.
+
+- **`owner_id` em `experiment`/`run`:** cada entidade de tracking pertence a um usuário; queries NL→SQL só enxergam dados do solicitante.
+- **`RowLevelSecurity`:** helper em `src/security/rls.py` injeta filtros `WHERE owner_id = ?` em SQLs gerados e em queries customizadas.
+- **Aplicação:** RLS é aplicada em `answer_question` e `execute_custom_sql` do MCP server e do CLI.
+- **Audit log:** cada query estruturada final é registrada em `logs/knowledge_structured_queries.jsonl` com `user_id`, SQL, parâmetros e timestamp.
+
+---
+
+## 🧨 Stress & Adversarial Testing
+
+Testes de resistência contra entradas maliciosas, prompts de injeção e consultas fora da distribuição.
+
+- **Corpus adversarial:** `tests/stress/adversarial_corpus.jsonl` com exemplos de prompt injection, SQLi e queries semânticas adversariais.
+- **Fuzz test:** `tests/stress/test_adversarial_fuzz.py`, marcado com `@pytest.mark.stress`, varre o corpus e verifica rejeições/retornos seguros.
+- **CI stress gate:** `.github/workflows/stress-gate.yml` executa os stress tests a cada push/PR.
+
+```bash
+make stress-test          # pytest -m stress
+```
 
 ---
 
@@ -356,7 +413,7 @@ make harness-renode    # harness de testes no Renode
 ### 🔄 CI/CD & Reprodutibilidade
 
 - **`uv` + `pyproject.toml`**: lockfile determinístico e ambientes isolados.
-- **Makefile**: targets por camada com paralelismo (`make -j4 all`).
+- **Makefile**: targets por camada executados sequencialmente; evite `make -j` porque stages compartilham artefatos mutáveis.
 - **Docker + Docker Compose**: reprodutibilidade total entre máquinas.
 - **GitHub Actions**: lint → unit tests → integration tests → quality gates.
 - **Pre-commit**: Black, isort, flake8, mypy, bandit.
@@ -458,8 +515,8 @@ make help      # lista todos os comandos disponíveis
 
 ```bash
 # Usando uv (recomendado)
-make env
-source .venv/bin/activate
+make env             # cria ambiente virtual e instala dependências
+uv run <comando>     # executa qualquer comando dentro do ambiente uv
 
 # Ou Docker
 make docker-build
@@ -506,7 +563,7 @@ make firmware-test
 make harness           # test harness native + renode
 ```
 
-### 6. Camada C11 — Knowledge Layer
+### 7. Camada C11 — Knowledge Layer
 
 ```bash
 make knowledge-index     # indexa docs/src/firmware
@@ -514,15 +571,26 @@ make knowledge-status    # status do índice
 make knowledge-query     # query interativa
 make knowledge-test      # testes C11
 make knowledge-validate  # validação do índice
+make hybrid-eval         # avaliação do hybrid search
+make ragas-eval          # avaliação RAGAS (requer OPENAI_API_KEY)
 ```
 
-### 7. Testes Completos
+### 8. Observabilidade e Stress Tests
 
 ```bash
-make test              # pytest completo (323 testes)
+make observability-up    # sobe Prometheus + Grafana + app de métricas
+make observability-down  # derruba a stack de métricas
+make stress-test         # pytest -m stress
+```
+
+### 9. Testes Completos
+
+```bash
+make test              # pytest completo (578 testes)
 make hard-gates        # Hard Gates HG-01..HG-06
 make quality-report    # relatório consolidado
 make lint              # flake8 + mypy + bandit
+make stress-test       # stress tests (RAG, SQL, Timeline)
 ```
 
 ---
@@ -537,7 +605,7 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 | :--- | :--- | :--- | :--- |
 | **QG0** | Download | Chapman ≥ 45k; MIT-BIH 48; SVDB 78; AFDB 25; INCART 75; DLQ vazia | `pytest tests/test_download.py` |
 | **QG1** | Pré-processamento | Fs = 500 Hz; range ±5 mV; Z-score global; linhagem 100% | `pytest tests/test_preprocessing.py` |
-| **QG2** | AMPT @ 500 Hz | Sens > 96,5%; PPV > 99,0%; tol = 150 ms | `pytest tests/test_ampt.py` |
+| **QG2** | AMPT @ 500 Hz | Sens > 96,5%; PPV > 99,0%; F1 > 97,5%; tol = 150 ms | `pytest tests/test_ampt.py` |
 | **QG3** | Features | Janela 1000 ms; ≥ 10 dimensões; sem NaN/Inf | `pytest tests/test_features.py` |
 | **QG4** | Pré-treino Chapman | AUC-ROC macro > 0,85 *(abandonado na prática; backbone treinado from-scratch)* | `pytest tests/test_pretrain.py` |
 | **QG5'** | Fine-tuning v2.2 | Stage1: Acc > 75%, F1-macro > 0,55, recall/precision Anormal ≥ 30%/25%; Stage2: F1(S) ≥ 55%, F1(V) ≥ 70%, F1(F) ≥ 15%; Pipeline: Acc > 78%, F1-macro > 0,30 | `pytest tests/test_finetune.py tests/test_two_stage_pipeline.py` |
@@ -572,6 +640,9 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 | **QG-C11-07** | Tamanho do banco | < 500 MB | `pytest tests/test_knowledge/test_indexer.py` |
 | **QG-C11-08** | CLI funcional | `reindex`, `query`, `status` | `pytest tests/test_knowledge/test_integration.py` |
 | **QG-C11-09** | Deps compliance | Sem LangChain/Chroma/typer | `pytest tests/test_knowledge/test_deps_compliance.py` |
+| **QG-C11-10** | Hybrid search | MRR/recall nos thresholds do golden dataset | `make hybrid-eval` |
+| **QG-C11-11** | RLS/Audit | `owner_id` isolado; audit log presente e consistente | `pytest tests/test_knowledge/test_structured_query.py tests/test_security/test_rls.py` |
+| **QG-C11-12** | Adversarial fuzzing | Corpus adversarial rejeitado/retornado sem vazamento | `pytest -m stress` |
 
 > QG19 é um débito técnico documentado para a v1.4. Veja [`docs/DEBITO_TECNICO_Energia_Renode-v1.4.md`](docs/DEBITO_TECNICO_Energia_Renode-v1.4.md).
 
@@ -590,7 +661,7 @@ Consulte [`docs/SIMULATION_LIMITS.md`](docs/SIMULATION_LIMITS.md) para detalhes 
 
 ## 📌 Versão Atual
 
-`v2.2+c11` — pipeline de classificação em duas etapas (Stage 1: N vs Anormal; Stage 2: S vs V vs F) atingindo todos os thresholds v2.2, firmware STM32F4 validado via Renode, e Camada C11 (RAG local sqlite-vec + MCP) para suporte a agentes de coding.
+`v2.2+c11+fase2` — pipeline de classificação em duas etapas (Stage 1: N vs Anormal; Stage 2: S vs V vs F) atingindo todos os thresholds v2.2, firmware STM32F4 validado via Renode, Camada C11 com hybrid search (BM25 + vector + RRF), RLS/audit, observabilidade Prometheus/Grafana e stress tests adversariais para suporte a agentes de coding. (O caminho CNN raw-signal está sob revisão; o fallback MLP-features está documentado em `reports/stage1_v2_training_analysis.md`.)
 
 ---
 
