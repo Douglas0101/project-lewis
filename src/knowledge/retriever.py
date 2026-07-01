@@ -9,6 +9,7 @@ Data: 2026-06-27
 
 from __future__ import annotations
 
+import functools
 import json
 import time
 from typing import List
@@ -16,14 +17,17 @@ from typing import List
 import sqlite_vec
 from sentence_transformers import SentenceTransformer
 
+from src.observability.metrics import LatencyTracker
+
 from .constants import EMBEDDING_MODEL, LOG_QUERIES
 from .db import get_connection
 from .schemas import QueryRequest, QueryResult
 from .utils import format_context_for_agent
 
 
+@functools.lru_cache(maxsize=1)
 def _get_model() -> SentenceTransformer:
-    """Factory do modelo de embeddings."""
+    """Factory do modelo de embeddings (singleton por processo)."""
     return SentenceTransformer(EMBEDDING_MODEL, device="cpu")
 
 
@@ -48,37 +52,38 @@ def _build_where_clause(req: QueryRequest) -> tuple[str, list]:
 
 def search(req: QueryRequest) -> List[QueryResult]:
     """Executa busca semântica com filtros e retorna top-k."""
-    model = _get_model()
-    query_emb = model.encode([req.query], normalize_embeddings=True, show_progress_bar=False)[0]
+    with LatencyTracker("rag", "semantic_search"):
+        model = _get_model()
+        query_emb = model.encode([req.query], normalize_embeddings=True, show_progress_bar=False)[0]
 
-    conn = get_connection()
-    try:
-        where_clause, where_params = _build_where_clause(req)
+        conn = get_connection()
+        try:
+            where_clause, where_params = _build_where_clause(req)
 
-        sql = """
-            SELECT
-                chunk_id,
-                source,
-                layer,
-                version,
-                tags,
-                header_1,
-                header_2,
-                content,
-                distance
-            FROM knowledge_chunks
-            WHERE embedding MATCH ?
-        """
-        params: List = [sqlite_vec.serialize_float32(query_emb)]
-        if where_clause:
-            sql += f" AND {where_clause}"
-            params.extend(where_params)
-        sql += " AND k = ? ORDER BY distance"
-        params.append(req.fetch_k)
+            sql = """
+                SELECT
+                    chunk_id,
+                    source,
+                    layer,
+                    version,
+                    tags,
+                    header_1,
+                    header_2,
+                    content,
+                    distance
+                FROM knowledge_chunks
+                WHERE embedding MATCH ?
+            """
+            params: List = [sqlite_vec.serialize_float32(query_emb)]
+            if where_clause:
+                sql += f" AND {where_clause}"
+                params.extend(where_params)
+            sql += " AND k = ? ORDER BY distance"
+            params.append(req.fetch_k)
 
-        rows = conn.execute(sql, params).fetchall()
-    finally:
-        conn.close()
+            rows = conn.execute(sql, params).fetchall()
+        finally:
+            conn.close()
 
     required_tags = set(req.tags or [])
     results: List[QueryResult] = []
@@ -88,16 +93,18 @@ def search(req: QueryRequest) -> List[QueryResult]:
         tags = json.loads(row["tags"] or "[]")
         if required_tags and not required_tags.issubset(set(tags)):
             continue
-        results.append(QueryResult(
-            chunk_id=row["chunk_id"],
-            source=row["source"],
-            layer=row["layer"],
-            version=row["version"],
-            tags=tags,
-            content=row["content"],
-            score=1.0 - float(row["distance"]),
-            rank=len(results) + 1,
-        ))
+        results.append(
+            QueryResult(
+                chunk_id=row["chunk_id"],
+                source=row["source"],
+                layer=row["layer"],
+                version=row["version"],
+                tags=tags,
+                content=row["content"],
+                score=1.0 - float(row["distance"]),
+                rank=len(results) + 1,
+            )
+        )
 
     _log_query(req, len(results))
     return results
