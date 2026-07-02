@@ -458,6 +458,7 @@ def finetune_mitbih(
     callbacks: List[tf.keras.callbacks.Callback] = [
         tf.keras.callbacks.ReduceLROnPlateau(
             monitor=monitor,
+            mode="min" if "loss" in monitor.lower() else "max",
             factor=0.5,
             patience=5,
             min_lr=1e-6,
