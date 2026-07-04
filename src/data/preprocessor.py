@@ -694,38 +694,3 @@ class ECGPreprocessor:
         """Define estatísticas globais para z-score global (quando per_record=False)."""
         self._global_mean = float(mean)
         self._global_std = float(std)
-
-    def set_global_stats_from_data(
-        self,
-        X: np.ndarray,
-        clip_limits: Optional[Tuple[float, float]] = None,
-        chunk_size: int = 8192,
-    ) -> Tuple[np.float32, np.float32]:
-        """Computa e define estatísticas globais a partir dos dados de treino.
-
-        Os valores são clipados antes do cálculo, conforme especificação da
-        Camada-02 v1.1. Usa ``self.clip_fixed_limits`` como limite padrão.
-
-        Parameters
-        ----------
-        X : np.ndarray
-            Dados de treino (1-D, 2-D ou 3-D).
-        clip_limits : tuple, optional
-            Limites de clipping. Padrão: ``self.clip_fixed_limits``.
-        chunk_size : int
-            Tamanho do chunk para processamento incremental.
-
-        Returns
-        -------
-        tuple
-            ``(mean, std)`` como escalares float32 (canal 0).
-        """
-        limits = clip_limits if clip_limits is not None else self.clip_fixed_limits
-        mean, std = self.compute_global_stats(
-            X,
-            clip_limits=limits,
-            chunk_size=chunk_size,
-            eps=self.eps,
-        )
-        self.set_global_stats(mean, std)
-        return mean, std

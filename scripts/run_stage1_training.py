@@ -40,18 +40,6 @@ def _load_config(config_path: Path) -> dict:
         return yaml.safe_load(fh)
 
 
-def _clear_cache(feature_npz: Path) -> None:
-    """Remove stale normalization caches for the given feature npz."""
-    cache_dir = feature_npz.parent / ".cache"
-    patterns = [
-        cache_dir / f"{feature_npz.stem}_zscore_float16.dat",
-    ]
-    for p in patterns:
-        if p.exists():
-            p.unlink()
-            LOGGER.info("Removed stale cache: %s", p)
-
-
 def _load_features_raw(
     feature_npz: Path,
     feature_parquet: Path,
@@ -175,11 +163,6 @@ def main() -> int:
         action="store_true",
         help="Congelar camadas convolucionais do backbone pré-treinado",
     )
-    parser.add_argument(
-        "--force-rebuild",
-        action="store_true",
-        help="Delete existing z-score .dat cache and recompute normalization from scratch.",
-    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -191,9 +174,6 @@ def main() -> int:
     train_cfg = cfg["training"]
     ds_cfg = cfg["dataset"]
     qg_cfg = cfg["quality_gate"]["qg5_stage1"]
-
-    if args.force_rebuild:
-        _clear_cache(PROJECT_ROOT / ds_cfg["feature_npz"])
 
     X, y, df = _load_features_raw(
         feature_npz=PROJECT_ROOT / ds_cfg["feature_npz"],

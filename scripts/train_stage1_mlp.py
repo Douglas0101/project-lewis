@@ -11,14 +11,14 @@ import logging
 import sys
 from pathlib import Path
 
+import joblib
 import numpy as np
 import tensorflow as tf
 from sklearn.model_selection import GroupKFold
-from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.models.evaluate import evaluate_fold
+from src.models.evaluate import evaluate_fold  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("train_stage1_mlp")
@@ -54,7 +54,6 @@ def train_fold(
     class_weight: dict,
     fold_idx: int,
     output_dir: Path,
-    scaler=None,
 ) -> dict:
     """Treina um único fold."""
     model = build_mlp(input_dim=X_train.shape[1], num_classes=2)
@@ -98,9 +97,6 @@ def train_fold(
     fold_dir = output_dir / f"fold_{fold_idx}"
     fold_dir.mkdir(parents=True, exist_ok=True)
     model.save(str(fold_dir / "model.keras"), save_format="keras")
-    if scaler is not None:
-        import joblib
-        joblib.dump(scaler, fold_dir / "input_scaler.pkl")
 
     LOGGER.info(
         "Fold %d | AUC=%.4f | F1_macro=%.4f | Acc=%.4f | epochs=%d",
@@ -122,9 +118,17 @@ def train_fold(
 def main() -> int:
     npz = np.load("data/features/stage1_binary_features.npz")
     X, y, groups = npz["X"], npz["y"], npz["groups"]
-    feature_names = json.loads(
-        Path("data/features/stage1_binary_features.json").read_text(encoding="utf-8")
-    )["feature_names"]
+    metadata_path = Path("data/features/stage1_binary_features.json")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    feature_names = metadata["feature_names"]
+    scaler_path = Path(metadata["scaler_path"])
+
+    if not scaler_path.exists():
+        raise FileNotFoundError(
+            f"Scaler não encontrado em {scaler_path}. "
+            "Execute scripts/prepare_stage1_features.py primeiro."
+        )
+    joblib.load(scaler_path)
 
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %s", feature_names)
@@ -141,14 +145,9 @@ def main() -> int:
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_val = scaler.transform(X_val)
-
         class_weight = compute_class_weights(y_train)
         result = train_fold(
-            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir,
-            scaler=scaler,
+            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir
         )
         fold_results.append(result)
 
