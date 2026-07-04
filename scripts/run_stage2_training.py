@@ -241,31 +241,46 @@ def main() -> int:
 
     optimize_thresholds = bool(cfg.get("threshold_tuning", {}).get("enabled", False))
 
+    from src.models.train import (
+        AugmentationConfig,
+        ModelConfig,
+        TrackingConfig,
+        TrainingConfig,
+    )
+
     summary = train_group_kfold(
         x=X,
         y=y,
         groups=groups,
         n_splits=args.n_splits if args.n_splits is not None else cfg["group_kfold"]["n_splits"],
-        epochs=args.epochs if args.epochs is not None else train_cfg["epochs"],
-        batch_size=train_cfg["batch_size"],
-        learning_rate=train_cfg["learning_rate"],
-        seed=cfg["group_kfold"]["seed"],
         experiment_dir=experiment_dir,
-        monitor=train_cfg["monitor"],
         class_names=class_names,
         thresholds=thresholds,
-        model_builder=model_builder,
         class_weight=class_weight,
-        selection_metric=selection_metric,
-        augment_class=augment_class,
-        augment_factor=augment_factor,
-        augment_config=augment_config,
-        loss=loss,
-        optimize_thresholds=optimize_thresholds,
-        freeze_backbone=args.freeze_backbone,
-        tracking_experiment_id=tracking_experiment_id,
-        tracking_stage_label="stage2",
         instrumentation_config=cfg.get("instrumentation"),
+        training_config=TrainingConfig(
+            epochs=args.epochs if args.epochs is not None else train_cfg["epochs"],
+            batch_size=train_cfg["batch_size"],
+            learning_rate=train_cfg["learning_rate"],
+            seed=cfg["group_kfold"]["seed"],
+            monitor=train_cfg["monitor"],
+            selection_metric=selection_metric,
+            loss=loss,
+            optimize_thresholds=optimize_thresholds,
+        ),
+        augmentation_config=AugmentationConfig(
+            augment_class=augment_class,
+            augment_factor=augment_factor,
+            augment_config=augment_config,
+        ),
+        tracking_config=TrackingConfig(
+            tracking_experiment_id=tracking_experiment_id,
+            tracking_stage_label="stage2",
+        ),
+        model_config=ModelConfig(
+            model_builder=model_builder,
+            freeze_backbone=args.freeze_backbone,
+        ),
     )
 
     LOGGER.info(

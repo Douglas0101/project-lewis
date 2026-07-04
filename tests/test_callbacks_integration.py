@@ -270,15 +270,16 @@ class TestTrainGroupKfoldInstrumentation:
                 "passes_qg5": True,
             }
 
+            from src.models.train import TrainingConfig
+
             train_group_kfold(
                 x=X,
                 y=y,
                 groups=groups,
                 n_splits=2,
-                epochs=1,
-                batch_size=4,
                 experiment_dir=tmp_path,
                 instrumentation_config=instrumentation_config,
+                training_config=TrainingConfig(epochs=1, batch_size=4),
             )
 
             finetune_kwargs = mock_finetune.call_args.kwargs
@@ -322,15 +323,16 @@ class TestTrainGroupKfoldInstrumentation:
                 "passes_qg5": True,
             }
 
+            from src.models.train import TrainingConfig
+
             train_group_kfold(
                 x=X,
                 y=y,
                 groups=groups,
                 n_splits=2,
-                epochs=1,
-                batch_size=4,
                 experiment_dir=tmp_path,
                 instrumentation_config=instrumentation_config,
+                training_config=TrainingConfig(epochs=1, batch_size=4),
             )
 
             calls = mock_finetune.call_args_list
@@ -360,15 +362,16 @@ class TestTrainGroupKfoldInstrumentation:
                 "passes_qg5": True,
             }
 
+            from src.models.train import TrainingConfig
+
             train_group_kfold(
                 x=X,
                 y=y,
                 groups=groups,
                 n_splits=2,
-                epochs=1,
-                batch_size=4,
                 experiment_dir=tmp_path,
                 instrumentation_config={},
+                training_config=TrainingConfig(epochs=1, batch_size=4),
             )
 
             extras = mock_finetune.call_args.kwargs.get("extra_callbacks", [])

@@ -183,25 +183,37 @@ def main() -> int:
         "%Y%m%d_%H%M%S_groupkfold"
     )
 
+    from src.models.train import (
+        ModelConfig,
+        TrackingConfig,
+        TrainingConfig,
+    )
+
     summary = train_group_kfold(
         x=X,
         y=y,
         groups=groups,
-        backbone_weights=args.backbone,
-        freeze_backbone=freeze_backbone,
         n_splits=args.n_splits if args.n_splits is not None else cfg["group_kfold"]["n_splits"],
-        epochs=args.epochs if args.epochs is not None else train_cfg["epochs"],
-        batch_size=args.batch_size if args.batch_size is not None else train_cfg["batch_size"],
-        learning_rate=(
-            args.learning_rate
-            if args.learning_rate is not None
-            else train_cfg["learning_rate"]
-        ),
-        seed=cfg["group_kfold"]["seed"],
         experiment_dir=experiment_dir,
-        monitor=train_cfg["monitor"],
-        tracking_experiment_id=tracking_experiment_id,
-        tracking_stage_label="finetune",
+        training_config=TrainingConfig(
+            epochs=args.epochs if args.epochs is not None else train_cfg["epochs"],
+            batch_size=args.batch_size if args.batch_size is not None else train_cfg["batch_size"],
+            learning_rate=(
+                args.learning_rate
+                if args.learning_rate is not None
+                else train_cfg["learning_rate"]
+            ),
+            seed=cfg["group_kfold"]["seed"],
+            monitor=train_cfg["monitor"],
+        ),
+        tracking_config=TrackingConfig(
+            tracking_experiment_id=tracking_experiment_id,
+            tracking_stage_label="finetune",
+        ),
+        model_config=ModelConfig(
+            backbone_weights=args.backbone,
+            freeze_backbone=freeze_backbone,
+        ),
     )
 
     LOGGER.info(

@@ -10,9 +10,10 @@ import json
 import logging
 import os
 import random
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import tensorflow as tf
@@ -39,6 +40,47 @@ def _set_seeds(seed: int = 42) -> None:
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
     tf.random.set_seed(seed)
+
+
+@dataclass
+class TrainingConfig:
+    """Hiper-parâmetros de treinamento."""
+
+    epochs: int = 100
+    batch_size: int = 64
+    learning_rate: float = 1e-4
+    seed: int = 42
+    monitor: str = "val_loss"
+    selection_metric: str = "F1_macro"
+    loss: Union[str, tf.keras.losses.Loss] = "sparse_categorical_crossentropy"
+    optimize_thresholds: bool = False
+
+
+@dataclass
+class AugmentationConfig:
+    """Configuração de augmentação/over-sampling."""
+
+    augment_class: Optional[int] = None
+    augment_factor: int = 1
+    augment_config: Optional[Dict[str, Any]] = None
+
+
+@dataclass
+class TrackingConfig:
+    """Configuração de tracking de experimentos."""
+
+    tracking_experiment_id: Optional[int] = None
+    tracking_stage_label: str = ""
+
+
+@dataclass
+class ModelConfig:
+    """Configuração do modelo e backbone."""
+
+    backbone_weights: Optional[Path] = None
+    freeze_backbone: bool = True
+    model_builder: Optional[Any] = None
+    normalize: bool = True
 
 
 def _normalize_fold(
@@ -153,258 +195,198 @@ def _build_instrumentation_callbacks(
     return callbacks
 
 
-def train_group_kfold(  # NOSONAR(S107): many hyper-parameters required by the training orchestrator
+def _normalize_or_identity(
+    x_train: np.ndarray,
+    x_test: np.ndarray,
+    normalize: bool,
+) -> Tuple[np.ndarray, np.ndarray, StandardScaler]:
+    """Aplica z-score quando normalize=True; caso contrário, retorna identidade."""
+    if normalize:
+        return _normalize_fold(x_train, x_test)
+    scaler = StandardScaler()
+    scaler.mean_ = np.zeros(x_train.shape[-1], dtype=np.float32)
+    scaler.scale_ = np.ones(x_train.shape[-1], dtype=np.float32)
+    return x_train, x_test, scaler
+
+
+def _build_model(
+    x: np.ndarray,
+    y: np.ndarray,
+    model_config: ModelConfig,
+) -> tf.keras.Model:
+    """Constrói o modelo e carrega pesos do backbone quando necessário."""
+    num_classes = len(np.unique(y))
+    if model_config.model_builder is None:
+        model = build_backbone_1d(input_len=x.shape[1], num_classes=num_classes)
+    else:
+        model = model_config.model_builder(input_len=x.shape[1], num_classes=num_classes)
+    if model_config.backbone_weights is not None:
+        model.load_weights(str(model_config.backbone_weights))
+        LOGGER.info("  Backbone weights loaded from %s", model_config.backbone_weights)
+    return model
+
+
+def _log_freeze_status(freeze_backbone: bool) -> None:
+    """Loga a estratégia de congelamento do backbone."""
+    if freeze_backbone:
+        LOGGER.info("  Freezing conv layers for transfer learning")
+    else:
+        LOGGER.info("  Training all layers (no backbone freezing)")
+
+
+def _start_tracking(
+    tracking_config: TrackingConfig,
+    fold_idx: int,
+    fold_dir: Path,
+) -> Optional[int]:
+    """Inicia run de tracking quando configurado."""
+    if tracking_config.tracking_experiment_id is None:
+        return None
+    try:
+        return start_tracking_run(
+            experiment_id=tracking_config.tracking_experiment_id,
+            run_type="train",
+            fold_idx=fold_idx,
+            artifact_dir=fold_dir,
+        )
+    except Exception:
+        LOGGER.exception("Falha ao criar run de tracking para fold %d", fold_idx)
+        return None
+
+
+def _finish_tracking(
+    tracking_config: TrackingConfig,
+    fold_run_id: Optional[int],
+    eval_result: Dict[str, Any],
+    fold_idx: int,
+) -> None:
+    """Finaliza run de tracking quando configurado."""
+    if fold_run_id is None or tracking_config.tracking_experiment_id is None:
+        return
+    try:
+        finish_tracking_run(
+            run_id=fold_run_id,
+            status="completed",
+            eval_result=eval_result,
+            experiment_id=tracking_config.tracking_experiment_id,
+            stage_label=tracking_config.tracking_stage_label,
+        )
+    except Exception:
+        LOGGER.exception("Falha ao finalizar run do fold %d no tracking", fold_idx)
+
+
+def _train_single_fold(
+    fold_idx: int,
+    n_splits: int,
+    train_idx: np.ndarray,
+    test_idx: np.ndarray,
     x: np.ndarray,
     y: np.ndarray,
     groups: np.ndarray,
-    backbone_weights: Optional[Path] = None,
-    freeze_backbone: bool = True,
-    n_splits: int = 5,
-    epochs: int = 100,
-    batch_size: int = 64,
-    learning_rate: float = 1e-4,
-    seed: int = 42,
-    experiment_dir: Optional[Path] = None,
-    monitor: str = "val_loss",
-    class_names: Optional[List[str]] = None,
-    thresholds: Optional[Dict[str, Any]] = None,
-    model_builder=None,
-    class_weight: Optional[Dict[int, float]] = None,
-    selection_metric: str = "F1_macro",
-    augment_class: Optional[int] = None,
-    augment_factor: int = 1,
-    augment_config: Optional[Dict[str, Any]] = None,
-    loss: str | tf.keras.losses.Loss = "sparse_categorical_crossentropy",
-    optimize_thresholds: bool = False,
-    tracking_experiment_id: Optional[int] = None,
-    tracking_stage_label: str = "",
-    instrumentation_config: Optional[Dict[str, Any]] = None,
-    normalize: bool = True,
-) -> Dict[str, Any]:
-    """Treinamento GroupKFold por paciente.
+    experiment_dir: Path,
+    class_names: Optional[List[str]],
+    thresholds: Optional[Dict[str, Any]],
+    class_weight: Optional[Dict[int, float]],
+    instrumentation_config: Optional[Dict[str, Any]],
+    training_config: TrainingConfig,
+    augmentation_config: AugmentationConfig,
+    tracking_config: TrackingConfig,
+    model_config: ModelConfig,
+) -> Tuple[Dict[str, Any], float]:
+    """Treina e avalia um único fold."""
+    LOGGER.info("=== Fold %d/%d ===", fold_idx + 1, n_splits)
+    fold_dir = experiment_dir / f"fold_{fold_idx}"
+    fold_dir.mkdir(parents=True, exist_ok=True)
 
-    Parameters
-    ----------
-    x : np.ndarray
-        Dados (shape: (n, 500, 1)).
-    y : np.ndarray
-        Labels inteiros (shape: (n,)).
-    groups : np.ndarray
-        IDs de paciente (shape: (n,)).
-    normalize : bool
-        Se True, aplica normalização Z-score por fold. Se False, mantém os
-        dados originais e usa um scaler identidade para compatibilidade dos
-        artefatos salvos.
-    backbone_weights : Path, optional
-        Caminho para pesos do backbone pré-treinado. Se None, o backbone é
-        treinado do zero (from scratch).
-    freeze_backbone : bool
-        Se True e ``backbone_weights`` for fornecido, congela as camadas
-        convolucionais para transfer learning. Ignorado quando não há pesos.
-    n_splits : int
-        Número de folds.
-    epochs : int
-        Épocas por fold.
-    batch_size : int
-        Batch size.
-    learning_rate : float
-        LR para fine-tuning.
-    seed : int
-        Seed.
-    experiment_dir : Path, optional
-        Diretório raiz dos experimentos.
-    monitor : str
-        Métrica para early stopping.
-    class_names : list[str], optional
-        Nomes das classes para avaliação AAMI.
-    thresholds : dict, optional
-        Thresholds configuráveis para ``evaluate_aami``.
-    model_builder : callable, optional
-        Função ``(input_len, num_classes) -> tf.keras.Model``. Se None, usa
-        ``build_backbone_1d``.
-    class_weight : dict, optional
-        Pesos por classe para ``model.fit``.
-    selection_metric : str
-        Métrica de seleção do melhor modelo no callback.
-    augment_class : int, optional
-        Classe a ser oversampled durante o treino (ex.: 2 para F no Estágio 2).
-    augment_factor : int
-        Fator de oversampling. factor=1 desativa.
-    augment_config : dict, optional
-        Configuração de oversampling por classe (class-specific augmentation).
-    loss : str or tf.keras.losses.Loss
-        Função de perda a ser passada para ``model.compile``.
-    optimize_thresholds : bool
-        Se True, aplica threshold tuning one-vs-rest na validação multiclasse.
-    instrumentation_config : dict, optional
-        Configuração para construção de callbacks de instrumentação
-        (GradientMonitor, CalibrationMonitor) dentro de cada fold, usando os
-        dados de validação normalizados do fold atual. Se None ou vazio, nenhum
-        callback extra é criado.
-
-    Returns
-    -------
-    dict
-        {
-            "folds": [resultados por fold],
-            "best_fold": índice do melhor fold,
-            "mean_metrics": médias,
-            "std_metrics": desvios,
-        }
-    """
-    _set_seeds(seed)
-
-    if experiment_dir is None:
-        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
-        experiment_dir = Path("experiments") / f"exp_{ts}_groupkfold"
-    experiment_dir = Path(experiment_dir)
-    experiment_dir.mkdir(parents=True, exist_ok=True)
+    x_train, x_test = x[train_idx], x[test_idx]
+    y_train, y_test = y[train_idx], y[test_idx]
 
     LOGGER.info(
-        "GroupKFold | n_splits=%d | n_samples=%d | n_patients=%d",
-        n_splits,
-        len(x),
-        len(np.unique(groups)),
+        "  Train: n=%d | Test: n=%d | Patients train=%d | Patients test=%d",
+        len(x_train),
+        len(x_test),
+        len(np.unique(groups[train_idx])),
+        len(np.unique(groups[test_idx])),
     )
 
-    gkf = GroupKFold(n_splits=n_splits)
-    fold_results: List[dict] = []
-    best_f1_macro = -1.0
-    best_fold = -1
+    x_train_norm, x_test_norm, scaler = _normalize_or_identity(
+        x_train, x_test, model_config.normalize
+    )
 
-    for fold_idx, (train_idx, test_idx) in enumerate(gkf.split(x, y, groups)):
-        LOGGER.info("=== Fold %d/%d ===", fold_idx + 1, n_splits)
-        fold_dir = experiment_dir / f"fold_{fold_idx}"
-        fold_dir.mkdir(parents=True, exist_ok=True)
+    fold_run_id = _start_tracking(tracking_config, fold_idx, fold_dir)
 
-        x_train, x_test = x[train_idx], x[test_idx]
-        y_train, y_test = y[train_idx], y[test_idx]
+    fold_callbacks = _build_instrumentation_callbacks(
+        instrumentation_config=instrumentation_config,
+        x_val_norm=x_test_norm,
+        y_val=y_test,
+        class_names=class_names,
+        fold_idx=fold_idx,
+    )
+    if fold_run_id is not None:
+        fold_callbacks.append(MetricTracker(run_id=fold_run_id))
 
-        LOGGER.info(
-            "  Train: n=%d | Test: n=%d | Patients train=%d | Patients test=%d",
-            len(x_train),
-            len(x_test),
-            len(np.unique(groups[train_idx])),
-            len(np.unique(groups[test_idx])),
-        )
+    import joblib
 
-        # 1. Normalização global (fit no treino)
-        if normalize:
-            x_train_norm, x_test_norm, scaler = _normalize_fold(x_train, x_test)
-        else:
-            x_train_norm, x_test_norm = x_train, x_test
-            scaler = StandardScaler()
-            scaler.mean_ = np.zeros(x.shape[-1], dtype=np.float32)
-            scaler.scale_ = np.ones(x.shape[-1], dtype=np.float32)
+    joblib.dump(scaler, fold_dir / "input_scaler.pkl")
 
-        # Criar run de tracking no início do fold para possibilitar métricas por época
-        fold_run_id: Optional[int] = None
-        if tracking_experiment_id is not None:
-            try:
-                fold_run_id = start_tracking_run(
-                    experiment_id=tracking_experiment_id,
-                    run_type="train",
-                    fold_idx=fold_idx,
-                    artifact_dir=fold_dir,
-                )
-            except Exception:
-                LOGGER.exception("Falha ao criar run de tracking para fold %d", fold_idx)
+    model = _build_model(x, y, model_config)
+    _log_freeze_status(model_config.freeze_backbone)
 
-        # Callbacks de instrumentação devem usar dados normalizados do fold
-        fold_callbacks = _build_instrumentation_callbacks(
-            instrumentation_config=instrumentation_config,
-            x_val_norm=x_test_norm,
-            y_val=y_test,
-            class_names=class_names,
-            fold_idx=fold_idx,
-        )
-        if fold_run_id is not None:
-            fold_callbacks.append(MetricTracker(run_id=fold_run_id))
+    model, history = finetune_mitbih(
+        model=model,
+        X_train=x_train_norm,
+        y_train=y_train,
+        X_val=x_test_norm,
+        y_val=y_test,
+        epochs=training_config.epochs,
+        batch_size=training_config.batch_size,
+        learning_rate=training_config.learning_rate,
+        seed=training_config.seed,
+        experiment_dir=fold_dir,
+        monitor=training_config.monitor,
+        freeze_backbone=model_config.freeze_backbone,
+        class_names=class_names,
+        thresholds=thresholds,
+        class_weight=class_weight,
+        selection_metric=training_config.selection_metric,
+        augment_class=augmentation_config.augment_class,
+        augment_factor=augmentation_config.augment_factor,
+        augment_config=augmentation_config.augment_config,
+        loss=training_config.loss,
+        optimize_thresholds=training_config.optimize_thresholds,
+        extra_callbacks=fold_callbacks,
+    )
 
-        # Salvar scaler
-        import joblib
+    eval_result = evaluate_fold(
+        model,
+        x_test_norm,
+        y_test,
+        class_names=class_names,
+        thresholds=thresholds,
+        optimize_thresholds=training_config.optimize_thresholds,
+    )
+    eval_result["fold"] = fold_idx
+    eval_result["history"] = history
 
-        joblib.dump(scaler, fold_dir / "input_scaler.pkl")
+    _finish_tracking(tracking_config, fold_run_id, eval_result, fold_idx)
 
-        # 2. Construir/carregar backbone
-        if model_builder is None:
-            model = build_backbone_1d(input_len=x.shape[1], num_classes=len(np.unique(y)))
-        else:
-            model = model_builder(input_len=x.shape[1], num_classes=len(np.unique(y)))
-        if backbone_weights is not None:
-            model.load_weights(str(backbone_weights))
-            LOGGER.info("  Backbone weights loaded from %s", backbone_weights)
+    f1_macro = eval_result["global"]["F1_macro"]
+    LOGGER.info(
+        "  Fold %d | F1-macro=%.4f | Acc=%.4f | MCC=%.4f",
+        fold_idx,
+        f1_macro,
+        eval_result["global"]["Acc"],
+        eval_result["global"]["MCC"],
+    )
+    return eval_result, f1_macro
 
-        # 3. Fine-tuning (propaga freeze_backbone explicitamente)
-        if freeze_backbone:
-            LOGGER.info("  Freezing conv layers for transfer learning")
-        else:
-            LOGGER.info("  Training all layers (no backbone freezing)")
 
-        model, history = finetune_mitbih(
-            model=model,
-            X_train=x_train_norm,
-            y_train=y_train,
-            X_val=x_test_norm,
-            y_val=y_test,
-            epochs=epochs,
-            batch_size=batch_size,
-            learning_rate=learning_rate,
-            seed=seed,
-            experiment_dir=fold_dir,
-            monitor=monitor,
-            freeze_backbone=freeze_backbone,
-            class_names=class_names,
-            thresholds=thresholds,
-            class_weight=class_weight,
-            selection_metric=selection_metric,
-            augment_class=augment_class,
-            augment_factor=augment_factor,
-            augment_config=augment_config,
-            loss=loss,
-            optimize_thresholds=optimize_thresholds,
-            extra_callbacks=fold_callbacks,
-        )
-
-        # 4. Avaliação
-        eval_result = evaluate_fold(
-            model,
-            x_test_norm,
-            y_test,
-            class_names=class_names,
-            thresholds=thresholds,
-            optimize_thresholds=optimize_thresholds,
-        )
-        eval_result["fold"] = fold_idx
-        eval_result["history"] = history
-        fold_results.append(eval_result)
-
-        if fold_run_id is not None:
-            try:
-                finish_tracking_run(
-                    run_id=fold_run_id,
-                    status="completed",
-                    eval_result=eval_result,
-                    experiment_id=tracking_experiment_id,
-                    stage_label=tracking_stage_label,
-                )
-            except Exception:
-                LOGGER.exception("Falha ao finalizar run do fold %d no tracking", fold_idx)
-
-        f1_macro = eval_result["global"]["F1_macro"]
-        LOGGER.info(
-            "  Fold %d | F1-macro=%.4f | Acc=%.4f | MCC=%.4f",
-            fold_idx,
-            f1_macro,
-            eval_result["global"]["Acc"],
-            eval_result["global"]["MCC"],
-        )
-
-        if f1_macro > best_f1_macro:
-            best_f1_macro = f1_macro
-            best_fold = fold_idx
-
-    # Resumo
+def _write_summary(
+    experiment_dir: Path,
+    fold_results: List[Dict[str, Any]],
+    best_fold: int,
+) -> Dict[str, Any]:
+    """Calcula métricas agregadas e persiste summary.json."""
     f1_macros = [r["global"]["F1_macro"] for r in fold_results]
     accs = [r["global"]["Acc"] for r in fold_results]
     mccs = [r["global"]["MCC"] for r in fold_results]
@@ -439,3 +421,112 @@ def train_group_kfold(  # NOSONAR(S107): many hyper-parameters required by the t
         summary["std_metrics"]["Acc"],
     )
     return summary
+
+
+def train_group_kfold(
+    x: np.ndarray,
+    y: np.ndarray,
+    groups: np.ndarray,
+    n_splits: int = 5,
+    experiment_dir: Optional[Path] = None,
+    class_names: Optional[List[str]] = None,
+    thresholds: Optional[Dict[str, Any]] = None,
+    class_weight: Optional[Dict[int, float]] = None,
+    instrumentation_config: Optional[Dict[str, Any]] = None,
+    training_config: Optional[TrainingConfig] = None,
+    augmentation_config: Optional[AugmentationConfig] = None,
+    tracking_config: Optional[TrackingConfig] = None,
+    model_config: Optional[ModelConfig] = None,
+) -> Dict[str, Any]:
+    """Treinamento GroupKFold por paciente.
+
+    Parameters
+    ----------
+    x : np.ndarray
+        Dados (shape: (n, 500, 1)).
+    y : np.ndarray
+        Labels inteiros (shape: (n,)).
+    groups : np.ndarray
+        IDs de paciente (shape: (n,)).
+    n_splits : int
+        Número de folds.
+    experiment_dir : Path, optional
+        Diretório raiz dos experimentos.
+    class_names : list[str], optional
+        Nomes das classes para avaliação AAMI.
+    thresholds : dict, optional
+        Thresholds configuráveis para ``evaluate_aami``.
+    class_weight : dict, optional
+        Pesos por classe para ``model.fit``.
+    instrumentation_config : dict, optional
+        Configuração para callbacks de instrumentação.
+    training_config : TrainingConfig, optional
+        Hiper-parâmetros de treinamento.
+    augmentation_config : AugmentationConfig, optional
+        Configuração de augmentação/over-sampling.
+    tracking_config : TrackingConfig, optional
+        Configuração de tracking de experimentos.
+    model_config : ModelConfig, optional
+        Configuração do modelo e backbone.
+
+    Returns
+    -------
+    dict
+        {
+            "folds": [resultados por fold],
+            "best_fold": índice do melhor fold,
+            "mean_metrics": médias,
+            "std_metrics": desvios,
+        }
+    """
+    training_config = training_config or TrainingConfig()
+    augmentation_config = augmentation_config or AugmentationConfig()
+    tracking_config = tracking_config or TrackingConfig()
+    model_config = model_config or ModelConfig()
+
+    _set_seeds(training_config.seed)
+
+    if experiment_dir is None:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        experiment_dir = Path("experiments") / f"exp_{ts}_groupkfold"
+    experiment_dir = Path(experiment_dir)
+    experiment_dir.mkdir(parents=True, exist_ok=True)
+
+    LOGGER.info(
+        "GroupKFold | n_splits=%d | n_samples=%d | n_patients=%d",
+        n_splits,
+        len(x),
+        len(np.unique(groups)),
+    )
+
+    gkf = GroupKFold(n_splits=n_splits)
+    fold_results: List[Dict[str, Any]] = []
+    best_f1_macro = -1.0
+    best_fold = -1
+
+    for fold_idx, (train_idx, test_idx) in enumerate(gkf.split(x, y, groups)):
+        eval_result, f1_macro = _train_single_fold(
+            fold_idx=fold_idx,
+            n_splits=n_splits,
+            train_idx=train_idx,
+            test_idx=test_idx,
+            x=x,
+            y=y,
+            groups=groups,
+            experiment_dir=experiment_dir,
+            class_names=class_names,
+            thresholds=thresholds,
+            class_weight=class_weight,
+            instrumentation_config=instrumentation_config,
+            training_config=training_config,
+            augmentation_config=augmentation_config,
+            tracking_config=tracking_config,
+            model_config=model_config,
+        )
+        fold_results.append(eval_result)
+
+        if f1_macro > best_f1_macro:
+            best_f1_macro = f1_macro
+            best_fold = fold_idx
+
+    return _write_summary(experiment_dir, fold_results, best_fold)
