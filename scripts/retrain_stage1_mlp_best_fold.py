@@ -9,21 +9,27 @@ from pathlib import Path
 
 import joblib
 import numpy as np
-import tensorflow as tf
 from sklearn.model_selection import GroupKFold
-from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scripts.train_stage1_mlp import build_mlp, compute_class_weights, train_fold
+from scripts.train_stage1_mlp import compute_class_weights, train_fold  # noqa: E402
 
 
 def main() -> int:
     npz = np.load("data/features/stage1_binary_features.npz")
     X, y, groups = npz["X"], npz["y"], npz["groups"]
-    feature_names = json.loads(
-        Path("data/features/stage1_binary_features.json").read_text(encoding="utf-8")
-    )["feature_names"]
+    metadata_path = Path("data/features/stage1_binary_features.json")
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    feature_names = metadata["feature_names"]
+    scaler_path = Path(metadata["scaler_path"])
+
+    if not scaler_path.exists():
+        raise FileNotFoundError(
+            f"Scaler não encontrado em {scaler_path}. "
+            "Execute scripts/prepare_stage1_features.py primeiro."
+        )
+    joblib.load(scaler_path)
 
     best_fold = 3
     gkf = GroupKFold(n_splits=5)
@@ -33,15 +39,10 @@ def main() -> int:
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_val = scaler.transform(X_val)
-
         class_weight = compute_class_weights(y_train)
         output_dir = Path("experiments/stage1_mlp_features_v2.1")
         result = train_fold(
-            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir,
-            scaler=scaler,
+            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir
         )
         print(json.dumps(result, indent=2, ensure_ascii=False))
 
@@ -53,7 +54,7 @@ def main() -> int:
             models_dir / "stage1_mlp_features_v2.1.keras",
         )
         shutil.copy(
-            output_dir / f"fold_{fold_idx}" / "input_scaler.pkl",
+            scaler_path,
             models_dir / "input_scaler_stage1_mlp_features_v2.1.pkl",
         )
         (models_dir / "stage1_mlp_features_v2.1.config.json").write_text(
