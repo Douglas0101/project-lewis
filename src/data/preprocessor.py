@@ -296,6 +296,87 @@ class ECGPreprocessor:
             "n_clipped": n_clipped,
         }
 
+    @staticmethod
+    def compute_global_stats(
+        X: np.ndarray,
+        clip_limits: Tuple[float, float] = (-5.0, 5.0),
+        chunk_size: int = 8192,
+        eps: float = 1.0e-12,
+    ) -> Tuple[np.float32, np.float32]:
+        """Computa média e desvio padrão globais do canal 0 após clipping.
+
+        Os valores são clipados *antes* das estatísticas, garantindo que
+        outliers de amplitude não distorçam o z-score global (Camada-02
+        v1.1). O cálculo é feito em dois passes com acumulador float64 para
+        evitar overflow em datasets grandes.
+
+        Este projeto processa ECG single-channel (input shape ``(500, 1)``);
+        portanto apenas o canal 0 é considerado e os valores retornados são
+        escalares float32.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Array 1-D, 2-D ou 3-D. 1-D é tratado como uma única amostra de
+            1 canal; 2-D como ``(amostras, sequência)`` com 1 canal; 3-D como
+            ``(amostras, sequência, canais)``.
+        clip_limits : tuple
+            Limites ``(lo, hi)`` aplicados antes das estatísticas.
+        chunk_size : int
+            Número de amostras (eixo 0) processadas por chunk.
+        eps : float
+            Limiar abaixo do qual o desvio padrão é substituído por ``1.0``.
+
+        Returns
+        -------
+        tuple
+            ``(mean, std)`` como escalares float32 (canal 0).
+        """
+        if X.ndim == 1:
+            X = X.reshape(1, -1, 1)
+        elif X.ndim == 2:
+            X = X.reshape(X.shape[0], X.shape[1], 1)
+        elif X.ndim != 3:
+            raise ValueError(
+                f"compute_global_stats espera array 1-D, 2-D ou 3-D; " f"recebeu ndim={X.ndim}"
+            )
+
+        n_samples, seq_len, n_channels = X.shape
+        if n_channels != 1:
+            raise ValueError(f"compute_global_stats suporta apenas 1 canal; recebeu {n_channels}")
+        lo, hi = clip_limits
+
+        # Passo 1: média por canal com acumulador float64
+        sum_per_channel = np.zeros(n_channels, dtype=np.float64)
+        count = 0
+        for start in range(0, n_samples, chunk_size):
+            end = min(start + chunk_size, n_samples)
+            chunk = X[start:end].astype(np.float64, copy=False)
+            chunk = np.clip(chunk, lo, hi)
+            if not np.isfinite(chunk).all():
+                raise ValueError("Input contains NaN or Inf after clipping")
+            sum_per_channel += chunk.sum(axis=(0, 1))
+            count += chunk.shape[0] * chunk.shape[1]
+
+        mean = sum_per_channel / max(count, 1)
+
+        # Passo 2: variância por canal com acumulador float64
+        sq_diff_sum = np.zeros(n_channels, dtype=np.float64)
+        for start in range(0, n_samples, chunk_size):
+            end = min(start + chunk_size, n_samples)
+            chunk = X[start:end].astype(np.float64, copy=False)
+            chunk = np.clip(chunk, lo, hi)
+            if not np.isfinite(chunk).all():
+                raise ValueError("Input contains NaN or Inf after clipping")
+            diff = chunk.reshape(-1, n_channels) - mean
+            sq_diff_sum += np.sum(diff * diff, axis=0)
+
+        variance = sq_diff_sum / max(count, 1)
+        std = np.sqrt(variance)
+        std[std < eps] = 1.0
+
+        return np.float32(mean[0]), np.float32(std[0])
+
     def _check_idempotency(
         self,
         dataset: str,
@@ -312,30 +393,31 @@ class ECGPreprocessor:
 
         try:
             lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+
+            if lineage.get("preprocess_config") != self.config_version:
+                return None
+
+            # Checksum do raw: preferimos .dat, fallback para .hea
+            raw_dat = raw_path.with_suffix(".dat")
+            raw_hea = raw_path.with_suffix(".hea")
+            checksum_path = raw_dat if raw_dat.exists() else raw_hea
+            if not checksum_path.exists():
+                return None
+
+            current_checksum = _sha256_file(checksum_path)
+            if lineage.get("raw_checksum") != current_checksum:
+                LOGGER.info(
+                    "Checksum mudou para %s/%s — reprocessando",
+                    dataset,
+                    record_id,
+                )
+                return None
+
+            # Carregar sinal já processado
+            out_path = Path(lineage["output"]["path"])
         except Exception:
             return None
 
-        if lineage.get("preprocess_config") != self.config_version:
-            return None
-
-        # Checksum do raw: preferimos .dat, fallback para .hea
-        raw_dat = raw_path.with_suffix(".dat")
-        raw_hea = raw_path.with_suffix(".hea")
-        checksum_path = raw_dat if raw_dat.exists() else raw_hea
-        if not checksum_path.exists():
-            return None
-
-        current_checksum = _sha256_file(checksum_path)
-        if lineage.get("raw_checksum") != current_checksum:
-            LOGGER.info(
-                "Checksum mudou para %s/%s — reprocessando",
-                dataset,
-                record_id,
-            )
-            return None
-
-        # Carregar sinal já processado
-        out_path = Path(lineage["output"]["path"])
         if out_path.exists():
             LOGGER.info(
                 "Idempotente: pulando %s/%s (config=%s)",
@@ -417,6 +499,9 @@ class ECGPreprocessor:
         """
         dataset = dataset.lower().strip()
         raw_path = Path(raw_path)
+
+        if not np.isfinite(x).all():
+            raise ValueError(f"Input signal for {record_id} contains NaN or Inf")
 
         # 1. Idempotência
         cached = self._check_idempotency(dataset, record_id, raw_path)
@@ -521,6 +606,7 @@ class ECGPreprocessor:
                     **clip_meta,
                 }
             )
+            lineage["pipeline"][-1]["input_range_after_clip_mV"] = [float(x.min()), float(x.max())]
 
             # Step 5: Normalize
             step = "normalize"
@@ -608,3 +694,38 @@ class ECGPreprocessor:
         """Define estatísticas globais para z-score global (quando per_record=False)."""
         self._global_mean = mean
         self._global_std = std
+
+    def set_global_stats_from_data(
+        self,
+        X: np.ndarray,
+        clip_limits: Optional[Tuple[float, float]] = None,
+        chunk_size: int = 8192,
+    ) -> Tuple[np.float32, np.float32]:
+        """Computa e define estatísticas globais a partir dos dados de treino.
+
+        Os valores são clipados antes do cálculo, conforme especificação da
+        Camada-02 v1.1. Usa ``self.clip_fixed_limits`` como limite padrão.
+
+        Parameters
+        ----------
+        X : np.ndarray
+            Dados de treino (1-D, 2-D ou 3-D).
+        clip_limits : tuple, optional
+            Limites de clipping. Padrão: ``self.clip_fixed_limits``.
+        chunk_size : int
+            Tamanho do chunk para processamento incremental.
+
+        Returns
+        -------
+        tuple
+            ``(mean, std)`` como escalares float32 (canal 0).
+        """
+        limits = clip_limits if clip_limits is not None else self.clip_fixed_limits
+        mean, std = self.compute_global_stats(
+            X,
+            clip_limits=limits,
+            chunk_size=chunk_size,
+            eps=self.eps,
+        )
+        self.set_global_stats(mean, std)
+        return mean, std

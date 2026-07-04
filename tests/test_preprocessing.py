@@ -381,3 +381,27 @@ class TestPreprocessorGlobalStats:
 
         expected = (x - 0.5) / 2.0
         np.testing.assert_array_almost_equal(y, expected, decimal=10)
+
+
+@pytest.mark.qg1
+class TestPreprocessorClipBeforeNormalize:
+    def test_global_normalize_uses_clipped_values(self, dlq_path):
+        pre = ECGPreprocessor(dlq_path=dlq_path)
+        x = np.random.randn(1000).astype(np.float64)
+        x[500] = 10.0
+        x_clip, _ = pre._clip_outliers(x.copy())
+        mean_clip = float(np.mean(x_clip))
+        std_clip = float(np.std(x_clip))
+        pre.set_global_stats(mean_clip, std_clip)
+        y = pre.normalize(x_clip)
+        assert abs(float(np.std(y)) - 1.0) < 1e-3
+
+    def test_compute_global_stats_clips_before_stats(self, dlq_path):
+        pre = ECGPreprocessor(dlq_path=dlq_path)
+        X = np.random.randn(100, 500, 1).astype(np.float32)
+        X[0, 0, 0] = 20.0
+        mean, std = pre.compute_global_stats(X, clip_limits=(-5.0, 5.0))
+        assert np.isscalar(mean)
+        assert np.isscalar(std)
+        assert std > 0
+        assert std < 5.0  # without clipping std would be ~2.1; with clipping ~1
