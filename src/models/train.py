@@ -153,7 +153,7 @@ def _build_instrumentation_callbacks(
     return callbacks
 
 
-def train_group_kfold(
+def train_group_kfold(  # NOSONAR(S107): many hyper-parameters required by the training orchestrator
     x: np.ndarray,
     y: np.ndarray,
     groups: np.ndarray,

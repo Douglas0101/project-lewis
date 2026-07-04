@@ -18,6 +18,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 REPORT_PATH = PROJECT_ROOT / "reports" / "stage1_v2_training_analysis.md"
 
 
+def _validate_report_path(path: Path) -> Path:
+    """Garante que o caminho do relatório não escape do diretório reports."""
+    resolved = path.resolve()
+    allowed_root = (PROJECT_ROOT / "reports").resolve()
+    if not str(resolved).startswith(str(allowed_root) + "/"):
+        raise ValueError(f"Caminho do relatório fora do diretório permitido: {resolved}")
+    return resolved
+
+
 def parse_training_log(log_path: Path) -> Dict[str, Any]:
     """Extrai métricas de época do log Keras."""
     content = log_path.read_text(encoding="utf-8")
@@ -281,9 +290,11 @@ def generate_report(
         "(RNF-02: Flash < 40 KB, RAM < 80 KB).\n"
     )
 
-    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
-    REPORT_PATH.write_text("".join(lines), encoding="utf-8")
-    print(f"[INFO] Relatório salvo em: {REPORT_PATH}")
+    report_path = _validate_report_path(REPORT_PATH)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_text = "".join(lines)
+    report_path.write_text(report_text, encoding="utf-8")
+    print(f"[INFO] Relatório salvo em: {report_path}")
 
 
 def main():
