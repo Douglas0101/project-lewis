@@ -180,6 +180,7 @@ def train_group_kfold(
     tracking_experiment_id: Optional[int] = None,
     tracking_stage_label: str = "",
     instrumentation_config: Optional[Dict[str, Any]] = None,
+    normalize: bool = True,
 ) -> Dict[str, Any]:
     """Treinamento GroupKFold por paciente.
 
@@ -191,6 +192,10 @@ def train_group_kfold(
         Labels inteiros (shape: (n,)).
     groups : np.ndarray
         IDs de paciente (shape: (n,)).
+    normalize : bool
+        Se True, aplica normalização Z-score por fold. Se False, mantém os
+        dados originais e usa um scaler identidade para compatibilidade dos
+        artefatos salvos.
     backbone_weights : Path, optional
         Caminho para pesos do backbone pré-treinado. Se None, o backbone é
         treinado do zero (from scratch).
@@ -285,7 +290,13 @@ def train_group_kfold(
         )
 
         # 1. Normalização global (fit no treino)
-        X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
+        if normalize:
+            X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
+        else:
+            X_train_norm, X_test_norm = X_train, X_test
+            scaler = StandardScaler()
+            scaler.mean_ = np.zeros(X.shape[-1], dtype=np.float32)
+            scaler.scale_ = np.ones(X.shape[-1], dtype=np.float32)
 
         # Criar run de tracking no início do fold para possibilitar métricas por época
         fold_run_id: Optional[int] = None
