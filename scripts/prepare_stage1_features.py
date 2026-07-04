@@ -11,8 +11,14 @@ import logging
 import sys
 from pathlib import Path
 
+import joblib
 import numpy as np
 import pandas as pd
+
+# Ajustar PYTHONPATH implicitamente quando rodado como script
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("prepare_stage1_features")
@@ -41,6 +47,7 @@ def main() -> int:
     parquet_path = Path("data/features/stage1_binary.parquet")
     npz_path = Path("data/features/stage1_binary.npz")
     output_path = Path("data/features/stage1_binary_features.npz")
+    scaler_path = Path("data/features/stage1_binary_features_scaler.pkl")
 
     if not parquet_path.exists():
         LOGGER.error("Parquet não encontrado: %s", parquet_path)
@@ -74,10 +81,20 @@ def main() -> int:
 
     X_features = features_df.values.astype(np.float32)
 
+    # Normaliza features com StandardScaler ajustado apenas no primeiro fold de treino.
+    from src.features.scaler_utils import fit_feature_scaler_on_train, scale_features
+
+    scaler, _, _ = fit_feature_scaler_on_train(X_features, groups, n_splits=5, seed=42)
+    X_features_scaled = scale_features(X_features, scaler)
+
+    scaler_path.parent.mkdir(parents=True, exist_ok=True)
+    joblib.dump(scaler, scaler_path)
+    LOGGER.info("Scaler salvo em %s", scaler_path)
+
     # Sanity check: distribuição de classes
     class_counts = dict(zip(*np.unique(y, return_counts=True)))
     LOGGER.info("Classes: %s", class_counts)
-    LOGGER.info("Features shape: %s", X_features.shape)
+    LOGGER.info("Features shape: %s", X_features_scaled.shape)
 
     # Mapeia record_id (string) para inteiros para compatibilidade com NPZ
     # sem object arrays e com GroupKFold.
@@ -87,17 +104,19 @@ def main() -> int:
 
     np.savez(
         output_path,
-        X=X_features,
+        X=X_features_scaled,
         y=y,
         groups=group_ids,
     )
     # Salva nomes das features e mapeamento de grupos em JSON.
     import json
+
     (output_path.parent / "stage1_binary_features.json").write_text(
         json.dumps(
             {
                 "feature_names": FEATURE_COLUMNS,
                 "group_mapping": record_to_idx,
+                "scaler_path": str(scaler_path),
             },
             indent=2,
             ensure_ascii=False,
