@@ -179,8 +179,7 @@ class ECGPreprocessor:
         self._global_std: Optional[float] = None
 
         LOGGER.info(
-            "ECGPreprocessor inicializado | config=%s | fs=%.1f | "
-            "band=[%.2f, %.2f] | order=%d | clip=%s",
+            "ECGPreprocessor inicializado | config=%s | fs=%.1f | band=[%.2f, %.2f] | order=%d | clip=%s",  # noqa: E501
             self.config_version,
             self.fs,
             self.lowcut,
@@ -261,9 +260,7 @@ class ECGPreprocessor:
 
         if self._global_mean is None or self._global_std is None:
             raise ValueError(
-                "Estatísticas globais não definidas. "
-                "Chame set_global_stats(mean, std) antes da normalização "
-                "quando normalization.per_record=False."
+                "Estatísticas globais não definidas. Chame set_global_stats(mean, std) antes da normalização quando normalization.per_record=False."  # noqa: E501
             )
 
         return (x - self._global_mean) / (self._global_std + self.eps)
@@ -296,6 +293,87 @@ class ECGPreprocessor:
             "n_clipped": n_clipped,
         }
 
+    @staticmethod
+    def compute_global_stats(
+        x: np.ndarray,
+        clip_limits: Tuple[float, float] = (-5.0, 5.0),
+        chunk_size: int = 8192,
+        eps: float = 1.0e-12,
+    ) -> Tuple[np.float32, np.float32]:
+        """Computa média e desvio padrão globais do canal 0 após clipping.
+
+        Os valores são clipados *antes* das estatísticas, garantindo que
+        outliers de amplitude não distorçam o z-score global (Camada-02
+        v1.1). O cálculo é feito em dois passes com acumulador float64 para
+        evitar overflow em datasets grandes.
+
+        Este projeto processa ECG single-channel (input shape ``(500, 1)``);
+        portanto apenas o canal 0 é considerado e os valores retornados são
+        escalares float32.
+
+        Parameters
+        ----------
+        x : np.ndarray
+            Array 1-D, 2-D ou 3-D. 1-D é tratado como uma única amostra de
+            1 canal; 2-D como ``(amostras, sequência)`` com 1 canal; 3-D como
+            ``(amostras, sequência, canais)``.
+        clip_limits : tuple
+            Limites ``(lo, hi)`` aplicados antes das estatísticas.
+        chunk_size : int
+            Número de amostras (eixo 0) processadas por chunk.
+        eps : float
+            Limiar abaixo do qual o desvio padrão é substituído por ``1.0``.
+
+        Returns
+        -------
+        tuple
+            ``(mean, std)`` como escalares float32 (canal 0).
+        """
+        if x.ndim == 1:
+            x = x.reshape(1, -1, 1)
+        elif x.ndim == 2:
+            x = x.reshape(x.shape[0], x.shape[1], 1)
+        elif x.ndim != 3:
+            raise ValueError(
+                f"compute_global_stats espera array 1-D, 2-D ou 3-D; recebeu ndim={x.ndim}"
+            )
+
+        n_samples, _, n_channels = x.shape
+        if n_channels != 1:
+            raise ValueError(f"compute_global_stats suporta apenas 1 canal; recebeu {n_channels}")
+        lo, hi = clip_limits
+
+        # Passo 1: média por canal com acumulador float64
+        sum_per_channel = np.zeros(n_channels, dtype=np.float64)
+        count = 0
+        for start in range(0, n_samples, chunk_size):
+            end = min(start + chunk_size, n_samples)
+            chunk = x[start:end].astype(np.float64, copy=False)
+            chunk = np.clip(chunk, lo, hi)
+            if not np.isfinite(chunk).all():
+                raise ValueError("Input contains NaN or Inf after clipping")
+            sum_per_channel += chunk.sum(axis=(0, 1))
+            count += chunk.shape[0] * chunk.shape[1]
+
+        mean = sum_per_channel / max(count, 1)
+
+        # Passo 2: variância por canal com acumulador float64
+        sq_diff_sum = np.zeros(n_channels, dtype=np.float64)
+        for start in range(0, n_samples, chunk_size):
+            end = min(start + chunk_size, n_samples)
+            chunk = x[start:end].astype(np.float64, copy=False)
+            chunk = np.clip(chunk, lo, hi)
+            if not np.isfinite(chunk).all():
+                raise ValueError("Input contains NaN or Inf after clipping")
+            diff = chunk.reshape(-1, n_channels) - mean
+            sq_diff_sum += np.sum(diff * diff, axis=0)
+
+        variance = sq_diff_sum / max(count, 1)
+        std = np.sqrt(variance)
+        std[std < eps] = 1.0
+
+        return np.float32(mean[0]), np.float32(std[0])
+
     def _check_idempotency(
         self,
         dataset: str,
@@ -312,30 +390,31 @@ class ECGPreprocessor:
 
         try:
             lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+
+            if lineage.get("preprocess_config") != self.config_version:
+                return None
+
+            # Checksum do raw: preferimos .dat, fallback para .hea
+            raw_dat = raw_path.with_suffix(".dat")
+            raw_hea = raw_path.with_suffix(".hea")
+            checksum_path = raw_dat if raw_dat.exists() else raw_hea
+            if not checksum_path.exists():
+                return None
+
+            current_checksum = _sha256_file(checksum_path)
+            if lineage.get("raw_checksum") != current_checksum:
+                LOGGER.info(
+                    "Checksum mudou para %s/%s — reprocessando",
+                    dataset,
+                    record_id,
+                )
+                return None
+
+            # Carregar sinal já processado
+            out_path = Path(lineage["output"]["path"])
         except Exception:
             return None
 
-        if lineage.get("preprocess_config") != self.config_version:
-            return None
-
-        # Checksum do raw: preferimos .dat, fallback para .hea
-        raw_dat = raw_path.with_suffix(".dat")
-        raw_hea = raw_path.with_suffix(".hea")
-        checksum_path = raw_dat if raw_dat.exists() else raw_hea
-        if not checksum_path.exists():
-            return None
-
-        current_checksum = _sha256_file(checksum_path)
-        if lineage.get("raw_checksum") != current_checksum:
-            LOGGER.info(
-                "Checksum mudou para %s/%s — reprocessando",
-                dataset,
-                record_id,
-            )
-            return None
-
-        # Carregar sinal já processado
-        out_path = Path(lineage["output"]["path"])
         if out_path.exists():
             LOGGER.info(
                 "Idempotente: pulando %s/%s (config=%s)",
@@ -418,6 +497,9 @@ class ECGPreprocessor:
         dataset = dataset.lower().strip()
         raw_path = Path(raw_path)
 
+        if not np.isfinite(x).all():
+            raise ValueError(f"Input signal for {record_id} contains NaN or Inf")
+
         # 1. Idempotência
         cached = self._check_idempotency(dataset, record_id, raw_path)
         if cached is not None:
@@ -452,9 +534,7 @@ class ECGPreprocessor:
             # Validação prévia: estatísticas globais obrigatórias quando per_record=False
             if not self.per_record and (self._global_mean is None or self._global_std is None):
                 raise ValueError(
-                    "Estatísticas globais não definidas. "
-                    "Chame set_global_stats(mean, std) antes de process() "
-                    "quando normalization.per_record=False."
+                    "Estatísticas globais não definidas. Chame set_global_stats(mean, std) antes de process() quando normalization.per_record=False."  # noqa: E501
                 )
 
             # Step 1: Resample
@@ -521,6 +601,7 @@ class ECGPreprocessor:
                     **clip_meta,
                 }
             )
+            lineage["pipeline"][-1]["input_range_after_clip_mV"] = [float(x.min()), float(x.max())]
 
             # Step 5: Normalize
             step = "normalize"
@@ -604,7 +685,7 @@ class ECGPreprocessor:
             )
             raise
 
-    def set_global_stats(self, mean: float, std: float) -> None:
+    def set_global_stats(self, mean: float | np.floating, std: float | np.floating) -> None:
         """Define estatísticas globais para z-score global (quando per_record=False)."""
-        self._global_mean = mean
-        self._global_std = std
+        self._global_mean = float(mean)
+        self._global_std = float(std)
