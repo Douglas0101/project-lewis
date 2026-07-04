@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 import shutil
 import sys
 from pathlib import Path
@@ -17,37 +15,12 @@ from sklearn.model_selection import GroupKFold
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.train_stage1_mlp import compute_class_weights, train_fold  # noqa: E402
+from src.utils.path_utils import resolve_scaler_path  # noqa: E402
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-FEATURES_DIR = PROJECT_ROOT / "data" / "features"
 OUTPUT_DIR = PROJECT_ROOT / "experiments" / "stage1_mlp_features_v2.1"
 MODELS_DIR = PROJECT_ROOT / "models"
-
-
-_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_\-\.]+$")
-
-
-def _resolve_scaler_path(scaler_path: str) -> Path:
-    """Resolve scaler path and ensure it stays inside features dir."""
-    filename = os.path.basename(scaler_path)
-    if (
-        not filename
-        or filename in (".", "..")
-        or os.path.sep in filename
-        or "/" in filename
-        or "\\" in filename
-        or not _SAFE_NAME_RE.match(filename)
-    ):
-        raise ValueError(f"Invalid scaler filename: {filename!r}")
-
-    target = FEATURES_DIR / filename
-    resolved = target.resolve()
-    try:
-        resolved.relative_to(FEATURES_DIR.resolve())
-    except ValueError as exc:
-        raise ValueError(f"Scaler path escapes features directory: {filename!r}") from exc
-    return resolved
 
 
 def main() -> int:
@@ -56,7 +29,7 @@ def main() -> int:
     metadata_path = Path("data/features/stage1_binary_features.json")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     feature_names = metadata["feature_names"]
-    scaler_path = _resolve_scaler_path(metadata["scaler_path"])
+    scaler_path = resolve_scaler_path(metadata["scaler_path"])
 
     if not scaler_path.exists():
         raise FileNotFoundError(
