@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import shutil
 import sys
 from pathlib import Path
@@ -15,6 +16,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from scripts.train_stage1_mlp import compute_class_weights, train_fold  # noqa: E402
 
+LOGGER = logging.getLogger(__name__)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FEATURES_DIR = PROJECT_ROOT / "data" / "features"
+
+
+def _resolve_scaler_path(scaler_path: str) -> Path:
+    """Resolve scaler path and ensure it stays inside features dir."""
+    target = Path(scaler_path)
+    if not target.is_absolute():
+        target = FEATURES_DIR / target
+    resolved = target.resolve()
+    try:
+        resolved.relative_to(FEATURES_DIR.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Scaler path escapes features directory: {scaler_path}") from exc
+    return resolved
+
 
 def main() -> int:
     npz = np.load("data/features/stage1_binary_features.npz")
@@ -22,14 +40,15 @@ def main() -> int:
     metadata_path = Path("data/features/stage1_binary_features.json")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     feature_names = metadata["feature_names"]
-    scaler_path = Path(metadata["scaler_path"])
+    scaler_path = _resolve_scaler_path(metadata["scaler_path"])
 
     if not scaler_path.exists():
         raise FileNotFoundError(
             f"Scaler não encontrado em {scaler_path}. "
             "Execute scripts/prepare_stage1_features.py primeiro."
         )
-    joblib.load(scaler_path)
+    _ = joblib.load(scaler_path)
+    LOGGER.info("Scaler loaded from %s", scaler_path.name)
 
     best_fold = 3
     gkf = GroupKFold(n_splits=5)

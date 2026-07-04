@@ -21,7 +21,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.models.evaluate import evaluate_fold  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
-LOGGER = logging.getLogger("train_stage1_mlp")
+LOGGER = logging.getLogger(__name__)
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+FEATURES_DIR = PROJECT_ROOT / "data" / "features"
+
+
+def _resolve_scaler_path(scaler_path: str) -> Path:
+    """Resolve scaler path and ensure it stays inside features dir."""
+    target = Path(scaler_path)
+    if not target.is_absolute():
+        target = FEATURES_DIR / target
+    resolved = target.resolve()
+    try:
+        resolved.relative_to(FEATURES_DIR.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Scaler path escapes features directory: {scaler_path}") from exc
+    return resolved
 
 
 def build_mlp(input_dim: int, num_classes: int = 2) -> tf.keras.Model:
@@ -121,17 +136,18 @@ def main() -> int:
     metadata_path = Path("data/features/stage1_binary_features.json")
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     feature_names = metadata["feature_names"]
-    scaler_path = Path(metadata["scaler_path"])
+    scaler_path = _resolve_scaler_path(metadata["scaler_path"])
 
     if not scaler_path.exists():
         raise FileNotFoundError(
             f"Scaler não encontrado em {scaler_path}. "
             "Execute scripts/prepare_stage1_features.py primeiro."
         )
-    joblib.load(scaler_path)
+    _ = joblib.load(scaler_path)
+    LOGGER.info("Scaler loaded from %s", scaler_path.name)
 
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
-    LOGGER.info("Features: %s", feature_names)
+    LOGGER.info("Features: %d features loaded", len(feature_names))
 
     output_dir = Path("experiments/stage1_mlp_features_v2.1")
     output_dir.mkdir(parents=True, exist_ok=True)
