@@ -6,6 +6,7 @@ Fit scaler no treino apenas; carregar backbone pré-treinado; congelar convs.
 
 from __future__ import annotations
 
+import gc
 import json
 import logging
 import os
@@ -68,9 +69,17 @@ def _normalize_fold(
     X_train_2d = X_train.reshape(-1, channels)
     scaler.fit(X_train_2d)
 
-    # Transform treino e teste
-    X_train_norm = scaler.transform(X_train_2d).reshape(n_train, seq_len, channels)
-    X_test_norm = scaler.transform(X_test.reshape(-1, channels)).reshape(n_test, seq_len, channels)
+    # Transform treino e teste. Forçamos float32 internamente e convertemos
+    # diretamente para float16, evitando o pico de float64 do sklearn e o
+    # pico de manter float32 + float16 simultaneamente.
+    mean = scaler.mean_.astype(np.float32, copy=False)
+    scale = scaler.scale_.astype(np.float32, copy=False)
+    X_train_norm = (
+        (X_train_2d.astype(np.float32, copy=False) - mean) / scale
+    ).astype(np.float16, copy=False).reshape(n_train, seq_len, channels)
+    X_test_norm = (
+        (X_test.reshape(-1, channels).astype(np.float32, copy=False) - mean) / scale
+    ).astype(np.float16, copy=False).reshape(n_test, seq_len, channels)
 
     return X_train_norm, X_test_norm, scaler
 
@@ -180,6 +189,9 @@ def train_group_kfold(
     tracking_experiment_id: Optional[int] = None,
     tracking_stage_label: str = "",
     instrumentation_config: Optional[Dict[str, Any]] = None,
+    checkpoint_max_samples: Optional[int] = None,
+    checkpoint_predict_batch_size: int = 1024,
+    normalize: bool = True,
 ) -> Dict[str, Any]:
     """Treinamento GroupKFold por paciente.
 
@@ -284,8 +296,20 @@ def train_group_kfold(
             len(np.unique(groups[test_idx])),
         )
 
-        # 1. Normalização global (fit no treino)
-        X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
+        # 1. Normalização global (fit no treino) — retorna float16 para economia
+        # de memória; o dataset converte de volta para float32 sob demanda.
+        if normalize:
+            X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
+        else:
+            # X já vem normalizado (ex.: memmap float16 pré-computado).
+            X_train_norm, X_test_norm = X_train, X_test
+            scaler = StandardScaler()
+            scaler.mean_ = np.zeros(X.shape[-1], dtype=np.float32)
+            scaler.scale_ = np.ones(X.shape[-1], dtype=np.float32)
+        # Libera as cópias do fold original do memmap; os arrays normalizados
+        # são mantidos para treino/validação.
+        del X_train, X_test
+        gc.collect()
 
         # Criar run de tracking no início do fold para possibilitar métricas por época
         fold_run_id: Optional[int] = None
@@ -354,6 +378,8 @@ def train_group_kfold(
             loss=loss,
             optimize_thresholds=optimize_thresholds,
             extra_callbacks=fold_callbacks,
+            checkpoint_max_samples=checkpoint_max_samples,
+            checkpoint_predict_batch_size=checkpoint_predict_batch_size,
         )
 
         # 4. Avaliação
