@@ -52,7 +52,7 @@ class TrainingConfig:
     seed: int = 42
     monitor: str = "val_loss"
     selection_metric: str = "F1_macro"
-    loss: Union[str, tf.keras.losses.Loss] = "sparse_categorical_crossentropy"
+    loss: str | tf.keras.losses.Loss = "sparse_categorical_crossentropy"
     optimize_thresholds: bool = False
 
 
@@ -60,16 +60,16 @@ class TrainingConfig:
 class AugmentationConfig:
     """Configuração de augmentação/over-sampling."""
 
-    augment_class: Optional[int] = None
+    augment_class: int | None = None
     augment_factor: int = 1
-    augment_config: Optional[Dict[str, Any]] = None
+    augment_config: Dict[str, Any] | None = None
 
 
 @dataclass
 class TrackingConfig:
     """Configuração de tracking de experimentos."""
 
-    tracking_experiment_id: Optional[int] = None
+    tracking_experiment_id: int | None = None
     tracking_stage_label: str = ""
 
 
@@ -77,9 +77,9 @@ class TrackingConfig:
 class ModelConfig:
     """Configuração do modelo e backbone."""
 
-    backbone_weights: Optional[Path] = None
+    backbone_weights: Path | None = None
     freeze_backbone: bool = True
-    model_builder: Optional[Any] = None
+    model_builder: Any | None = None
     normalize: bool = True
 
 
@@ -117,10 +117,10 @@ def _normalize_fold(
 
 
 def _build_instrumentation_callbacks(
-    instrumentation_config: Optional[Dict[str, Any]],
+    instrumentation_config: Dict[str, Any] | None,
     x_val_norm: np.ndarray,
     y_val: np.ndarray,
-    class_names: Optional[List[str]] = None,
+    class_names: List[str] | None = None,
     fold_idx: int = 0,
 ) -> List[tf.keras.callbacks.Callback]:
     """Constrói callbacks de instrumentação para um fold específico.
@@ -195,6 +195,17 @@ def _build_instrumentation_callbacks(
     return callbacks
 
 
+@dataclass
+class FoldData:
+    """Conjunto de dados e índices de um fold."""
+
+    x: np.ndarray
+    y: np.ndarray
+    groups: np.ndarray
+    train_idx: np.ndarray
+    test_idx: np.ndarray
+
+
 def _normalize_or_identity(
     x_train: np.ndarray,
     x_test: np.ndarray,
@@ -238,7 +249,7 @@ def _start_tracking(
     tracking_config: TrackingConfig,
     fold_idx: int,
     fold_dir: Path,
-) -> Optional[int]:
+) -> int | None:
     """Inicia run de tracking quando configurado."""
     if tracking_config.tracking_experiment_id is None:
         return None
@@ -256,7 +267,7 @@ def _start_tracking(
 
 def _finish_tracking(
     tracking_config: TrackingConfig,
-    fold_run_id: Optional[int],
+    fold_run_id: int | None,
     eval_result: Dict[str, Any],
     fold_idx: int,
 ) -> None:
@@ -278,16 +289,12 @@ def _finish_tracking(
 def _train_single_fold(
     fold_idx: int,
     n_splits: int,
-    train_idx: np.ndarray,
-    test_idx: np.ndarray,
-    x: np.ndarray,
-    y: np.ndarray,
-    groups: np.ndarray,
+    fold_data: FoldData,
     experiment_dir: Path,
-    class_names: Optional[List[str]],
-    thresholds: Optional[Dict[str, Any]],
-    class_weight: Optional[Dict[int, float]],
-    instrumentation_config: Optional[Dict[str, Any]],
+    class_names: List[str] | None,
+    thresholds: Dict[str, Any] | None,
+    class_weight: Dict[int, float] | None,
+    instrumentation_config: Dict[str, Any] | None,
     training_config: TrainingConfig,
     augmentation_config: AugmentationConfig,
     tracking_config: TrackingConfig,
@@ -298,15 +305,15 @@ def _train_single_fold(
     fold_dir = experiment_dir / f"fold_{fold_idx}"
     fold_dir.mkdir(parents=True, exist_ok=True)
 
-    x_train, x_test = x[train_idx], x[test_idx]
-    y_train, y_test = y[train_idx], y[test_idx]
+    x_train, x_test = fold_data.x[fold_data.train_idx], fold_data.x[fold_data.test_idx]
+    y_train, y_test = fold_data.y[fold_data.train_idx], fold_data.y[fold_data.test_idx]
 
     LOGGER.info(
         "  Train: n=%d | Test: n=%d | Patients train=%d | Patients test=%d",
         len(x_train),
         len(x_test),
-        len(np.unique(groups[train_idx])),
-        len(np.unique(groups[test_idx])),
+        len(np.unique(fold_data.groups[fold_data.train_idx])),
+        len(np.unique(fold_data.groups[fold_data.test_idx])),
     )
 
     x_train_norm, x_test_norm, scaler = _normalize_or_identity(
@@ -329,7 +336,7 @@ def _train_single_fold(
 
     joblib.dump(scaler, fold_dir / "input_scaler.pkl")
 
-    model = _build_model(x, y, model_config)
+    model = _build_model(fold_data.x, fold_data.y, model_config)
     _log_freeze_status(model_config.freeze_backbone)
 
     model, history = finetune_mitbih(
@@ -428,15 +435,15 @@ def train_group_kfold(
     y: np.ndarray,
     groups: np.ndarray,
     n_splits: int = 5,
-    experiment_dir: Optional[Path] = None,
-    class_names: Optional[List[str]] = None,
-    thresholds: Optional[Dict[str, Any]] = None,
-    class_weight: Optional[Dict[int, float]] = None,
-    instrumentation_config: Optional[Dict[str, Any]] = None,
-    training_config: Optional[TrainingConfig] = None,
-    augmentation_config: Optional[AugmentationConfig] = None,
-    tracking_config: Optional[TrackingConfig] = None,
-    model_config: Optional[ModelConfig] = None,
+    experiment_dir: Path | None = None,
+    class_names: List[str] | None = None,
+    thresholds: Dict[str, Any] | None = None,
+    class_weight: Dict[int, float] | None = None,
+    instrumentation_config: Dict[str, Any] | None = None,
+    training_config: TrainingConfig | None = None,
+    augmentation_config: AugmentationConfig | None = None,
+    tracking_config: TrackingConfig | None = None,
+    model_config: ModelConfig | None = None,
 ) -> Dict[str, Any]:
     """Treinamento GroupKFold por paciente.
 
@@ -505,14 +512,13 @@ def train_group_kfold(
     best_fold = -1
 
     for fold_idx, (train_idx, test_idx) in enumerate(gkf.split(x, y, groups)):
+        fold_data = FoldData(
+            x=x, y=y, groups=groups, train_idx=train_idx, test_idx=test_idx
+        )
         eval_result, f1_macro = _train_single_fold(
             fold_idx=fold_idx,
             n_splits=n_splits,
-            train_idx=train_idx,
-            test_idx=test_idx,
-            x=x,
-            y=y,
-            groups=groups,
+            fold_data=fold_data,
             experiment_dir=experiment_dir,
             class_names=class_names,
             thresholds=thresholds,
