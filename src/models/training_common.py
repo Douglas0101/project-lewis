@@ -26,8 +26,21 @@ LOGGER = logging.getLogger("lewis.camada04.training_common")
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 
+def _resolve_and_validate(path: Path) -> Path:
+    """Resolve ``path`` e garante que ele permaneça dentro de ``PROJECT_ROOT``."""
+    if not path.is_absolute():
+        path = Path.cwd() / path
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(PROJECT_ROOT.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Path escapes project root: {path}") from exc
+    return resolved
+
+
 def load_config(config_path: Path) -> dict:
     """Carrega um arquivo YAML de configuração."""
+    config_path = _resolve_and_validate(config_path)
     with config_path.open("r", encoding="utf-8") as fh:
         return yaml.safe_load(fh)
 
@@ -150,6 +163,7 @@ def copy_best_fold_artifacts(
     ``artifact_map`` mapeia caminho relativo do artefato dentro do fold
     para o caminho absoluto de destino.
     """
+    output_dir = _resolve_and_validate(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     best_fold_dir = experiment_dir / f"fold_{summary['best_fold']}"
 
