@@ -14,6 +14,9 @@ from typing import Any, Dict, List
 
 import numpy as np
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPORT_PATH = PROJECT_ROOT / "reports" / "stage1_v2_training_analysis.md"
+
 
 def parse_training_log(log_path: Path) -> Dict[str, Any]:
     """Extrai métricas de época do log Keras."""
@@ -144,7 +147,6 @@ def load_summary(experiment_dir: Path) -> Dict[str, Any]:
 
 def generate_report(
     experiment_dir: Path,
-    output_path: Path,
     logs_dir: Path,
 ) -> None:
     """Gera relatório markdown com conclusões."""
@@ -279,8 +281,9 @@ def generate_report(
         "(RNF-02: Flash < 40 KB, RAM < 80 KB).\n"
     )
 
-    output_path.write_text("".join(lines), encoding="utf-8")
-    print(f"[INFO] Relatório salvo em: {output_path}")
+    REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    REPORT_PATH.write_text("".join(lines), encoding="utf-8")
+    print(f"[INFO] Relatório salvo em: {REPORT_PATH}")
 
 
 def main():
@@ -289,9 +292,7 @@ def main():
         print(f"[ERRO] Experimento nao encontrado: {experiment_dir}")
         sys.exit(1)
 
-    output_path = Path("reports/stage1_v2_training_analysis.md")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    generate_report(experiment_dir, output_path, logs_dir=Path("logs"))
+    generate_report(experiment_dir, logs_dir=Path("logs"))
 
 
 if __name__ == "__main__":

@@ -516,6 +516,10 @@ def _execute_sql(
     Retorna o SQL efetivamente executado (pode incluir LIMIT anexado),
     colunas, linhas visíveis, total de linhas retornadas e tempo de execução.
     """
+    ok, reason = validate_sql(sql)
+    if not ok:
+        raise ValueError(f"SQL rejeitado pela validação interna: {reason}")
+
     conn = _get_readonly_connection(db_path)
     start = time.perf_counter()
 
@@ -536,6 +540,10 @@ def _execute_sql(
             elif not _has_top_level_limit(exec_sql):
                 exec_sql = f"{exec_sql.rstrip(';').strip()} LIMIT ?"
                 merged = merged + (max_rows + 1,)
+        ok, reason = validate_sql(exec_sql)
+        if not ok:
+            raise ValueError(f"SQL final rejeitado pela validação interna: {reason}")
+
         cursor = conn.execute(exec_sql, merged)
         columns = [desc[0] for desc in cursor.description] if cursor.description else []
         all_rows = [dict(row) for row in cursor.fetchall()]
