@@ -690,10 +690,10 @@ class ECGPreprocessor:
             )
             raise
 
-    def set_global_stats(self, mean: float, std: float) -> None:
+    def set_global_stats(self, mean: float | np.floating, std: float | np.floating) -> None:
         """Define estatísticas globais para z-score global (quando per_record=False)."""
-        self._global_mean = mean
-        self._global_std = std
+        self._global_mean = float(mean)
+        self._global_std = float(std)
 
     def set_global_stats_from_data(
         self,
