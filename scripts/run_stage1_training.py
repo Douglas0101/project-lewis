@@ -20,7 +20,6 @@ from sklearn.utils.class_weight import compute_class_weight
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.global_stats import GlobalStatsHelper  # noqa: F401,E402
 from src.models.backbone_1d import (  # noqa: E402
     build_backbone_1d,
     load_backbone_weights_from_pretrained,
@@ -179,7 +178,7 @@ def main() -> int:
     parser.add_argument(
         "--force-rebuild",
         action="store_true",
-        help="Delete existing .dat/.npz caches and recompute normalization from scratch.",
+        help="Delete existing z-score .dat cache and recompute normalization from scratch.",
     )
     args = parser.parse_args()
 
