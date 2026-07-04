@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import sys
 from pathlib import Path
 
@@ -24,18 +26,31 @@ logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FEATURES_DIR = PROJECT_ROOT / "data" / "features"
+OUTPUT_DIR = PROJECT_ROOT / "experiments" / "stage1_mlp_features_v2.1"
+
+
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_\-\.]+$")
 
 
 def _resolve_scaler_path(scaler_path: str) -> Path:
     """Resolve scaler path and ensure it stays inside features dir."""
-    target = Path(scaler_path)
-    if not target.is_absolute():
-        target = FEATURES_DIR / target
+    filename = os.path.basename(scaler_path)
+    if (
+        not filename
+        or filename in (".", "..")
+        or os.path.sep in filename
+        or "/" in filename
+        or "\\" in filename
+        or not _SAFE_NAME_RE.match(filename)
+    ):
+        raise ValueError(f"Invalid scaler filename: {filename!r}")
+
+    target = FEATURES_DIR / filename
     resolved = target.resolve()
     try:
         resolved.relative_to(FEATURES_DIR.resolve())
     except ValueError as exc:
-        raise ValueError(f"Scaler path escapes features directory: {scaler_path}") from exc
+        raise ValueError(f"Scaler path escapes features directory: {filename!r}") from exc
     return resolved
 
 
@@ -64,11 +79,10 @@ def compute_class_weights(y: np.ndarray) -> dict:
 def train_fold(
     X_train: np.ndarray,
     y_train: np.ndarray,
-    X_val: np.ndarray,
+    x_val: np.ndarray,
     y_val: np.ndarray,
     class_weight: dict,
     fold_idx: int,
-    output_dir: Path,
 ) -> dict:
     """Treina um único fold."""
     model = build_mlp(input_dim=X_train.shape[1], num_classes=2)
@@ -95,7 +109,7 @@ def train_fold(
     history = model.fit(
         X_train,
         y_train,
-        validation_data=(X_val, y_val),
+        validation_data=(x_val, y_val),
         epochs=50,
         batch_size=256,
         class_weight=class_weight,
@@ -103,13 +117,13 @@ def train_fold(
         verbose=2,
     )
 
-    eval_result = evaluate_fold(model, X_val, y_val, class_names=["N", "Anormal"])
-    y_proba = model.predict(X_val, batch_size=1024, verbose=0)
+    eval_result = evaluate_fold(model, x_val, y_val, class_names=["N", "Anormal"])
+    y_proba = model.predict(x_val, batch_size=1024, verbose=0)
 
     from sklearn.metrics import roc_auc_score
     auc = roc_auc_score(y_val, y_proba[:, 1])
 
-    fold_dir = output_dir / f"fold_{fold_idx}"
+    fold_dir = OUTPUT_DIR / f"fold_{fold_idx}"
     fold_dir.mkdir(parents=True, exist_ok=True)
     model.save(str(fold_dir / "model.keras"), save_format="keras")
 
@@ -149,8 +163,7 @@ def main() -> int:
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %d features loaded", len(feature_names))
 
-    output_dir = Path("experiments/stage1_mlp_features_v2.1")
-    output_dir.mkdir(parents=True, exist_ok=True)
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     n_splits = 5
     gkf = GroupKFold(n_splits=n_splits)
@@ -158,12 +171,12 @@ def main() -> int:
 
     for fold_idx, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups)):
         LOGGER.info("=== Fold %d/%d ===", fold_idx + 1, n_splits)
-        X_train, X_val = X[train_idx], X[val_idx]
+        X_train, x_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
         class_weight = compute_class_weights(y_train)
         result = train_fold(
-            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir
+            X_train, y_train, x_val, y_val, class_weight, fold_idx
         )
         fold_results.append(result)
 
@@ -188,7 +201,7 @@ def main() -> int:
         },
     }
 
-    (output_dir / "summary.json").write_text(
+    (OUTPUT_DIR / "summary.json").write_text(
         json.dumps(summary, indent=2, ensure_ascii=False)
     )
 

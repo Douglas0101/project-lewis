@@ -20,6 +20,7 @@ from sklearn.utils.class_weight import compute_class_weight
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.data.npz_loader import load_feature_npz_and_parquet  # noqa: E402
 from src.models.backbone_1d import (  # noqa: E402
     build_backbone_1d,
     load_backbone_weights_from_pretrained,
@@ -46,22 +47,9 @@ def _load_features_raw(
 ) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Load raw features without pre-normalization."""
     LOGGER.info("Loading raw features from %s", feature_npz)
-    data = np.load(feature_npz, mmap_mode="r")
-    X_raw = data["X"]
-    if str(X_raw.dtype) != "float32":
-        X_raw = X_raw.astype(np.float32)
-    y = data["y"].astype(np.int64)
-    if X_raw.ndim == 2:
-        X_raw = X_raw[..., np.newaxis]
-
-    LOGGER.info("Loading metadata from %s", feature_parquet)
-    df = pd.read_parquet(feature_parquet)
-
-    if len(X_raw) != len(df) or len(y) != len(df):
-        raise ValueError(f"Mismatch: X={len(X_raw)}, y={len(y)}, df={len(df)}")
-
-    LOGGER.info("Loaded %d beats | X shape=%s", len(X_raw), X_raw.shape)
-    return X_raw, y, df
+    x_raw, y, df = load_feature_npz_and_parquet(feature_npz, feature_parquet)
+    LOGGER.info("Loaded %d beats | X shape=%s", len(x_raw), x_raw.shape)
+    return x_raw, y, df
 
 
 def _build_groups(df: pd.DataFrame) -> np.ndarray:
@@ -247,7 +235,7 @@ def main() -> int:
     optimize_thresholds = bool(cfg.get("threshold_tuning", {}).get("enabled", False))
 
     summary = train_group_kfold(
-        X=X,
+        x=X,
         y=y,
         groups=groups,
         n_splits=args.n_splits if args.n_splits is not None else cfg["group_kfold"]["n_splits"],

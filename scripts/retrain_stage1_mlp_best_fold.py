@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -19,18 +21,32 @@ from scripts.train_stage1_mlp import compute_class_weights, train_fold  # noqa: 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FEATURES_DIR = PROJECT_ROOT / "data" / "features"
+OUTPUT_DIR = PROJECT_ROOT / "experiments" / "stage1_mlp_features_v2.1"
+MODELS_DIR = PROJECT_ROOT / "models"
+
+
+_SAFE_NAME_RE = re.compile(r"^[A-Za-z0-9_\-\.]+$")
 
 
 def _resolve_scaler_path(scaler_path: str) -> Path:
     """Resolve scaler path and ensure it stays inside features dir."""
-    target = Path(scaler_path)
-    if not target.is_absolute():
-        target = FEATURES_DIR / target
+    filename = os.path.basename(scaler_path)
+    if (
+        not filename
+        or filename in (".", "..")
+        or os.path.sep in filename
+        or "/" in filename
+        or "\\" in filename
+        or not _SAFE_NAME_RE.match(filename)
+    ):
+        raise ValueError(f"Invalid scaler filename: {filename!r}")
+
+    target = FEATURES_DIR / filename
     resolved = target.resolve()
     try:
         resolved.relative_to(FEATURES_DIR.resolve())
     except ValueError as exc:
-        raise ValueError(f"Scaler path escapes features directory: {scaler_path}") from exc
+        raise ValueError(f"Scaler path escapes features directory: {filename!r}") from exc
     return resolved
 
 
@@ -55,28 +71,26 @@ def main() -> int:
     for fold_idx, (train_idx, val_idx) in enumerate(gkf.split(X, y, groups)):
         if fold_idx != best_fold:
             continue
-        X_train, X_val = X[train_idx], X[val_idx]
+        X_train, x_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
         class_weight = compute_class_weights(y_train)
-        output_dir = Path("experiments/stage1_mlp_features_v2.1")
         result = train_fold(
-            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir
+            X_train, y_train, x_val, y_val, class_weight, fold_idx
         )
         print(json.dumps(result, indent=2, ensure_ascii=False))
 
         # Copia melhor modelo e scaler para models/
-        models_dir = Path("models")
-        models_dir.mkdir(parents=True, exist_ok=True)
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
         shutil.copy(
-            output_dir / f"fold_{fold_idx}" / "model.keras",
-            models_dir / "stage1_mlp_features_v2.1.keras",
+            OUTPUT_DIR / f"fold_{fold_idx}" / "model.keras",
+            MODELS_DIR / "stage1_mlp_features_v2.1.keras",
         )
         shutil.copy(
             scaler_path,
-            models_dir / "input_scaler_stage1_mlp_features_v2.1.pkl",
+            MODELS_DIR / "input_scaler_stage1_mlp_features_v2.1.pkl",
         )
-        (models_dir / "stage1_mlp_features_v2.1.config.json").write_text(
+        (MODELS_DIR / "stage1_mlp_features_v2.1.config.json").write_text(
             json.dumps({"feature_names": feature_names}, indent=2, ensure_ascii=False)
         )
         print("Modelo e scaler salvos em models/")

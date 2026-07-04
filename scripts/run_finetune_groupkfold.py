@@ -25,8 +25,8 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.models.train import train_group_kfold
-from src.tracking.integrations import (
+from src.models.train import train_group_kfold  # noqa: E402
+from src.tracking.integrations import (  # noqa: E402
     finish_tracking_experiment,
     record_summary_metrics,
     start_tracking_experiment,
@@ -40,7 +40,9 @@ def _load_config(config_path: Path) -> dict:
         return yaml.safe_load(fh)
 
 
-def _load_features(feature_npz: Path, feature_parquet: Path) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+def _load_features(
+    feature_npz: Path, feature_parquet: Path
+) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     """Load segmented beats and metadata."""
     LOGGER.info("Loading features from %s", feature_npz)
     data = np.load(feature_npz)
@@ -156,7 +158,6 @@ def main() -> int:
     )
 
     cfg = _load_config(args.config)
-    model_cfg = cfg["model"]
     train_cfg = cfg["training"]
     ds_cfg = cfg["dataset"]
 
@@ -183,7 +184,7 @@ def main() -> int:
     )
 
     summary = train_group_kfold(
-        X=X,
+        x=X,
         y=y,
         groups=groups,
         backbone_weights=args.backbone,
@@ -191,7 +192,11 @@ def main() -> int:
         n_splits=args.n_splits if args.n_splits is not None else cfg["group_kfold"]["n_splits"],
         epochs=args.epochs if args.epochs is not None else train_cfg["epochs"],
         batch_size=args.batch_size if args.batch_size is not None else train_cfg["batch_size"],
-        learning_rate=args.learning_rate if args.learning_rate is not None else train_cfg["learning_rate"],
+        learning_rate=(
+            args.learning_rate
+            if args.learning_rate is not None
+            else train_cfg["learning_rate"]
+        ),
         seed=cfg["group_kfold"]["seed"],
         experiment_dir=experiment_dir,
         monitor=train_cfg["monitor"],

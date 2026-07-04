@@ -20,10 +20,13 @@ from sklearn.utils.class_weight import compute_class_weight
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.models.backbone_1d import build_backbone_1d, load_backbone_weights_from_pretrained
-from src.models.finetune_mitbih import SparseCategoricalFocalLoss
-from src.models.train import train_group_kfold
-from src.tracking.integrations import (
+from src.models.backbone_1d import (  # noqa: E402
+    build_backbone_1d,
+    load_backbone_weights_from_pretrained,
+)
+from src.models.finetune_mitbih import SparseCategoricalFocalLoss  # noqa: E402
+from src.models.train import train_group_kfold  # noqa: E402
+from src.tracking.integrations import (  # noqa: E402
     finish_tracking_experiment,
     record_summary_metrics,
     start_tracking_experiment,
@@ -37,7 +40,9 @@ def _load_config(config_path: Path) -> dict:
         return yaml.safe_load(fh)
 
 
-def _load_features(feature_npz: Path, feature_parquet: Path) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+def _load_features(
+    feature_npz: Path, feature_parquet: Path
+) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
     LOGGER.info("Loading features from %s", feature_npz)
     data = np.load(feature_npz)
     X = data["X"].astype(np.float32)
@@ -79,7 +84,9 @@ def _thresholds_from_config(qg_cfg: dict) -> Dict[str, Any]:
     }
 
 
-def _copy_best_fold(summary: Dict[str, Any], experiment_dir: Path, output_dir: Path, cfg: dict) -> None:
+def _copy_best_fold(
+    summary: Dict[str, Any], experiment_dir: Path, output_dir: Path, cfg: dict
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     best_fold = summary["best_fold"]
     best_fold_dir = experiment_dir / f"fold_{best_fold}"
@@ -235,7 +242,7 @@ def main() -> int:
     optimize_thresholds = bool(cfg.get("threshold_tuning", {}).get("enabled", False))
 
     summary = train_group_kfold(
-        X=X,
+        x=X,
         y=y,
         groups=groups,
         n_splits=args.n_splits if args.n_splits is not None else cfg["group_kfold"]["n_splits"],

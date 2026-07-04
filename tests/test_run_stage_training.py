@@ -90,7 +90,7 @@ def _run_stage_script(script_module: str, extra_argv: list[str]):
     summary = _make_summary()
 
     load_features_module = (
-        "scripts.run_stage1_training._load_features"
+        "scripts.run_stage1_training._load_features_raw"
         if script_module == "stage1"
         else "scripts.run_stage2_training._load_features"
     )

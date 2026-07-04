@@ -114,7 +114,7 @@ def _run_stage_script_with_instrumentation(stage: str):
     summary = _make_summary()
 
     load_features_module = (
-        "scripts.run_stage1_training._load_features"
+        "scripts.run_stage1_training._load_features_raw"
         if stage == "stage1"
         else "scripts.run_stage2_training._load_features"
     )
@@ -160,9 +160,10 @@ class TestFinetuneMitbihExtraCallbacks:
         """Callbacks extras devem aparecer na lista passada para ``model.fit``."""
         from src.models.finetune_mitbih import finetune_mitbih
 
-        X_train = np.random.randn(16, 500, 1).astype(np.float32)
+        rng = np.random.default_rng(42)
+        x_train = rng.standard_normal((16, 500, 1)).astype(np.float32)
         y_train = np.array([0] * 8 + [1] * 8, dtype=np.int64)
-        X_val = np.random.randn(8, 500, 1).astype(np.float32)
+        x_val = rng.standard_normal((8, 500, 1)).astype(np.float32)
         y_val = np.array([0] * 4 + [1] * 4, dtype=np.int64)
 
         mock_model = MagicMock()
@@ -177,15 +178,15 @@ class TestFinetuneMitbihExtraCallbacks:
         )
 
         extra_callback = GradientMonitor(
-            val_data=X_val, val_labels=y_val, log_path=str(tmp_path / "grad.json")
+            val_data=x_val, val_labels=y_val, log_path=str(tmp_path / "grad.json")
         )
 
         with patch("src.models.finetune_mitbih.save_model_config"):
             finetune_mitbih(
                 model=mock_model,
-                X_train=X_train,
+                X_train=x_train,
                 y_train=y_train,
-                X_val=X_val,
+                X_val=x_val,
                 y_val=y_val,
                 epochs=1,
                 batch_size=8,
@@ -200,9 +201,10 @@ class TestFinetuneMitbihExtraCallbacks:
         """Sem callbacks extras, apenas os callbacks padrão devem ser usados."""
         from src.models.finetune_mitbih import finetune_mitbih
 
-        X_train = np.random.randn(16, 500, 1).astype(np.float32)
+        rng = np.random.default_rng(42)
+        x_train = rng.standard_normal((16, 500, 1)).astype(np.float32)
         y_train = np.array([0] * 8 + [1] * 8, dtype=np.int64)
-        X_val = np.random.randn(8, 500, 1).astype(np.float32)
+        x_val = rng.standard_normal((8, 500, 1)).astype(np.float32)
         y_val = np.array([0] * 4 + [1] * 4, dtype=np.int64)
 
         mock_model = MagicMock()
@@ -219,9 +221,9 @@ class TestFinetuneMitbihExtraCallbacks:
         with patch("src.models.finetune_mitbih.save_model_config"):
             finetune_mitbih(
                 model=mock_model,
-                X_train=X_train,
+                X_train=x_train,
                 y_train=y_train,
-                X_val=X_val,
+                X_val=x_val,
                 y_val=y_val,
                 epochs=1,
                 batch_size=8,
@@ -269,7 +271,7 @@ class TestTrainGroupKfoldInstrumentation:
             }
 
             train_group_kfold(
-                X=X,
+                x=X,
                 y=y,
                 groups=groups,
                 n_splits=2,
@@ -321,7 +323,7 @@ class TestTrainGroupKfoldInstrumentation:
             }
 
             train_group_kfold(
-                X=X,
+                x=X,
                 y=y,
                 groups=groups,
                 n_splits=2,
@@ -359,7 +361,7 @@ class TestTrainGroupKfoldInstrumentation:
             }
 
             train_group_kfold(
-                X=X,
+                x=X,
                 y=y,
                 groups=groups,
                 n_splits=2,
@@ -400,7 +402,7 @@ class TestStageScriptsInstrumentation:
 
         with (
             patch("yaml.safe_load", return_value=cfg),
-            patch("scripts.run_stage1_training._load_features", return_value=(X, y, df)),
+            patch("scripts.run_stage1_training._load_features_raw", return_value=(X, y, df)),
             patch(
                 "scripts.run_stage1_training.train_group_kfold", return_value=summary
             ) as mock_train,

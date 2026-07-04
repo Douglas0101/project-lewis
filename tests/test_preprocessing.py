@@ -162,14 +162,14 @@ class TestPreprocessorNormalize:
 
     def test_zscore_mean_zero(self, dlq_path):
         pre = self._per_record_pre(dlq_path)
-        x = rng.standard_normal(500) + 3.0  # mean = 3
+        x = rng.standard_normal(500) + 3.0
         y = pre.normalize(x)
 
         assert abs(float(np.mean(y))) < 1e-6, f"Mean after z-score = {np.mean(y):.6f}"
 
     def test_zscore_std_one(self, dlq_path):
         pre = self._per_record_pre(dlq_path)
-        x = rng.standard_normal(500) * 2.0  # std = 2
+        x = rng.standard_normal(500) * 2.0
         y = pre.normalize(x)
 
         assert abs(float(np.std(y)) - 1.0) < 1e-4, f"Std after z-score = {np.std(y):.6f}"
@@ -186,8 +186,9 @@ class TestPreprocessorNormalize:
     def test_zscore_requires_global_stats(self, dlq_path):
         """QG1.7: normalize() must raise when per_record=False and stats are missing."""
         pre = ECGPreprocessor(dlq_path=dlq_path)
+        x = rng.standard_normal(500)
         with pytest.raises(ValueError, match="Estatísticas globais não definidas"):
-            pre.normalize(rng.standard_normal(500))
+            pre.normalize(x)
 
 
 @pytest.mark.qg1
@@ -260,13 +261,15 @@ class TestPreprocessorProcess:
     def test_process_requires_global_stats(self, dlq_path):
         """QG1.7: process() must raise when per_record=False and stats are missing."""
         pre = ECGPreprocessor(dlq_path=dlq_path)
+        x = rng.standard_normal(500)
+        raw_path = Path("data/raw_mitbih/test_no_stats")
         with pytest.raises(ValueError, match="Estatísticas globais não definidas"):
             pre.process(
-                rng.standard_normal(500),
+                x,
                 record_id="test_no_stats",
                 dataset="mitdb",
                 fs_orig=500.0,
-                raw_path=Path("data/raw_mitbih/test_no_stats"),
+                raw_path=raw_path,
                 lead_name="MLII",
             )
 
