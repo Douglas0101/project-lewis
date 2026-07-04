@@ -20,10 +20,14 @@ from sklearn.utils.class_weight import compute_class_weight
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.models.backbone_1d import build_backbone_1d, load_backbone_weights_from_pretrained
-from src.models.finetune_mitbih import SparseCategoricalFocalLoss
-from src.models.train import train_group_kfold
-from src.tracking.integrations import (
+from src.data.global_stats import GlobalStatsHelper  # noqa: F401,E402
+from src.models.backbone_1d import (  # noqa: E402
+    build_backbone_1d,
+    load_backbone_weights_from_pretrained,
+)
+from src.models.finetune_mitbih import SparseCategoricalFocalLoss  # noqa: E402
+from src.models.train import train_group_kfold  # noqa: E402
+from src.tracking.integrations import (  # noqa: E402
     finish_tracking_experiment,
     record_summary_metrics,
     start_tracking_experiment,
@@ -37,22 +41,40 @@ def _load_config(config_path: Path) -> dict:
         return yaml.safe_load(fh)
 
 
-def _load_features(feature_npz: Path, feature_parquet: Path) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
-    LOGGER.info("Loading features from %s", feature_npz)
-    data = np.load(feature_npz)
-    X = data["X"].astype(np.float32)
+def _clear_cache(feature_npz: Path) -> None:
+    """Remove stale normalization caches for the given feature npz."""
+    cache_dir = feature_npz.parent / ".cache"
+    patterns = [
+        cache_dir / f"{feature_npz.stem}_zscore_float16.dat",
+    ]
+    for p in patterns:
+        if p.exists():
+            p.unlink()
+            LOGGER.info("Removed stale cache: %s", p)
+
+
+def _load_features_raw(
+    feature_npz: Path,
+    feature_parquet: Path,
+) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+    """Load raw features without pre-normalization."""
+    LOGGER.info("Loading raw features from %s", feature_npz)
+    data = np.load(feature_npz, mmap_mode="r")
+    X_raw = data["X"]
+    if str(X_raw.dtype) != "float32":
+        X_raw = X_raw.astype(np.float32)
     y = data["y"].astype(np.int64)
-    if X.ndim == 2:
-        X = X[..., np.newaxis]
+    if X_raw.ndim == 2:
+        X_raw = X_raw[..., np.newaxis]
 
     LOGGER.info("Loading metadata from %s", feature_parquet)
     df = pd.read_parquet(feature_parquet)
 
-    if len(X) != len(df) or len(y) != len(df):
-        raise ValueError(f"Mismatch: X={len(X)}, y={len(y)}, df={len(df)}")
+    if len(X_raw) != len(df) or len(y) != len(df):
+        raise ValueError(f"Mismatch: X={len(X_raw)}, y={len(y)}, df={len(df)}")
 
-    LOGGER.info("Loaded %d beats | X shape=%s | classes=%d", len(X), X.shape, len(np.unique(y)))
-    return X, y, df
+    LOGGER.info("Loaded %d beats | X shape=%s", len(X_raw), X_raw.shape)
+    return X_raw, y, df
 
 
 def _build_groups(df: pd.DataFrame) -> np.ndarray:
@@ -80,7 +102,12 @@ def _thresholds_from_config(qg_cfg: dict) -> Dict[str, Any]:
     }
 
 
-def _copy_best_fold(summary: Dict[str, Any], experiment_dir: Path, output_dir: Path, cfg: dict) -> None:
+def _copy_best_fold(
+    summary: Dict[str, Any],
+    experiment_dir: Path,
+    output_dir: Path,
+    cfg: dict,
+) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
     best_fold = summary["best_fold"]
     best_fold_dir = experiment_dir / f"fold_{best_fold}"
@@ -113,9 +140,7 @@ def _copy_best_fold(summary: Dict[str, Any], experiment_dir: Path, output_dir: P
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Treinamento Estágio 1 — N vs Anormal"
-    )
+    parser = argparse.ArgumentParser(description="Treinamento Estágio 1 — N vs Anormal")
     parser.add_argument(
         "--config",
         type=Path,
@@ -151,6 +176,11 @@ def main() -> int:
         action="store_true",
         help="Congelar camadas convolucionais do backbone pré-treinado",
     )
+    parser.add_argument(
+        "--force-rebuild",
+        action="store_true",
+        help="Delete existing .dat/.npz caches and recompute normalization from scratch.",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -163,7 +193,10 @@ def main() -> int:
     ds_cfg = cfg["dataset"]
     qg_cfg = cfg["quality_gate"]["qg5_stage1"]
 
-    X, y, df = _load_features(
+    if args.force_rebuild:
+        _clear_cache(PROJECT_ROOT / ds_cfg["feature_npz"])
+
+    X, y, df = _load_features_raw(
         feature_npz=PROJECT_ROOT / ds_cfg["feature_npz"],
         feature_parquet=PROJECT_ROOT / ds_cfg["feature_parquet"],
     )
@@ -176,8 +209,10 @@ def main() -> int:
         description="Treinamento Estágio 1 (N vs Anormal) v2.0",
     )
 
-    experiment_dir = PROJECT_ROOT / "experiments" / datetime.now(timezone.utc).strftime(
-        "%Y%m%d_%H%M%S_stage1_v2.0"
+    experiment_dir = (
+        PROJECT_ROOT
+        / "experiments"
+        / datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S_stage1_v2.0")
     )
 
     thresholds = _thresholds_from_config(qg_cfg)
@@ -255,6 +290,7 @@ def main() -> int:
         tracking_experiment_id=tracking_experiment_id,
         tracking_stage_label="stage1",
         instrumentation_config=cfg.get("instrumentation"),
+        normalize=True,
     )
 
     LOGGER.info(
