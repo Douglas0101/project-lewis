@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -15,7 +16,14 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from scripts.train_stage1_mlp import build_mlp, compute_class_weights, train_fold
+from scripts.train_stage1_mlp import (
+    build_mlp,
+    compute_class_weights,
+    train_fold,
+    _resolve_output_dir,
+)
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def main() -> int:
@@ -38,7 +46,7 @@ def main() -> int:
         X_val = scaler.transform(X_val)
 
         class_weight = compute_class_weights(y_train)
-        output_dir = Path("experiments/stage1_mlp_features_v2.1")
+        output_dir = _resolve_output_dir("experiments/stage1_mlp_features_v2.1")
         result = train_fold(
             X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir,
             scaler=scaler,
@@ -46,7 +54,7 @@ def main() -> int:
         print(json.dumps(result, indent=2, ensure_ascii=False))
 
         # Copia melhor modelo e scaler para models/
-        models_dir = Path("models")
+        models_dir = _resolve_output_dir("models")
         models_dir.mkdir(parents=True, exist_ok=True)
         shutil.copy(
             output_dir / f"fold_{fold_idx}" / "model.keras",

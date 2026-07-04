@@ -2,27 +2,30 @@
 
 from __future__ import annotations
 
-import argparse
-import json
 import logging
-import shutil
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
-import yaml
 from sklearn.utils.class_weight import compute_class_weight
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.models.backbone_1d import build_backbone_1d, load_backbone_weights_from_pretrained
-from src.models.finetune_mitbih import SparseCategoricalFocalLoss
 from src.models.train import train_group_kfold
+from src.models.training_common import (
+    build_base_arg_parser,
+    build_groups as _build_groups,
+    copy_best_fold_artifacts,
+    load_config as _load_config,
+    load_features as _load_features,
+    resolve_loss,
+    write_lineage,
+)
 from src.tracking.integrations import (
     finish_tracking_experiment,
     record_summary_metrics,
@@ -30,37 +33,6 @@ from src.tracking.integrations import (
 )
 
 LOGGER = logging.getLogger("lewis.camada04.run_stage1")
-
-
-def _load_config(config_path: Path) -> dict:
-    with config_path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
-
-
-def _load_features(feature_npz: Path, feature_parquet: Path) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
-    LOGGER.info("Loading features from %s", feature_npz)
-    data = np.load(feature_npz)
-    X = data["X"].astype(np.float32)
-    y = data["y"].astype(np.int64)
-    if X.ndim == 2:
-        X = X[..., np.newaxis]
-
-    LOGGER.info("Loading metadata from %s", feature_parquet)
-    df = pd.read_parquet(feature_parquet)
-
-    if len(X) != len(df) or len(y) != len(df):
-        raise ValueError(f"Mismatch: X={len(X)}, y={len(y)}, df={len(df)}")
-
-    LOGGER.info("Loaded %d beats | X shape=%s | classes=%d", len(X), X.shape, len(np.unique(y)))
-    return X, y, df
-
-
-def _build_groups(df: pd.DataFrame) -> np.ndarray:
-    unique_records = df["record_id"].unique()
-    record_to_group = {rec: idx for idx, rec in enumerate(unique_records)}
-    groups = df["record_id"].map(record_to_group).to_numpy(dtype=np.int64)
-    LOGGER.info("Built groups | n_patients=%d", len(unique_records))
-    return groups
 
 
 def _thresholds_from_config(qg_cfg: dict) -> Dict[str, Any]:
@@ -81,75 +53,18 @@ def _thresholds_from_config(qg_cfg: dict) -> Dict[str, Any]:
 
 
 def _copy_best_fold(summary: Dict[str, Any], experiment_dir: Path, output_dir: Path, cfg: dict) -> None:
-    output_dir.mkdir(parents=True, exist_ok=True)
-    best_fold = summary["best_fold"]
-    best_fold_dir = experiment_dir / f"fold_{best_fold}"
-
-    src_model = best_fold_dir / "model.keras"
-    src_scaler = best_fold_dir / "input_scaler.pkl"
-    src_threshold = best_fold_dir / "best_weights.weights.threshold.json"
-
-    dst_model = output_dir / cfg["output"]["model_filename"]
-    dst_scaler = output_dir / cfg["output"]["scaler_filename"]
-    dst_threshold = output_dir / "stage1_threshold.json"
-
-    if src_model.exists():
-        shutil.copy(str(src_model), str(dst_model))
-        LOGGER.info("Best model copied to %s", dst_model)
-    else:
-        LOGGER.error("Best model not found at %s", src_model)
-
-    if src_scaler.exists():
-        shutil.copy(str(src_scaler), str(dst_scaler))
-        LOGGER.info("Best scaler copied to %s", dst_scaler)
-    else:
-        LOGGER.error("Best scaler not found at %s", src_scaler)
-
-    if src_threshold.exists():
-        shutil.copy(str(src_threshold), str(dst_threshold))
-        LOGGER.info("Best threshold copied to %s", dst_threshold)
-    else:
-        LOGGER.warning("Threshold file not found at %s", src_threshold)
+    artifact_map = {
+        "model.keras": output_dir / cfg["output"]["model_filename"],
+        "input_scaler.pkl": output_dir / cfg["output"]["scaler_filename"],
+        "best_weights.weights.threshold.json": output_dir / "stage1_threshold.json",
+    }
+    copy_best_fold_artifacts(summary, experiment_dir, output_dir, artifact_map)
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Treinamento Estágio 1 — N vs Anormal"
-    )
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=PROJECT_ROOT / "config" / "stage1_binary.yaml",
-        help="Caminho para config/stage1_binary.yaml",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=PROJECT_ROOT / "models",
-        help="Diretório para salvar modelo final",
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=None,
-        help="Sobrescrever número de épocas",
-    )
-    parser.add_argument(
-        "--n-splits",
-        type=int,
-        default=None,
-        help="Sobrescrever número de folds",
-    )
-    parser.add_argument(
-        "--pretrained",
-        type=Path,
-        default=PROJECT_ROOT / "models" / "finetuned_float32_v1.1.keras",
-        help="Modelo pré-treinado para inicializar o backbone (ex.: v1.1)",
-    )
-    parser.add_argument(
-        "--freeze-backbone",
-        action="store_true",
-        help="Congelar camadas convolucionais do backbone pré-treinado",
+    parser = build_base_arg_parser(
+        description="Treinamento Estágio 1 — N vs Anormal",
+        default_config=PROJECT_ROOT / "config" / "stage1_binary.yaml",
     )
     args = parser.parse_args()
 
@@ -214,21 +129,7 @@ def main() -> int:
         return model
 
     selection_metric = train_cfg.get("selection_metric", "F1_macro")
-
-    # Configuração de loss (crossentropy ou focal loss)
-    loss_cfg = train_cfg.get("loss", "sparse_categorical_crossentropy")
-    if loss_cfg == "sparse_categorical_crossentropy":
-        loss = "sparse_categorical_crossentropy"
-    elif loss_cfg == "focal_loss":
-        gamma = float(train_cfg.get("focal_gamma", 2.0))
-        alpha = train_cfg.get("focal_alpha")
-        if alpha is not None:
-            alpha = np.array(alpha, dtype=np.float32)
-        loss = SparseCategoricalFocalLoss(gamma=gamma, alpha=alpha)
-        LOGGER.info("Using focal loss | gamma=%.2f | alpha=%s", gamma, alpha)
-    else:
-        raise ValueError(f"Unsupported loss: {loss_cfg}")
-
+    loss = resolve_loss(train_cfg)
     augment_config = cfg.get("augmentation")
     optimize_thresholds = bool(cfg.get("threshold_tuning", {}).get("enabled", False))
 
@@ -285,15 +186,8 @@ def main() -> int:
         "class_names": class_names,
         "thresholds": thresholds,
         "config": str(args.config),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    lineage_dir = PROJECT_ROOT / "data" / "lineage" / "models"
-    lineage_dir.mkdir(parents=True, exist_ok=True)
-    model_name = Path(cfg["output"]["model_filename"]).stem
-    lineage_path = lineage_dir / f"{model_name}.json"
-    with lineage_path.open("w", encoding="utf-8") as fh:
-        json.dump(lineage, fh, indent=2, ensure_ascii=False)
-    LOGGER.info("Lineage saved to %s", lineage_path)
+    write_lineage(lineage, cfg["output"]["model_filename"])
 
     _copy_best_fold(summary, experiment_dir, args.output_dir, cfg)
 

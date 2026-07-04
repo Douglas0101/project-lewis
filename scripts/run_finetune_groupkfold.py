@@ -8,8 +8,6 @@ Usage:
 
 from __future__ import annotations
 
-import argparse
-import json
 import logging
 import shutil
 import sys
@@ -18,14 +16,19 @@ from pathlib import Path
 from typing import Any, Dict
 
 import numpy as np
-import pandas as pd
-import yaml
 
 # Add project root to path
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from src.models.train import train_group_kfold
+from src.models.training_common import (
+    build_base_arg_parser,
+    build_groups as _build_groups,
+    load_config as _load_config,
+    load_features as _load_features,
+    write_lineage,
+)
 from src.tracking.integrations import (
     finish_tracking_experiment,
     record_summary_metrics,
@@ -33,47 +36,6 @@ from src.tracking.integrations import (
 )
 
 LOGGER = logging.getLogger("lewis.camada04.run_finetune")
-
-
-def _load_config(config_path: Path) -> dict:
-    with config_path.open("r", encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
-
-
-def _load_features(feature_npz: Path, feature_parquet: Path) -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
-    """Load segmented beats and metadata."""
-    LOGGER.info("Loading features from %s", feature_npz)
-    data = np.load(feature_npz)
-    X = data["X"].astype(np.float32)
-    y = data["y"].astype(np.int64)
-
-    # Adicionar dimensão de canal: (n, 500) -> (n, 500, 1)
-    if X.ndim == 2:
-        X = X[..., np.newaxis]
-
-    LOGGER.info("Loading metadata from %s", feature_parquet)
-    df = pd.read_parquet(feature_parquet)
-
-    if len(X) != len(df) or len(y) != len(df):
-        raise ValueError(
-            f"Mismatch: X={len(X)}, y={len(y)}, df={len(df)}"
-        )
-
-    LOGGER.info("Loaded %d beats | X shape=%s | classes=%d", len(X), X.shape, len(np.unique(y)))
-    return X, y, df
-
-
-def _build_groups(df: pd.DataFrame) -> np.ndarray:
-    """Build group array from record_id for GroupKFold.
-
-    Each unique record_id is a distinct patient/recording. Never mix beats
-    from the same record between train and test.
-    """
-    unique_records = df["record_id"].unique()
-    record_to_group = {rec: idx for idx, rec in enumerate(unique_records)}
-    groups = df["record_id"].map(record_to_group).to_numpy(dtype=np.int64)
-    LOGGER.info("Built groups | n_patients=%d", len(unique_records))
-    return groups
 
 
 def _copy_best_fold(summary: Dict[str, Any], experiment_dir: Path, output_dir: Path) -> None:
@@ -103,50 +65,17 @@ def _copy_best_fold(summary: Dict[str, Any], experiment_dir: Path, output_dir: P
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Fine-tuning Project-Lewis em MIT-BIH+ com GroupKFold por paciente"
-    )
-    parser.add_argument(
-        "--config",
-        type=Path,
-        default=PROJECT_ROOT / "config" / "finetune_v1.0.yaml",
-        help="Caminho para config/finetune_v*.yaml",
+    parser = build_base_arg_parser(
+        description="Fine-tuning Project-Lewis em MIT-BIH+ com GroupKFold por paciente",
+        default_config=PROJECT_ROOT / "config" / "finetune_v1.0.yaml",
+        include_pretrained=False,
+        include_batch_size_lr=True,
     )
     parser.add_argument(
         "--backbone",
         type=Path,
         default=None,
         help="Caminho para backbone pré-treinado (.keras). Se omitido, treina do zero.",
-    )
-    parser.add_argument(
-        "--output-dir",
-        type=Path,
-        default=PROJECT_ROOT / "models",
-        help="Diretório para salvar modelo final",
-    )
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=None,
-        help="Sobrescrever número de épocas do config",
-    )
-    parser.add_argument(
-        "--n-splits",
-        type=int,
-        default=None,
-        help="Sobrescrever número de folds do config",
-    )
-    parser.add_argument(
-        "--batch-size",
-        type=int,
-        default=None,
-        help="Sobrescrever batch size do config",
-    )
-    parser.add_argument(
-        "--learning-rate",
-        type=float,
-        default=None,
-        help="Sobrescrever learning rate do config",
     )
     args = parser.parse_args()
 
@@ -225,15 +154,8 @@ def main() -> int:
         "std_metrics": summary["std_metrics"],
         "passes_qg5": summary["passes_qg5"],
         "config": str(args.config),
-        "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    lineage_dir = PROJECT_ROOT / "data" / "lineage" / "models"
-    lineage_dir.mkdir(parents=True, exist_ok=True)
-    model_name = Path(cfg["output"]["model_filename"]).stem
-    lineage_path = lineage_dir / f"{model_name}.json"
-    with lineage_path.open("w", encoding="utf-8") as fh:
-        json.dump(lineage, fh, indent=2, ensure_ascii=False)
-    LOGGER.info("Lineage saved to %s", lineage_path)
+    write_lineage(lineage, cfg["output"]["model_filename"])
 
     _copy_best_fold(summary, experiment_dir, args.output_dir)
 
