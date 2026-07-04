@@ -3,32 +3,29 @@ import pandas as pd
 from src.features.scaler_utils import fit_feature_scaler_on_train, scale_features
 
 
-def test_prepare_stage1_features_scaler_logic():
-    rng = np.random.default_rng(42)
-    n = 50
+def _make_synthetic_feature_data(
+    n: int = 50,
+    feature_cols: list[str] | None = None,
+    seed: int = 42,
+) -> tuple[pd.DataFrame, np.ndarray, np.ndarray]:
+    """Create synthetic feature DataFrame, feature matrix, and groups."""
+    rng = np.random.default_rng(seed)
+    if feature_cols is None:
+        feature_cols = [
+            "rr_prev", "rr_next", "rr_ratio", "rr_local_mean", "rr_local_std",
+            "rmssd", "heart_rate", "r_amplitude", "q_depth", "t_amplitude",
+            "qrs_width_ms", "qrs_area", "st_slope_mV_s",
+        ]
     records = [f"r{i % 10}" for i in range(n)]
-    feature_cols = [
-        "rr_prev",
-        "rr_next",
-        "rr_ratio",
-        "rr_local_mean",
-        "rr_local_std",
-        "rmssd",
-        "heart_rate",
-        "r_amplitude",
-        "q_depth",
-        "t_amplitude",
-        "qrs_width_ms",
-        "qrs_area",
-        "st_slope_mV_s",
-    ]
-    df = pd.DataFrame(
-        rng.random((n, len(feature_cols))).astype(np.float32),
-        columns=feature_cols,
-    )
+    df = pd.DataFrame(rng.random((n, len(feature_cols))).astype(np.float32), columns=feature_cols)
     df["record_id"] = records
     groups = np.array([int(r[1:]) for r in records])
     x = df[feature_cols].values.astype(np.float32)
+    return df, x, groups
+
+
+def test_prepare_stage1_features_scaler_logic():
+    _, x, groups = _make_synthetic_feature_data()
 
     scaler, train_idx, _ = fit_feature_scaler_on_train(x, groups, n_splits=5)
     x_scaled = scale_features(x, scaler)
@@ -43,31 +40,7 @@ def test_prepare_stage1_features_scaler_logic():
 def test_scaler_roundtrip(tmp_path):
     import joblib
 
-    rng = np.random.default_rng(42)
-    n = 50
-    records = [f"r{i % 10}" for i in range(n)]
-    feature_cols = [
-        "rr_prev",
-        "rr_next",
-        "rr_ratio",
-        "rr_local_mean",
-        "rr_local_std",
-        "rmssd",
-        "heart_rate",
-        "r_amplitude",
-        "q_depth",
-        "t_amplitude",
-        "qrs_width_ms",
-        "qrs_area",
-        "st_slope_mV_s",
-    ]
-    df = pd.DataFrame(
-        rng.random((n, len(feature_cols))).astype(np.float32),
-        columns=feature_cols,
-    )
-    df["record_id"] = records
-    groups = np.array([int(r[1:]) for r in records])
-    x = df[feature_cols].values.astype(np.float32)
+    _, x, groups = _make_synthetic_feature_data()
 
     scaler, _, _ = fit_feature_scaler_on_train(x, groups, n_splits=5)
     x_scaled = scale_features(x, scaler)
@@ -79,17 +52,8 @@ def test_scaler_roundtrip(tmp_path):
 
 
 def test_median_imputation_uses_train_only():
-    rng = np.random.default_rng(42)
-    n = 50
-    records = [f"r{i % 10}" for i in range(n)]
     feature_cols = ["rr_prev", "qrs_width_ms"]
-    df = pd.DataFrame(
-        rng.random((n, len(feature_cols))).astype(np.float32),
-        columns=feature_cols,
-    )
-    df["record_id"] = records
-    groups = np.array([int(r[1:]) for r in records])
-    x = df[feature_cols].values.astype(np.float32)
+    _, x, groups = _make_synthetic_feature_data(feature_cols=feature_cols)
     x[0, 0] = np.nan  # introduce NaN in a validation sample
 
     scaler, train_idx, _ = fit_feature_scaler_on_train(x, groups, n_splits=5)
