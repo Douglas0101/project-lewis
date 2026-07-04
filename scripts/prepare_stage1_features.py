@@ -7,6 +7,7 @@ um formato NPZ adequado para treinamento de MLP.
 
 from __future__ import annotations
 
+import json
 import logging
 import sys
 from pathlib import Path
@@ -72,19 +73,22 @@ def main() -> int:
 
     # Verifica NaN/Inf nas features
     features_df = df[FEATURE_COLUMNS].copy()
-    n_nan = features_df.isna().sum().sum()
-    if n_nan > 0:
-        LOGGER.warning("%d valores NaN encontrados; preenchendo com mediana", n_nan)
-        for col in FEATURE_COLUMNS:
-            median = features_df[col].median()
-            features_df[col] = features_df[col].fillna(median)
-
     X_features = features_df.values.astype(np.float32)
 
     # Normaliza features com StandardScaler ajustado apenas no primeiro fold de treino.
     from src.features.scaler_utils import fit_feature_scaler_on_train, scale_features
 
-    scaler, _, _ = fit_feature_scaler_on_train(X_features, groups, n_splits=5, seed=42)
+    scaler, train_idx, _ = fit_feature_scaler_on_train(X_features, groups, n_splits=5)
+
+    # Imputa NaNs usando medianas apenas do conjunto de treino.
+    n_nan = features_df.isna().sum().sum()
+    if n_nan > 0:
+        LOGGER.warning("%d valores NaN encontrados; preenchendo com mediana do treino", n_nan)
+        for col in FEATURE_COLUMNS:
+            median = features_df[col].iloc[train_idx].median()
+            features_df[col] = features_df[col].fillna(median)
+        X_features = features_df.values.astype(np.float32)
+
     X_features_scaled = scale_features(X_features, scaler)
 
     scaler_path.parent.mkdir(parents=True, exist_ok=True)
@@ -109,8 +113,6 @@ def main() -> int:
         groups=group_ids,
     )
     # Salva nomes das features e mapeamento de grupos em JSON.
-    import json
-
     (output_path.parent / "stage1_binary_features.json").write_text(
         json.dumps(
             {

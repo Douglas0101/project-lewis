@@ -11,9 +11,12 @@ def fit_feature_scaler_on_train(
     X: np.ndarray,
     groups: np.ndarray,
     n_splits: int = 5,
-    seed: int = 42,
 ) -> Tuple[StandardScaler, np.ndarray, np.ndarray]:
-    """Fit StandardScaler on the first training fold and return train/val indices."""
+    """Fit StandardScaler on the first training fold and return train/val indices.
+
+    GroupKFold is deterministic for a given ordering of samples and groups, so no
+    random seed is required.
+    """
     gkf = GroupKFold(n_splits=n_splits)
     splits = list(gkf.split(X, groups=groups))
     train_idx, val_idx = splits[0]
