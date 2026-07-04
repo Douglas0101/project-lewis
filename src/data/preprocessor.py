@@ -179,8 +179,7 @@ class ECGPreprocessor:
         self._global_std: Optional[float] = None
 
         LOGGER.info(
-            "ECGPreprocessor inicializado | config=%s | fs=%.1f | "
-            "band=[%.2f, %.2f] | order=%d | clip=%s",
+            "ECGPreprocessor inicializado | config=%s | fs=%.1f | band=[%.2f, %.2f] | order=%d | clip=%s",  # noqa: E501
             self.config_version,
             self.fs,
             self.lowcut,
@@ -261,9 +260,7 @@ class ECGPreprocessor:
 
         if self._global_mean is None or self._global_std is None:
             raise ValueError(
-                "Estatísticas globais não definidas. "
-                "Chame set_global_stats(mean, std) antes da normalização "
-                "quando normalization.per_record=False."
+                "Estatísticas globais não definidas. Chame set_global_stats(mean, std) antes da normalização quando normalization.per_record=False."  # noqa: E501
             )
 
         return (x - self._global_mean) / (self._global_std + self.eps)
@@ -298,7 +295,7 @@ class ECGPreprocessor:
 
     @staticmethod
     def compute_global_stats(
-        X: np.ndarray,
+        x: np.ndarray,
         clip_limits: Tuple[float, float] = (-5.0, 5.0),
         chunk_size: int = 8192,
         eps: float = 1.0e-12,
@@ -316,7 +313,7 @@ class ECGPreprocessor:
 
         Parameters
         ----------
-        X : np.ndarray
+        x : np.ndarray
             Array 1-D, 2-D ou 3-D. 1-D é tratado como uma única amostra de
             1 canal; 2-D como ``(amostras, sequência)`` com 1 canal; 3-D como
             ``(amostras, sequência, canais)``.
@@ -332,16 +329,16 @@ class ECGPreprocessor:
         tuple
             ``(mean, std)`` como escalares float32 (canal 0).
         """
-        if X.ndim == 1:
-            X = X.reshape(1, -1, 1)
-        elif X.ndim == 2:
-            X = X.reshape(X.shape[0], X.shape[1], 1)
-        elif X.ndim != 3:
+        if x.ndim == 1:
+            x = x.reshape(1, -1, 1)
+        elif x.ndim == 2:
+            x = x.reshape(x.shape[0], x.shape[1], 1)
+        elif x.ndim != 3:
             raise ValueError(
-                f"compute_global_stats espera array 1-D, 2-D ou 3-D; " f"recebeu ndim={X.ndim}"
+                f"compute_global_stats espera array 1-D, 2-D ou 3-D; recebeu ndim={x.ndim}"
             )
 
-        n_samples, seq_len, n_channels = X.shape
+        n_samples, _, n_channels = x.shape
         if n_channels != 1:
             raise ValueError(f"compute_global_stats suporta apenas 1 canal; recebeu {n_channels}")
         lo, hi = clip_limits
@@ -351,7 +348,7 @@ class ECGPreprocessor:
         count = 0
         for start in range(0, n_samples, chunk_size):
             end = min(start + chunk_size, n_samples)
-            chunk = X[start:end].astype(np.float64, copy=False)
+            chunk = x[start:end].astype(np.float64, copy=False)
             chunk = np.clip(chunk, lo, hi)
             if not np.isfinite(chunk).all():
                 raise ValueError("Input contains NaN or Inf after clipping")
@@ -364,7 +361,7 @@ class ECGPreprocessor:
         sq_diff_sum = np.zeros(n_channels, dtype=np.float64)
         for start in range(0, n_samples, chunk_size):
             end = min(start + chunk_size, n_samples)
-            chunk = X[start:end].astype(np.float64, copy=False)
+            chunk = x[start:end].astype(np.float64, copy=False)
             chunk = np.clip(chunk, lo, hi)
             if not np.isfinite(chunk).all():
                 raise ValueError("Input contains NaN or Inf after clipping")
@@ -537,9 +534,7 @@ class ECGPreprocessor:
             # Validação prévia: estatísticas globais obrigatórias quando per_record=False
             if not self.per_record and (self._global_mean is None or self._global_std is None):
                 raise ValueError(
-                    "Estatísticas globais não definidas. "
-                    "Chame set_global_stats(mean, std) antes de process() "
-                    "quando normalization.per_record=False."
+                    "Estatísticas globais não definidas. Chame set_global_stats(mean, std) antes de process() quando normalization.per_record=False."  # noqa: E501
                 )
 
             # Step 1: Resample

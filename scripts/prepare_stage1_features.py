@@ -73,12 +73,12 @@ def main() -> int:
 
     # Verifica NaN/Inf nas features
     features_df = df[FEATURE_COLUMNS].copy()
-    X_features = features_df.values.astype(np.float32)
+    x_features = features_df.values.astype(np.float32)
 
     # Normaliza features com StandardScaler ajustado apenas no primeiro fold de treino.
     from src.features.scaler_utils import fit_feature_scaler_on_train, scale_features
 
-    scaler, train_idx, _ = fit_feature_scaler_on_train(X_features, groups, n_splits=5)
+    scaler, train_idx, _ = fit_feature_scaler_on_train(x_features, groups, n_splits=5)
 
     # Imputa NaNs usando medianas apenas do conjunto de treino.
     n_nan = features_df.isna().sum().sum()
@@ -87,9 +87,9 @@ def main() -> int:
         for col in FEATURE_COLUMNS:
             median = features_df[col].iloc[train_idx].median()
             features_df[col] = features_df[col].fillna(median)
-        X_features = features_df.values.astype(np.float32)
+        x_features = features_df.values.astype(np.float32)
 
-    X_features_scaled = scale_features(X_features, scaler)
+    x_features_scaled = scale_features(x_features, scaler)
 
     scaler_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(scaler, scaler_path)
@@ -98,7 +98,7 @@ def main() -> int:
     # Sanity check: distribuição de classes
     class_counts = dict(zip(*np.unique(y, return_counts=True)))
     LOGGER.info("Classes: %s", class_counts)
-    LOGGER.info("Features shape: %s", X_features_scaled.shape)
+    LOGGER.info("Features shape: %s", x_features_scaled.shape)
 
     # Mapeia record_id (string) para inteiros para compatibilidade com NPZ
     # sem object arrays e com GroupKFold.
@@ -108,7 +108,7 @@ def main() -> int:
 
     np.savez(
         output_path,
-        X=X_features_scaled,
+        X=x_features_scaled,
         y=y,
         groups=group_ids,
     )

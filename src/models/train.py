@@ -38,46 +38,45 @@ def _set_seeds(seed: int = 42) -> None:
     """Fixa seeds para reprodutibilidade."""
     os.environ["PYTHONHASHSEED"] = str(seed)
     random.seed(seed)
-    np.random.seed(seed)
     tf.random.set_seed(seed)
 
 
 def _normalize_fold(
-    X_train: np.ndarray,
-    X_test: np.ndarray,
+    x_train: np.ndarray,
+    x_test: np.ndarray,
 ) -> Tuple[np.ndarray, np.ndarray, StandardScaler]:
     """Normalização z-score global: fit no treino, transform em teste.
 
     Parameters
     ----------
-    X_train : np.ndarray
+    x_train : np.ndarray
         Shape (n_train, 500, 1).
-    X_test : np.ndarray
+    x_test : np.ndarray
         Shape (n_test, 500, 1).
 
     Returns
     -------
     tuple
-        (X_train_norm, X_test_norm, scaler)
+        (x_train_norm, x_test_norm, scaler)
     """
     scaler = StandardScaler()
-    n_train, seq_len, channels = X_train.shape
-    n_test = X_test.shape[0]
+    n_train, seq_len, channels = x_train.shape
+    n_test = x_test.shape[0]
 
     # Fit no treino (reshape para 2D)
-    X_train_2d = X_train.reshape(-1, channels)
-    scaler.fit(X_train_2d)
+    x_train_2d = x_train.reshape(-1, channels)
+    scaler.fit(x_train_2d)
 
     # Transform treino e teste
-    X_train_norm = scaler.transform(X_train_2d).reshape(n_train, seq_len, channels)
-    X_test_norm = scaler.transform(X_test.reshape(-1, channels)).reshape(n_test, seq_len, channels)
+    x_train_norm = scaler.transform(x_train_2d).reshape(n_train, seq_len, channels)
+    x_test_norm = scaler.transform(x_test.reshape(-1, channels)).reshape(n_test, seq_len, channels)
 
-    return X_train_norm, X_test_norm, scaler
+    return x_train_norm, x_test_norm, scaler
 
 
 def _build_instrumentation_callbacks(
     instrumentation_config: Optional[Dict[str, Any]],
-    X_val_norm: np.ndarray,
+    x_val_norm: np.ndarray,
     y_val: np.ndarray,
     class_names: Optional[List[str]] = None,
     fold_idx: int = 0,
@@ -92,7 +91,7 @@ def _build_instrumentation_callbacks(
     ----------
     instrumentation_config : dict, optional
         Configuração com as chaves ``gradient_monitor`` e ``calibration_monitor``.
-    X_val_norm : np.ndarray
+    x_val_norm : np.ndarray
         Dados de validação normalizados do fold atual.
     y_val : np.ndarray
         Labels de validação do fold atual.
@@ -116,7 +115,7 @@ def _build_instrumentation_callbacks(
         fold_path = base_path.parent / f"fold_{fold_idx}" / base_path.name
         callbacks.append(
             GradientMonitor(
-                val_data=X_val_norm,
+                val_data=x_val_norm,
                 val_labels=y_val,
                 log_path=str(fold_path),
                 layer_names=grad_cfg.get("layer_names"),
@@ -136,7 +135,7 @@ def _build_instrumentation_callbacks(
         fold_path = base_path.parent / f"fold_{fold_idx}" / base_path.name
         callbacks.append(
             CalibrationMonitor(
-                val_data=X_val_norm,
+                val_data=x_val_norm,
                 val_labels=y_val,
                 n_bins=cal_cfg.get("n_bins", 15),
                 log_path=str(fold_path),
@@ -155,7 +154,7 @@ def _build_instrumentation_callbacks(
 
 
 def train_group_kfold(
-    X: np.ndarray,
+    x: np.ndarray,
     y: np.ndarray,
     groups: np.ndarray,
     backbone_weights: Optional[Path] = None,
@@ -186,7 +185,7 @@ def train_group_kfold(
 
     Parameters
     ----------
-    X : np.ndarray
+    x : np.ndarray
         Dados (shape: (n, 500, 1)).
     y : np.ndarray
         Labels inteiros (shape: (n,)).
@@ -264,7 +263,7 @@ def train_group_kfold(
     LOGGER.info(
         "GroupKFold | n_splits=%d | n_samples=%d | n_patients=%d",
         n_splits,
-        len(X),
+        len(x),
         len(np.unique(groups)),
     )
 
@@ -273,30 +272,30 @@ def train_group_kfold(
     best_f1_macro = -1.0
     best_fold = -1
 
-    for fold_idx, (train_idx, test_idx) in enumerate(gkf.split(X, y, groups)):
+    for fold_idx, (train_idx, test_idx) in enumerate(gkf.split(x, y, groups)):
         LOGGER.info("=== Fold %d/%d ===", fold_idx + 1, n_splits)
         fold_dir = experiment_dir / f"fold_{fold_idx}"
         fold_dir.mkdir(parents=True, exist_ok=True)
 
-        X_train, X_test = X[train_idx], X[test_idx]
+        x_train, x_test = x[train_idx], x[test_idx]
         y_train, y_test = y[train_idx], y[test_idx]
 
         LOGGER.info(
             "  Train: n=%d | Test: n=%d | Patients train=%d | Patients test=%d",
-            len(X_train),
-            len(X_test),
+            len(x_train),
+            len(x_test),
             len(np.unique(groups[train_idx])),
             len(np.unique(groups[test_idx])),
         )
 
         # 1. Normalização global (fit no treino)
         if normalize:
-            X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
+            x_train_norm, x_test_norm, scaler = _normalize_fold(x_train, x_test)
         else:
-            X_train_norm, X_test_norm = X_train, X_test
+            x_train_norm, x_test_norm = x_train, x_test
             scaler = StandardScaler()
-            scaler.mean_ = np.zeros(X.shape[-1], dtype=np.float32)
-            scaler.scale_ = np.ones(X.shape[-1], dtype=np.float32)
+            scaler.mean_ = np.zeros(x.shape[-1], dtype=np.float32)
+            scaler.scale_ = np.ones(x.shape[-1], dtype=np.float32)
 
         # Criar run de tracking no início do fold para possibilitar métricas por época
         fold_run_id: Optional[int] = None
@@ -314,7 +313,7 @@ def train_group_kfold(
         # Callbacks de instrumentação devem usar dados normalizados do fold
         fold_callbacks = _build_instrumentation_callbacks(
             instrumentation_config=instrumentation_config,
-            X_val_norm=X_test_norm,
+            x_val_norm=x_test_norm,
             y_val=y_test,
             class_names=class_names,
             fold_idx=fold_idx,
@@ -329,9 +328,9 @@ def train_group_kfold(
 
         # 2. Construir/carregar backbone
         if model_builder is None:
-            model = build_backbone_1d(input_len=X.shape[1], num_classes=len(np.unique(y)))
+            model = build_backbone_1d(input_len=x.shape[1], num_classes=len(np.unique(y)))
         else:
-            model = model_builder(input_len=X.shape[1], num_classes=len(np.unique(y)))
+            model = model_builder(input_len=x.shape[1], num_classes=len(np.unique(y)))
         if backbone_weights is not None:
             model.load_weights(str(backbone_weights))
             LOGGER.info("  Backbone weights loaded from %s", backbone_weights)
@@ -344,9 +343,9 @@ def train_group_kfold(
 
         model, history = finetune_mitbih(
             model=model,
-            X_train=X_train_norm,
+            X_train=x_train_norm,
             y_train=y_train,
-            X_val=X_test_norm,
+            X_val=x_test_norm,
             y_val=y_test,
             epochs=epochs,
             batch_size=batch_size,
@@ -370,7 +369,7 @@ def train_group_kfold(
         # 4. Avaliação
         eval_result = evaluate_fold(
             model,
-            X_test_norm,
+            x_test_norm,
             y_test,
             class_names=class_names,
             thresholds=thresholds,

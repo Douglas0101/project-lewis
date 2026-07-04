@@ -24,6 +24,8 @@ from src.data.preprocessor import DEFAULT_CONFIG, ECGPreprocessor
 
 LOGGER = logging.getLogger("lewis.tests.preprocessing")
 
+rng = np.random.default_rng(42)
+
 
 @pytest.fixture
 def dlq_path(tmp_path: Path) -> Path:
@@ -160,14 +162,14 @@ class TestPreprocessorNormalize:
 
     def test_zscore_mean_zero(self, dlq_path):
         pre = self._per_record_pre(dlq_path)
-        x = np.random.randn(500) + 3.0  # mean = 3
+        x = rng.standard_normal(500) + 3.0  # mean = 3
         y = pre.normalize(x)
 
         assert abs(float(np.mean(y))) < 1e-6, f"Mean after z-score = {np.mean(y):.6f}"
 
     def test_zscore_std_one(self, dlq_path):
         pre = self._per_record_pre(dlq_path)
-        x = np.random.randn(500) * 2.0  # std = 2
+        x = rng.standard_normal(500) * 2.0  # std = 2
         y = pre.normalize(x)
 
         assert abs(float(np.std(y)) - 1.0) < 1e-4, f"Std after z-score = {np.std(y):.6f}"
@@ -185,7 +187,7 @@ class TestPreprocessorNormalize:
         """QG1.7: normalize() must raise when per_record=False and stats are missing."""
         pre = ECGPreprocessor(dlq_path=dlq_path)
         with pytest.raises(ValueError, match="Estatísticas globais não definidas"):
-            pre.normalize(np.random.randn(500))
+            pre.normalize(rng.standard_normal(500))
 
 
 @pytest.mark.qg1
@@ -200,7 +202,7 @@ class TestPreprocessorProcess:
         fs_orig = 360.0
         n_samples = int(fs_orig * 2)  # 2 seconds
         t = np.arange(n_samples) / fs_orig
-        x = np.sin(2 * np.pi * 10.0 * t) + 0.1 * np.random.randn(n_samples)
+        x = np.sin(2 * np.pi * 10.0 * t) + 0.1 * rng.standard_normal(n_samples)
 
         x_proc, metadata = pre.process(
             x,
@@ -227,7 +229,7 @@ class TestPreprocessorProcess:
         pre.cfg["normalization"]["per_record"] = True
         pre.per_record = True
         n_samples = 1000
-        x = np.random.randn(n_samples)
+        x = rng.standard_normal(n_samples)
 
         x_proc, _ = pre.process(
             x,
@@ -260,7 +262,7 @@ class TestPreprocessorProcess:
         pre = ECGPreprocessor(dlq_path=dlq_path)
         with pytest.raises(ValueError, match="Estatísticas globais não definidas"):
             pre.process(
-                np.random.randn(500),
+                rng.standard_normal(500),
                 record_id="test_no_stats",
                 dataset="mitdb",
                 fs_orig=500.0,
@@ -376,7 +378,7 @@ class TestPreprocessorGlobalStats:
     def test_set_global_stats(self, dlq_path):
         pre = ECGPreprocessor(dlq_path=dlq_path)
         pre.set_global_stats(mean=0.5, std=2.0)
-        x = np.random.randn(500)
+        x = rng.standard_normal(500)
         y = pre.normalize(x)
 
         expected = (x - 0.5) / 2.0
@@ -387,7 +389,7 @@ class TestPreprocessorGlobalStats:
 class TestPreprocessorClipBeforeNormalize:
     def test_global_normalize_uses_clipped_values(self, dlq_path):
         pre = ECGPreprocessor(dlq_path=dlq_path)
-        x = np.random.randn(1000).astype(np.float64)
+        x = rng.standard_normal(1000).astype(np.float64)
         x[500] = 10.0
         x_clip, _ = pre._clip_outliers(x.copy())
         mean_clip = float(np.mean(x_clip))
@@ -398,9 +400,9 @@ class TestPreprocessorClipBeforeNormalize:
 
     def test_compute_global_stats_clips_before_stats(self, dlq_path):
         pre = ECGPreprocessor(dlq_path=dlq_path)
-        X = np.random.randn(100, 500, 1).astype(np.float32)
-        X[0, 0, 0] = 20.0
-        mean, std = pre.compute_global_stats(X, clip_limits=(-5.0, 5.0))
+        x = rng.standard_normal((100, 500, 1)).astype(np.float32)
+        x[0, 0, 0] = 20.0
+        mean, std = pre.compute_global_stats(x, clip_limits=(-5.0, 5.0))
         assert np.isscalar(mean)
         assert np.isscalar(std)
         assert std > 0
