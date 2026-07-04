@@ -59,7 +59,7 @@ def _normalize_fold(
     Returns
     -------
     tuple
-        (X_train_norm, X_test_norm, scaler)
+        (x_train_norm, x_test_norm, scaler)
     """
     scaler = StandardScaler()
     n_train, seq_len, channels = X_train.shape
@@ -74,14 +74,14 @@ def _normalize_fold(
     # pico de manter float32 + float16 simultaneamente.
     mean = scaler.mean_.astype(np.float32, copy=False)
     scale = scaler.scale_.astype(np.float32, copy=False)
-    X_train_norm = (
+    x_train_norm = (
         (X_train_2d.astype(np.float32, copy=False) - mean) / scale
     ).astype(np.float16, copy=False).reshape(n_train, seq_len, channels)
-    X_test_norm = (
+    x_test_norm = (
         (X_test.reshape(-1, channels).astype(np.float32, copy=False) - mean) / scale
     ).astype(np.float16, copy=False).reshape(n_test, seq_len, channels)
 
-    return X_train_norm, X_test_norm, scaler
+    return x_train_norm, x_test_norm, scaler
 
 
 def _build_instrumentation_callbacks(
@@ -299,10 +299,10 @@ def train_group_kfold(
         # 1. Normalização global (fit no treino) — retorna float16 para economia
         # de memória; o dataset converte de volta para float32 sob demanda.
         if normalize:
-            X_train_norm, X_test_norm, scaler = _normalize_fold(X_train, X_test)
+            x_train_norm, x_test_norm, scaler = _normalize_fold(X_train, X_test)
         else:
             # X já vem normalizado (ex.: memmap float16 pré-computado).
-            X_train_norm, X_test_norm = X_train, X_test
+            x_train_norm, x_test_norm = X_train, X_test
             scaler = StandardScaler()
             scaler.mean_ = np.zeros(X.shape[-1], dtype=np.float32)
             scaler.scale_ = np.ones(X.shape[-1], dtype=np.float32)
@@ -327,7 +327,7 @@ def train_group_kfold(
         # Callbacks de instrumentação devem usar dados normalizados do fold
         fold_callbacks = _build_instrumentation_callbacks(
             instrumentation_config=instrumentation_config,
-            X_val_norm=X_test_norm,
+            X_val_norm=x_test_norm,
             y_val=y_test,
             class_names=class_names,
             fold_idx=fold_idx,
@@ -357,9 +357,9 @@ def train_group_kfold(
 
         model, history = finetune_mitbih(
             model=model,
-            X_train=X_train_norm,
+            X_train=x_train_norm,
             y_train=y_train,
-            X_val=X_test_norm,
+            X_val=x_test_norm,
             y_val=y_test,
             epochs=epochs,
             batch_size=batch_size,
@@ -385,7 +385,7 @@ def train_group_kfold(
         # 4. Avaliação
         eval_result = evaluate_fold(
             model,
-            X_test_norm,
+            x_test_norm,
             y_test,
             class_names=class_names,
             thresholds=thresholds,
