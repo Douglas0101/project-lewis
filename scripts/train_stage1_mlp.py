@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -22,6 +23,21 @@ from src.models.evaluate import evaluate_fold
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("train_stage1_mlp")
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _resolve_output_dir(output_dir: str) -> Path:
+    """Resolve output directory and ensure it stays inside PROJECT_ROOT."""
+    target = Path(output_dir)
+    if not target.is_absolute():
+        target = PROJECT_ROOT / target
+    resolved = target.resolve()
+    try:
+        resolved.relative_to(PROJECT_ROOT.resolve())
+    except ValueError as exc:
+        raise ValueError(f"Output directory escapes project root: {output_dir!r}") from exc
+    return resolved
 
 
 def build_mlp(input_dim: int, num_classes: int = 2) -> tf.keras.Model:
@@ -129,7 +145,7 @@ def main() -> int:
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %s", feature_names)
 
-    output_dir = Path("experiments/stage1_mlp_features_v2.1")
+    output_dir = _resolve_output_dir("experiments/stage1_mlp_features_v2.1")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     n_splits = 5

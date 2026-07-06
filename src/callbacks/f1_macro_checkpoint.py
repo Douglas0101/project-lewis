@@ -53,16 +53,26 @@ class F1MacroCheckpoint(tf.keras.callbacks.Callback):
         metric: str = "F1_macro",
         patience: int = 10,
         optimize_thresholds: bool = False,
+        max_samples: Optional[int] = None,
+        predict_batch_size: int = 1024,
     ):
         super().__init__()
-        self.X_val = X_val
-        self.y_val = y_val
+        n_samples = X_val.shape[0]
+        if max_samples is not None and 0 < max_samples < n_samples:
+            rng = np.random.default_rng(seed=42)
+            indices = rng.choice(n_samples, size=max_samples, replace=False)
+            self.X_val = X_val[indices]
+            self.y_val = y_val[indices]
+        else:
+            self.X_val = X_val
+            self.y_val = y_val
         self.filepath = Path(filepath)
         self.class_names = class_names
         self.thresholds = thresholds
         self.metric = metric
         self.patience = patience
         self.optimize_thresholds = optimize_thresholds
+        self.predict_batch_size = predict_batch_size
         self.best_score = -1.0
         self.wait = 0
         self.stopped_epoch = 0
@@ -86,7 +96,9 @@ class F1MacroCheckpoint(tf.keras.callbacks.Callback):
             find_best_thresholds_multiclass,
         )
 
-        y_proba = self.model.predict(self.X_val, verbose=0)
+        y_proba = self.model.predict(
+            self.X_val, batch_size=self.predict_batch_size, verbose=0
+        ).astype(np.float32, copy=False)
 
         if self.class_names is not None and len(self.class_names) == 2:
             result = find_best_threshold(

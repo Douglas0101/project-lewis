@@ -14,6 +14,32 @@ from typing import Any, Dict, List
 
 import numpy as np
 
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+REPORT_PATH = PROJECT_ROOT / "reports" / "stage1_v2_training_analysis.md"
+
+
+def _validate_report_path(path: Path) -> Path:
+    """Garante que o caminho do relatório não escape do diretório reports."""
+    resolved = path.resolve()
+    allowed_root = (PROJECT_ROOT / "reports").resolve()
+    if not str(resolved).startswith(str(allowed_root) + "/"):
+        raise ValueError(f"Caminho do relatório fora do diretório permitido: {resolved}")
+    return resolved
+
+
+def _safe_number(value: Any, name: str = "value") -> float:
+    """Converte um valor em float, rejeitando tipos inesperados."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    raise ValueError(f"{name} deve ser numérico, recebido: {type(value).__name__}")
+
+
+def _safe_str(value: Any, name: str = "value") -> str:
+    """Converte um valor em string, rejeitando tipos inesperados."""
+    if isinstance(value, str):
+        return value
+    raise ValueError(f"{name} deve ser string, recebido: {type(value).__name__}")
+
 
 def parse_training_log(log_path: Path) -> Dict[str, Any]:
     """Extrai métricas de época do log Keras."""
@@ -49,21 +75,35 @@ def parse_training_log(log_path: Path) -> Dict[str, Any]:
 
 
 def parse_gradients_log(log_path: Path) -> Dict[str, Any]:
-    """Carrega log de gradientes em formato JSON."""
+    """Carrega log de gradientes em formato JSON com validação de tipos."""
     data = json.loads(log_path.read_text(encoding="utf-8"))
-    epochs = []
+    if not isinstance(data, list):
+        raise ValueError("Log de gradientes deve ser uma lista de entradas")
+
+    epochs: List[int] = []
     norm_ratios: Dict[str, List[float]] = {}
     grad_means: Dict[str, List[float]] = {}
     grad_per_class: Dict[str, Dict[str, List[float]]] = {}
 
     for entry in data:
-        epochs.append(entry["epoch"])
+        if not isinstance(entry, dict):
+            raise ValueError("Cada entrada do log de gradientes deve ser um objeto")
+        epochs.append(int(_safe_number(entry.get("epoch"), "epoch")))
         for layer in entry.get("layers", []):
-            name = layer["layer_name"]
-            norm_ratios.setdefault(name, []).append(layer["norm_ratio"])
-            grad_means.setdefault(name, []).append(layer["gradient_mean"])
+            if not isinstance(layer, dict):
+                raise ValueError("Cada layer deve ser um objeto")
+            name = _safe_str(layer.get("layer_name"), "layer_name")
+            norm_ratios.setdefault(name, []).append(
+                _safe_number(layer.get("norm_ratio"), "norm_ratio")
+            )
+            grad_means.setdefault(name, []).append(
+                _safe_number(layer.get("gradient_mean"), "gradient_mean")
+            )
             for cls, value in layer.get("gradient_mean_per_class", {}).items():
-                grad_per_class.setdefault(name, {}).setdefault(cls, []).append(value)
+                cls_key = _safe_str(cls, "gradient_mean_per_class key")
+                grad_per_class.setdefault(name, {}).setdefault(cls_key, []).append(
+                    _safe_number(value, "gradient_mean_per_class value")
+                )
 
     return {
         "epochs": epochs,
@@ -74,21 +114,29 @@ def parse_gradients_log(log_path: Path) -> Dict[str, Any]:
 
 
 def parse_calibration_log(log_path: Path) -> Dict[str, Any]:
-    """Carrega log de calibração em formato JSON."""
+    """Carrega log de calibração em formato JSON com validação de tipos."""
     data = json.loads(log_path.read_text(encoding="utf-8"))
-    epochs = []
-    ece = []
-    mce = []
-    brier = []
+    if not isinstance(data, list):
+        raise ValueError("Log de calibração deve ser uma lista de entradas")
+
+    epochs: List[int] = []
+    ece: List[float] = []
+    mce: List[float] = []
+    brier: List[float] = []
     confidence_per_class: Dict[str, List[float]] = {}
 
     for entry in data:
-        epochs.append(entry["epoch"])
-        ece.append(entry["ece"])
-        mce.append(entry["mce"])
-        brier.append(entry["brier_score"])
+        if not isinstance(entry, dict):
+            raise ValueError("Cada entrada do log de calibração deve ser um objeto")
+        epochs.append(int(_safe_number(entry.get("epoch"), "epoch")))
+        ece.append(_safe_number(entry.get("ece"), "ece"))
+        mce.append(_safe_number(entry.get("mce"), "mce"))
+        brier.append(_safe_number(entry.get("brier_score"), "brier_score"))
         for cls, value in entry.get("confidence_per_class", {}).items():
-            confidence_per_class.setdefault(cls, []).append(value)
+            cls_key = _safe_str(cls, "confidence_per_class key")
+            confidence_per_class.setdefault(cls_key, []).append(
+                _safe_number(value, "confidence_per_class value")
+            )
 
     return {
         "epochs": epochs,
@@ -142,12 +190,22 @@ def load_summary(experiment_dir: Path) -> Dict[str, Any]:
     return json.loads(summary_path.read_text(encoding="utf-8"))
 
 
+def _validate_directory(path: Path, name: str) -> Path:
+    """Garante que um diretório informado não escape do projeto."""
+    resolved = path.resolve()
+    allowed_root = PROJECT_ROOT.resolve()
+    if not str(resolved).startswith(str(allowed_root) + "/"):
+        raise ValueError(f"{name} fora do diretório do projeto: {resolved}")
+    return resolved
+
+
 def generate_report(
     experiment_dir: Path,
-    output_path: Path,
     logs_dir: Path,
 ) -> None:
     """Gera relatório markdown com conclusões."""
+    experiment_dir = _validate_directory(experiment_dir, "experiment_dir")
+    logs_dir = _validate_directory(logs_dir, "logs_dir")
     summary = load_summary(experiment_dir)
     folds_analysis = []
     for fold_idx in range(5):
@@ -279,8 +337,11 @@ def generate_report(
         "(RNF-02: Flash < 40 KB, RAM < 80 KB).\n"
     )
 
-    output_path.write_text("".join(lines), encoding="utf-8")
-    print(f"[INFO] Relatório salvo em: {output_path}")
+    report_path = _validate_report_path(REPORT_PATH)
+    report_path.parent.mkdir(parents=True, exist_ok=True)
+    report_text = "".join(lines)
+    report_path.write_text(report_text, encoding="utf-8")
+    print(f"[INFO] Relatório salvo em: {report_path}")
 
 
 def main():
@@ -289,9 +350,7 @@ def main():
         print(f"[ERRO] Experimento nao encontrado: {experiment_dir}")
         sys.exit(1)
 
-    output_path = Path("reports/stage1_v2_training_analysis.md")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    generate_report(experiment_dir, output_path, logs_dir=Path("logs"))
+    generate_report(experiment_dir, logs_dir=Path("logs"))
 
 
 if __name__ == "__main__":
