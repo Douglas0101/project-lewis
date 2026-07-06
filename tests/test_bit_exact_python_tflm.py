@@ -11,6 +11,7 @@ concordância do argmax para baseline.
 
 from __future__ import annotations
 
+import random
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,14 @@ import pytest
 import tensorflow as tf
 
 from src.inference.quantized_runner import QuantizedModelRunner
+
+
+def _set_global_seeds(seed: int = 123) -> None:
+    """Fixa seeds para tornar construção de modelos e dados determinística."""
+    random.seed(seed)
+    np.random.seed(seed)
+    tf.random.set_seed(seed)
+
 
 ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = ROOT / "models"
@@ -170,11 +179,25 @@ def _build_and_quantize_tiny_model(
     Usado apenas para validar a lógica de comparação quando os modelos
     reais não estão disponíveis ou como sanity check da pipeline de
     quantização.
+
+    Os dados são gerados com médias por classe bem separadas, de modo que
+    um modelo pequeno consiga aprender um padrão estável em poucas épocas
+    e o teste seja determinístico no CI.
     """
+    _set_global_seeds(123)
     rng = np.random.default_rng(123)
-    n_samples = 128
-    x_train = rng.normal(size=(n_samples, 500, 1)).astype(np.float32)
-    y_train = rng.integers(0, num_classes, size=n_samples)
+    samples_per_class = 64
+    n_samples = samples_per_class * num_classes
+    x_train = np.zeros((n_samples, 500, 1), dtype=np.float32)
+    y_train = np.zeros(n_samples, dtype=np.int64)
+
+    # Classes com médias -1.5, 0.0 e +1.5 no domínio do sinal.
+    class_means = np.linspace(-1.5, 1.5, num=num_classes)
+    for cls, mean in enumerate(class_means):
+        start = cls * samples_per_class
+        end = start + samples_per_class
+        x_train[start:end, :, 0] = rng.normal(loc=mean, scale=0.2, size=(samples_per_class, 500))
+        y_train[start:end] = cls
 
     model = tf.keras.Sequential(
         [
@@ -187,7 +210,7 @@ def _build_and_quantize_tiny_model(
         optimizer="adam",
         loss="sparse_categorical_crossentropy",
     )
-    model.fit(x_train, y_train, epochs=1, verbose=0)
+    model.fit(x_train, y_train, epochs=5, batch_size=32, verbose=0)
 
     float_path = workdir / "synthetic_float32.keras"
     int8_path = workdir / "synthetic_int8.tflite"
