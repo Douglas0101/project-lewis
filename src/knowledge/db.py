@@ -15,7 +15,6 @@ from sqlalchemy.engine import Engine
 
 from .constants import EMBEDDING_DIM, KNOWLEDGE_DB
 
-
 _SQL_CREATE_VEC_TABLE = f"""
 CREATE VIRTUAL TABLE IF NOT EXISTS knowledge_chunks USING vec0(
     chunk_id TEXT PRIMARY KEY,

@@ -1,0 +1,17 @@
+{
+  "feature_names": [
+    "rr_prev",
+    "rr_next",
+    "rr_ratio",
+    "rr_local_mean",
+    "rr_local_std",
+    "rmssd",
+    "heart_rate",
+    "r_amplitude",
+    "q_depth",
+    "t_amplitude",
+    "qrs_width_ms",
+    "qrs_area",
+    "st_slope_mV_s"
+  ]
+}

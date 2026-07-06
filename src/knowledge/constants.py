@@ -10,6 +10,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DOCS_DIR = PROJECT_ROOT / "docs"
 SRC_DIR = PROJECT_ROOT / "src"
 FIRMWARE_DIR = PROJECT_ROOT / "firmware" / "src"
+EXPERIMENTS_DIR = PROJECT_ROOT / "data" / "lineage" / "experiments"
 KNOWLEDGE_DB = PROJECT_ROOT / "data" / "knowledge.db"
 LINEAGE_DIR = PROJECT_ROOT / "data" / "lineage" / "knowledge"
 DLQ_PATH = PROJECT_ROOT / "data" / ".dlq" / "knowledge_rejected.jsonl"

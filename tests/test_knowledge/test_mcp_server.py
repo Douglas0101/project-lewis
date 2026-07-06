@@ -47,9 +47,10 @@ class TestMcpTools:
         assert "F1-macro" in result
 
     def test_tools_are_registered_in_mcp_app(self) -> None:
-        """Verifica que as três tools foram registradas no FastMCP."""
+        """Verifica que as tools foram registradas no FastMCP."""
         tools = mcp_server.mcp._tool_manager._tools
         assert "search_docs" in tools
+        assert "search_docs_hybrid" in tools
         assert "list_layers" in tools
         assert "get_doc_by_source" in tools
 
@@ -100,6 +101,7 @@ class TestMcpProtocol:
             tools = tools_response["result"]["tools"]
             names = {tool["name"] for tool in tools}
             assert "search_docs" in names
+            assert "search_docs_hybrid" in names
             assert "list_layers" in names
             assert "get_doc_by_source" in names
         finally:

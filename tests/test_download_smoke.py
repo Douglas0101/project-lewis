@@ -38,9 +38,7 @@ def smoke_record_factory():
             f"{record_name} {n_sig} {fs} {sig_len} 00:00:00",
         ]
         for name in signal_names:
-            header_lines.append(
-                f"{name} 16 1000 0 mV"
-            )
+            header_lines.append(f"{name} 16 1000 0 mV")
         for comment in comments or []:
             header_lines.append(f"# {comment}")
         hea_path = root / f"{record_name}.hea"

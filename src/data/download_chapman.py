@@ -146,8 +146,10 @@ def _try_wget_recursive(raw_dir: Path) -> bool:
             "-np",  # no parent
             "-nH",  # no host prefix
             "--cut-dirs=5",
-            "-R", "index.html*",
-            "-P", str(subset_dir),
+            "-R",
+            "index.html*",
+            "-P",
+            str(subset_dir),
             f"{base_url}/{subset}/",
         ]
         LOGGER.info("starting recursive wget for %s", subset)

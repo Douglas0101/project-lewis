@@ -10,7 +10,6 @@ import pytest
 
 from firmware.scripts.run_renode_tests import check_report, parse_uart_log
 
-
 SAMPLE_LOG = """\
 === Project-Lewis Firmware v2.0 ===
 Model size (stage1+stage2): 111440 bytes

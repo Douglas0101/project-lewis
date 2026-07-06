@@ -20,7 +20,7 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import List
+from typing import Any, Dict, List
 
 import sqlite_vec
 from sentence_transformers import SentenceTransformer
@@ -31,6 +31,7 @@ from .constants import (
     CONFIG_PATH,
     DOCS_DIR,
     EMBEDDING_MODEL,
+    EXPERIMENTS_DIR,
     FIRMWARE_DIR,
     KNOWLEDGE_DB,
     LAYER_MAP,
@@ -50,6 +51,44 @@ from .utils import (
     parse_markdown_frontmatter,
     write_dlq,
 )
+
+
+class _FTS5Adapter:
+    """Adaptador leve para indexação FTS5 sem carregar SentenceTransformer."""
+
+    def semantic_search(
+        self, query: str, filters: Dict[str, Any] | None = None, top_k: int = 10
+    ) -> List[Dict[str, Any]]:
+        return []
+
+    def get_doc(self, doc_id: str) -> Dict[str, Any]:
+        return {"id": doc_id}
+
+
+def _index_fts5(unique_enriched: List[tuple[DocumentMeta, str]]) -> None:
+    """Popula a tabela FTS5 usada pela busca híbrida BM25+vector."""
+    import sqlite3
+
+    from .hybrid_search import HybridSearcher
+
+    adapter = _FTS5Adapter()
+    hybrid = HybridSearcher(KNOWLEDGE_DB, adapter)
+
+    conn = sqlite3.connect(KNOWLEDGE_DB)
+    try:
+        conn.execute("DELETE FROM knowledge_fts")
+        conn.commit()
+    finally:
+        conn.close()
+
+    for meta, content in unique_enriched:
+        hybrid.index_document(
+            doc_id=meta.chunk_id,
+            content=content,
+            run_id=meta.source,
+            stage=meta.layer,
+            status=",".join(meta.tags),
+        )
 
 
 class Chunk:
@@ -138,6 +177,65 @@ def load_code_documents() -> List[Chunk]:
     return chunks
 
 
+def _parse_experiment_metadata(source: str, content: str) -> Dict[str, Any]:
+    """Extrai metadados do nome do arquivo e do bloco 'Metadados para Indexação'."""
+    meta: Dict[str, Any] = {}
+    # Nome do arquivo: stage1_20260630_051337.md -> stage stage1
+    parts = Path(source).stem.split("_")
+    if parts and parts[0].startswith("stage"):
+        meta["stage"] = parts[0]
+
+    for line in content.splitlines():
+        if line.strip().startswith("- **experiment_id:**"):
+            meta["experiment_id"] = line.split(":**")[-1].strip()
+        elif line.strip().startswith("- **run_id:**"):
+            meta["run_id"] = line.split(":**")[-1].strip()
+        elif line.strip().startswith("- **stage:**"):
+            meta["stage"] = line.split(":**")[-1].strip()
+        elif line.strip().startswith("- **status:**"):
+            meta["status"] = line.split(":**")[-1].strip()
+        elif line.strip().startswith("- **health_status:**"):
+            meta["health_status"] = line.split(":**")[-1].strip()
+        elif line.strip().startswith("- **tags:**"):
+            tags_text = line.split(":**")[-1].strip()
+            meta["tags"] = [t.strip() for t in tags_text.split(",") if t.strip()]
+    return meta
+
+
+def load_experiment_summary_documents() -> List[Chunk]:
+    """Carrega resumos de experimentos gerados pelo summarizer."""
+    chunks: List[Chunk] = []
+    if not EXPERIMENTS_DIR.exists():
+        return chunks
+
+    for md_path in EXPERIMENTS_DIR.rglob("*.md"):
+        if is_forbidden_path(md_path):
+            continue
+        content = md_path.read_text(encoding="utf-8")
+        header = None
+        if content.startswith("# "):
+            first_line = content.splitlines()[0]
+            header = first_line.lstrip("# ").strip()
+
+        if len(content) > MAX_CHUNK_CHARS:
+            sub_chunks = split_text_recursive(content, CHUNK_SIZE, CHUNK_OVERLAP)
+            for i, sub in enumerate(sub_chunks):
+                chunks.append(
+                    Chunk(
+                        sub,
+                        md_path.relative_to(PROJECT_ROOT).as_posix(),
+                        header_1=header,
+                        header_2=f"parte_{i + 1}" if len(sub_chunks) > 1 else None,
+                    )
+                )
+        else:
+            chunks.append(
+                Chunk(content, md_path.relative_to(PROJECT_ROOT).as_posix(), header_1=header)
+            )
+
+    return chunks
+
+
 def split_text_recursive(text: str, chunk_size: int, overlap: int) -> List[str]:
     """Segmentador recursivo simples por parágrafos/frases/palavras."""
     separators = ["\n\n", "\n", ". ", " ", ""]
@@ -173,13 +271,36 @@ def enrich_metadata(chunks: List[Chunk]) -> List[tuple[DocumentMeta, str]]:
 
         pii_matches = detect_pii(content)
         if pii_matches:
-            write_dlq({
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "source": source,
-                "reason": "PII_DETECTED",
-                "matches": pii_matches,
-                "action": "REJECTED",
-            })
+            write_dlq(
+                {
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "source": source,
+                    "reason": "PII_DETECTED",
+                    "matches": pii_matches,
+                    "action": "REJECTED",
+                }
+            )
+            continue
+
+        # Resumos de experimentos recebem metadados especiais e layer SIMULATION
+        if "data/lineage/experiments/" in source:
+            exp_meta = _parse_experiment_metadata(source, content)
+            layer = "SIMULATION"
+            version = resolve_version(file_path)
+            tags = list({*(exp_meta.get("tags") or []), "experimento", exp_meta.get("stage", "")})
+            tags = [t for t in tags if t]
+            chunk_id = deterministic_chunk_id(source, content)
+            meta = DocumentMeta(
+                source=source,
+                layer=layer,
+                version=version,
+                tags=tags,
+                filename=file_path.name,
+                chunk_id=chunk_id,
+                header_1=chunk.header_1,
+                header_2=chunk.header_2,
+            )
+            enriched.append((meta, content))
             continue
 
         layer = resolve_layer(file_path)
@@ -212,7 +333,8 @@ def build_index() -> IndexLineage:
 
     md_chunks = load_markdown_documents()
     code_chunks = load_code_documents()
-    all_chunks = md_chunks + code_chunks
+    experiment_chunks = load_experiment_summary_documents()
+    all_chunks = md_chunks + code_chunks + experiment_chunks
 
     enriched = enrich_metadata(all_chunks)
 
@@ -221,13 +343,15 @@ def build_index() -> IndexLineage:
     seen_ids: set[str] = set()
     for meta, content in enriched:
         if meta.chunk_id in seen_ids:
-            write_dlq({
-                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-                "source": meta.source,
-                "chunk_id": meta.chunk_id,
-                "reason": "DUPLICATE_CHUNK_ID",
-                "action": "REJECTED",
-            })
+            write_dlq(
+                {
+                    "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "source": meta.source,
+                    "chunk_id": meta.chunk_id,
+                    "reason": "DUPLICATE_CHUNK_ID",
+                    "action": "REJECTED",
+                }
+            )
             continue
         seen_ids.add(meta.chunk_id)
         unique_enriched.append((meta, content))
@@ -262,6 +386,8 @@ def build_index() -> IndexLineage:
             conn.commit()
     conn.commit()
     conn.close()
+
+    _index_fts5(unique_enriched)
 
     duration = time.perf_counter() - start_time
 

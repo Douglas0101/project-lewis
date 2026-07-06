@@ -1,0 +1,786 @@
+[
+  {
+    "question": "Qual a accuracy do run_001 no Estágio 1?",
+    "answer": "A accuracy do run_001 no Estágio 1 foi 0.92, superando o baseline de 0.80.",
+    "contexts": [
+      "A accuracy do run_001 no Estágio 1 foi 0.92, superando o baseline de 0.80."
+    ],
+    "ground_truth": "A accuracy do run_001 no Estágio 1 foi 0.92, superando o baseline de 0.80.",
+    "expected_chunk_ids": [
+      "run_001_stage1"
+    ],
+    "expected_sources": [
+      "data/lineage/experiments/run_001_stage1.md"
+    ]
+  },
+  {
+    "question": "Como funciona a Camada C01 de ingestão de dados?",
+    "answer": "A Camada C01 ingere e valida datasets públicos de ECG, mantendo checksums, mirrors e proveniência.",
+    "contexts": [
+      "A Camada C01 ingere e valida datasets publicos, garantindo checksums, mirrors e proveniencia."
+    ],
+    "ground_truth": "A Camada C01 ingere e valida datasets publicos, garantindo checksums, mirrors e proveniencia.",
+    "expected_chunk_ids": [
+      "camada_01_ingestao"
+    ],
+    "expected_sources": [
+      "docs/Camada-01-Ingestao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quais datasets são usados no pré-treino do modelo?",
+    "answer": "O pré-treino usa Chapman-Shaoxing e PTB-XL como fallback, com 5 superclasses SCP-ECG.",
+    "contexts": [
+      "O pre-treino utiliza Chapman-Shaoxing e PTB-XL como fallback."
+    ],
+    "ground_truth": "O pre-treino utiliza Chapman-Shaoxing e PTB-XL como fallback.",
+    "expected_chunk_ids": [
+      "c01_datasets_pretrain"
+    ],
+    "expected_sources": [
+      "docs/Camada-01-Ingestao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual a frequência de amostragem padrão após o resample?",
+    "answer": "A frequência padrão após o resample é 500 Hz.",
+    "contexts": [
+      "A frequencia padrao apos resample e 500 Hz."
+    ],
+    "ground_truth": "A frequencia padrao apos resample e 500 Hz.",
+    "expected_chunk_ids": [
+      "c02_resample_500hz"
+    ],
+    "expected_sources": [
+      "docs/Camada-02-Resample-Preprocessamento-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como é feita a normalização do sinal ECG?",
+    "answer": "A normalização do sinal ECG é feita com Z-score global.",
+    "contexts": [
+      "A normalizacao do sinal ECG e Z-score global."
+    ],
+    "ground_truth": "A normalizacao do sinal ECG e Z-score global.",
+    "expected_chunk_ids": [
+      "c02_zscore_normalization"
+    ],
+    "expected_sources": [
+      "docs/Camada-02-Resample-Preprocessamento-v1.1.md"
+    ]
+  },
+  {
+    "question": "O que é o detector AMPT e qual banda de frequência ele usa?",
+    "answer": "O AMPT é um detector de picos R que usa a banda passa-banda 5–15 Hz.",
+    "contexts": [
+      "O AMPT e um detector de picos R que usa a banda 5-15 Hz."
+    ],
+    "ground_truth": "O AMPT e um detector de picos R que usa a banda 5-15 Hz.",
+    "expected_chunk_ids": [
+      "c03_ampt_detector"
+    ],
+    "expected_sources": [
+      "docs/Camada-03-Feature-Engineering-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual a tolerância temporal aceita para detecção de picos R?",
+    "answer": "A tolerância temporal aceita para detecção de picos R é 150 ms.",
+    "contexts": [
+      "A tolerancia temporal aceita e 150 ms."
+    ],
+    "ground_truth": "A tolerancia temporal aceita e 150 ms.",
+    "expected_chunk_ids": [
+      "c03_ampt_tolerance"
+    ],
+    "expected_sources": [
+      "docs/Camada-03-Feature-Engineering-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quantas dimensões de features são extraídas por batimento?",
+    "answer": "São extraídas pelo menos 10 dimensões de features por batimento.",
+    "contexts": [
+      "O pipeline extrai pelo menos 10 dimensoes de features por batimento."
+    ],
+    "ground_truth": "O pipeline extrai pelo menos 10 dimensoes de features por batimento.",
+    "expected_chunk_ids": [
+      "c03_features_dimensions"
+    ],
+    "expected_sources": [
+      "docs/Camada-03-Feature-Engineering-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual a arquitetura da rede neural usada no Estágio 1?",
+    "answer": "O Estágio 1 usa um backbone 1D-CNN enxuto.",
+    "contexts": [
+      "A arquitetura do Estagio 1 e um backbone 1D-CNN enxuto."
+    ],
+    "ground_truth": "A arquitetura do Estagio 1 e um backbone 1D-CNN enxuto.",
+    "expected_chunk_ids": [
+      "c04_stage1_architecture"
+    ],
+    "expected_sources": [
+      "docs/Camada-04-Modelagem-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como é feita a validação cruzada no treinamento?",
+    "answer": "A validação cruzada é feita com GroupKFold por paciente.",
+    "contexts": [
+      "A validacao cruzada e feita com GroupKFold por paciente."
+    ],
+    "ground_truth": "A validacao cruzada e feita com GroupKFold por paciente.",
+    "expected_chunk_ids": [
+      "c04_groupkfold"
+    ],
+    "expected_sources": [
+      "docs/Camada-04-Modelagem-v1.1.md"
+    ]
+  },
+  {
+    "question": "Por que o GroupKFold por paciente é obrigatório?",
+    "answer": "O GroupKFold por paciente é obrigatório para evitar data leakage.",
+    "contexts": [
+      "O GroupKFold por paciente e obrigatorio para evitar data leakage."
+    ],
+    "ground_truth": "O GroupKFold por paciente e obrigatorio para evitar data leakage.",
+    "expected_chunk_ids": [
+      "c04_groupkfold_patient"
+    ],
+    "expected_sources": [
+      "docs/Camada-04-Modelagem-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o threshold de AUC-ROC macro para o pré-treino Chapman?",
+    "answer": "O threshold de AUC-ROC macro para o pré-treino Chapman é 0.85.",
+    "contexts": [
+      "O threshold de AUC-ROC macro para pre-treino e 0.85."
+    ],
+    "ground_truth": "O threshold de AUC-ROC macro para pre-treino e 0.85.",
+    "expected_chunk_ids": [
+      "c04_pretrain_auc"
+    ],
+    "expected_sources": [
+      "docs/Camada-04-Modelagem-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como funciona a quantização pós-treino PTQ?",
+    "answer": "A quantização pós-treino PTQ converte o modelo para INT8 per-channel.",
+    "contexts": [
+      "A quantizacao PTQ converte o modelo para INT8 per-channel."
+    ],
+    "ground_truth": "A quantizacao PTQ converte o modelo para INT8 per-channel.",
+    "expected_chunk_ids": [
+      "c05_ptq_quantization"
+    ],
+    "expected_sources": [
+      "docs/Camada-05-Quantizacao-Exportacao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o tamanho máximo permitido para o FlatBuffer TFLite?",
+    "answer": "O tamanho máximo permitido para o FlatBuffer TFLite é 64KB.",
+    "contexts": [
+      "O tamanho maximo permitido para o FlatBuffer TFLite e 64KB."
+    ],
+    "ground_truth": "O tamanho maximo permitido para o FlatBuffer TFLite e 64KB.",
+    "expected_chunk_ids": [
+      "c05_flatbuffer_size"
+    ],
+    "expected_sources": [
+      "docs/Camada-05-Quantizacao-Exportacao-v1.1.md"
+    ]
+  },
+  {
+    "question": "O que é o QG6 e quais métricas ele avalia?",
+    "answer": "O QG6 avalia quantização INT8, degradação e tamanho do FlatBuffer.",
+    "contexts": [
+      "O QG6 avalia quantizacao INT8, degradacao e tamanho do FlatBuffer."
+    ],
+    "ground_truth": "O QG6 avalia quantizacao INT8, degradacao e tamanho do FlatBuffer.",
+    "expected_chunk_ids": [
+      "c06_qg6_quantization"
+    ],
+    "expected_sources": [
+      "docs/Camada-06-Validacao-Quality-Gates-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quais são os critérios do QG5 de fine-tuning?",
+    "answer": "O QG5 define critérios de fine-tuning do pipeline de duas etapas.",
+    "contexts": [
+      "O QG5 define criterios de fine-tuning do pipeline de duas etapas."
+    ],
+    "ground_truth": "O QG5 define criterios de fine-tuning do pipeline de duas etapas.",
+    "expected_chunk_ids": [
+      "c06_qg5_finetune"
+    ],
+    "expected_sources": [
+      "docs/Camada-06-Validacao-Quality-Gates-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual a latência máxima aceita por batimento no firmware?",
+    "answer": "A latência máxima aceita por batimento no firmware é 200 ms.",
+    "contexts": [
+      "A latencia maxima aceita por batimento no firmware e 200ms."
+    ],
+    "ground_truth": "A latencia maxima aceita por batimento no firmware e 200ms.",
+    "expected_chunk_ids": [
+      "c06_qg9_latency"
+    ],
+    "expected_sources": [
+      "docs/Camada-06-Validacao-Quality-Gates-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como o pipeline CI/CD é organizado no projeto?",
+    "answer": "O pipeline CI/CD organiza lint, testes, quality gates e relatório de qualidade.",
+    "contexts": [
+      "O pipeline CI/CD organiza lint, testes, quality gates e relatorio."
+    ],
+    "ground_truth": "O pipeline CI/CD organiza lint, testes, quality gates e relatorio.",
+    "expected_chunk_ids": [
+      "c07_devops_pipeline"
+    ],
+    "expected_sources": [
+      "docs/Camada-07-Integracao-DevOps-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quais ferramentas de lint são executadas no Makefile?",
+    "answer": "As ferramentas de lint são black, isort, flake8, mypy e bandit.",
+    "contexts": [
+      "As ferramentas de lint sao black, isort, flake8, mypy e bandit."
+    ],
+    "ground_truth": "As ferramentas de lint sao black, isort, flake8, mypy e bandit.",
+    "expected_chunk_ids": [
+      "c07_lint_tools"
+    ],
+    "expected_sources": [
+      "docs/Camada-07-Integracao-DevOps-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o compilador C usado no firmware bare-metal?",
+    "answer": "O compilador C usado no firmware bare-metal é o arm-none-eabi-gcc 13.3.rel1.",
+    "contexts": [
+      "O compilador C usado no firmware bare-metal e o arm-none-eabi-gcc 13.3.rel1."
+    ],
+    "ground_truth": "O compilador C usado no firmware bare-metal e o arm-none-eabi-gcc 13.3.rel1.",
+    "expected_chunk_ids": [
+      "c08_compiler"
+    ],
+    "expected_sources": [
+      "docs/Camada-08-Firmware-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como o TensorFlow Lite Micro é integrado ao firmware?",
+    "answer": "O TensorFlow Lite Micro é integrado como biblioteca compilada separadamente.",
+    "contexts": [
+      "O TensorFlow Lite Micro e integrado como biblioteca compilada separadamente."
+    ],
+    "ground_truth": "O TensorFlow Lite Micro e integrado como biblioteca compilada separadamente.",
+    "expected_chunk_ids": [
+      "c08_tflm_integration"
+    ],
+    "expected_sources": [
+      "docs/Camada-08-Firmware-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o tamanho da arena TFLM configurada?",
+    "answer": "A arena TFLM configurada tem 64KB.",
+    "contexts": [
+      "A arena TFLM configurada tem 64KB."
+    ],
+    "ground_truth": "A arena TFLM configurada tem 64KB.",
+    "expected_chunk_ids": [
+      "c08_arena_size"
+    ],
+    "expected_sources": [
+      "docs/Camada-08-Firmware-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como funciona o watchdog no firmware STM32?",
+    "answer": "O watchdog no firmware STM32 reseta após timeout de inferência.",
+    "contexts": [
+      "O watchdog no firmware STM32 reseta apos timeout de inferencia."
+    ],
+    "ground_truth": "O watchdog no firmware STM32 reseta apos timeout de inferencia.",
+    "expected_chunk_ids": [
+      "c08_watchdog"
+    ],
+    "expected_sources": [
+      "docs/Camada-08-Firmware-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual versão do Renode é usada na simulação?",
+    "answer": "A versão do Renode usada na simulação é 1.15.3.",
+    "contexts": [
+      "A versao do Renode usada e 1.15.3."
+    ],
+    "ground_truth": "A versao do Renode usada e 1.15.3.",
+    "expected_chunk_ids": [
+      "c09_renode_version"
+    ],
+    "expected_sources": [
+      "docs/Camada-09-Simulacao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quais são os limites de consumo energético por batimento?",
+    "answer": "Os limites de consumo são 50mA médio e 165mJ por batimento.",
+    "contexts": [
+      "Os limites de consumo energetico sao 50mA medio e 165mJ por batimento."
+    ],
+    "ground_truth": "Os limites de consumo energetico sao 50mA medio e 165mJ por batimento.",
+    "expected_chunk_ids": [
+      "c09_energy_limits"
+    ],
+    "expected_sources": [
+      "docs/Camada-09-Energia-v1.4.md"
+    ]
+  },
+  {
+    "question": "Como é feita a injeção de falhas na comunicação SPI?",
+    "answer": "A injeção de falhas na SPI/UART verifica recuperação ou relatório de erro sem travar.",
+    "contexts": [
+      "A injecao de falhas na SPI/UART verifica recuperacao ou relatorio de erro."
+    ],
+    "ground_truth": "A injecao de falhas na SPI/UART verifica recuperacao ou relatorio de erro.",
+    "expected_chunk_ids": [
+      "c09_fault_injection"
+    ],
+    "expected_sources": [
+      "docs/Camada-09-Simulacao-v1.1.md"
+    ]
+  },
+  {
+    "question": "O que é o Test Harness do projeto?",
+    "answer": "O Test Harness é o conjunto automatizado de testes de firmware no Renode.",
+    "contexts": [
+      "O Test Harness e o conjunto automatizado de testes de firmware no Renode."
+    ],
+    "ground_truth": "O Test Harness e o conjunto automatizado de testes de firmware no Renode.",
+    "expected_chunk_ids": [
+      "c10_test_harness"
+    ],
+    "expected_sources": [
+      "docs/SDD_Project-Lewis_v3.md"
+    ]
+  },
+  {
+    "question": "Como funciona a Camada C11 de Knowledge?",
+    "answer": "A Camada C11 de Knowledge é um RAG local baseado em sqlite-vec.",
+    "contexts": [
+      "A Camada C11 de Knowledge e um RAG local baseado em sqlite-vec."
+    ],
+    "ground_truth": "A Camada C11 de Knowledge e um RAG local baseado em sqlite-vec.",
+    "expected_chunk_ids": [
+      "c11_knowledge_layer"
+    ],
+    "expected_sources": [
+      "docs/SDD-C11-Knowledge-Impl-v2.0.md"
+    ]
+  },
+  {
+    "question": "Qual banco de dados é usado pelo RAG local?",
+    "answer": "O RAG local usa sqlite-vec sobre SQLite.",
+    "contexts": [
+      "O RAG local usa sqlite-vec sobre SQLite."
+    ],
+    "ground_truth": "O RAG local usa sqlite-vec sobre SQLite.",
+    "expected_chunk_ids": [
+      "c11_sqlite_vec"
+    ],
+    "expected_sources": [
+      "docs/SDD-C11-Knowledge-Impl-v2.0.md"
+    ]
+  },
+  {
+    "question": "O que é a busca híbrida na Camada C11?",
+    "answer": "A busca híbrida combina retrieval vetorial e filtros 3D de metadata.",
+    "contexts": [
+      "A busca hibrida combina retrieval vetorial e filtros 3D de metadata."
+    ],
+    "ground_truth": "A busca hibrida combina retrieval vetorial e filtros 3D de metadata.",
+    "expected_chunk_ids": [
+      "c11_hybrid_search"
+    ],
+    "expected_sources": [
+      "docs/SDD-C11-Knowledge-Impl-v2.0.md"
+    ]
+  },
+  {
+    "question": "Quais são os filtros 3D do retriever?",
+    "answer": "Os filtros 3D do retriever são layer, version e tags.",
+    "contexts": [
+      "Os filtros 3D do retriever sao layer, version e tags."
+    ],
+    "ground_truth": "Os filtros 3D do retriever sao layer, version e tags.",
+    "expected_chunk_ids": [
+      "c11_filters_3d"
+    ],
+    "expected_sources": [
+      "docs/SDD-C11-Knowledge-Impl-v2.0.md"
+    ]
+  },
+  {
+    "question": "Qual o MRR mínimo esperado para o índice de knowledge?",
+    "answer": "O MRR mínimo esperado para o índice de knowledge é 0.7.",
+    "contexts": [
+      "O MRR minimo esperado para o indice de knowledge e 0.7."
+    ],
+    "ground_truth": "O MRR minimo esperado para o indice de knowledge e 0.7.",
+    "expected_chunk_ids": [
+      "c11_qg_mrr"
+    ],
+    "expected_sources": [
+      "docs/SDD-C11-Knowledge-Impl-v2.0.md"
+    ]
+  },
+  {
+    "question": "Quais camadas arquiteturais compõem o pipeline SDD?",
+    "answer": "As camadas arquiteturais do pipeline SDD vão de C01 a C10.",
+    "contexts": [
+      "As camadas arquiteturais do pipeline SDD vao de C01 a C10."
+    ],
+    "ground_truth": "As camadas arquiteturais do pipeline SDD vao de C01 a C10.",
+    "expected_chunk_ids": [
+      "sdd_layers"
+    ],
+    "expected_sources": [
+      "docs/SDD_Project-Lewis_v3.md"
+    ]
+  },
+  {
+    "question": "Qual o hardware alvo do projeto Lewis?",
+    "answer": "O hardware alvo do projeto é o STM32F407VG Cortex-M4F.",
+    "contexts": [
+      "O hardware alvo do projeto e o STM32F407VG Cortex-M4F."
+    ],
+    "ground_truth": "O hardware alvo do projeto e o STM32F407VG Cortex-M4F.",
+    "expected_chunk_ids": [
+      "sdd_hardware"
+    ],
+    "expected_sources": [
+      "docs/SDD_Project-Lewis_v3.md"
+    ]
+  },
+  {
+    "question": "O que são os Quality Gates QG0 a QG19?",
+    "answer": "QG0 a QG19 são quality gates que validam cada camada do pipeline.",
+    "contexts": [
+      "QG0 a QG19 sao quality gates que validam cada camada do pipeline."
+    ],
+    "ground_truth": "QG0 a QG19 sao quality gates que validam cada camada do pipeline.",
+    "expected_chunk_ids": [
+      "sdd_quality_gates"
+    ],
+    "expected_sources": [
+      "docs/SDD_Project-Lewis_v3.md"
+    ]
+  },
+  {
+    "question": "Qual a arquitetura final do modelo CNN-LSTM?",
+    "answer": "A arquitetura final é composta por dois estágios 1D-CNN INT8: N vs Anormal e depois S vs V vs F.",
+    "contexts": [
+      "A arquitetura final do pipeline e composta por dois estagios 1D-CNN INT8: N vs Anormal e depois S vs V vs F."
+    ],
+    "ground_truth": "A arquitetura final do pipeline e composta por dois estagios 1D-CNN INT8: N vs Anormal e depois S vs V vs F.",
+    "expected_chunk_ids": [
+      "sdd_cnn_lstm"
+    ],
+    "expected_sources": [
+      "reports/final_architecture_v2.0.md"
+    ]
+  },
+  {
+    "question": "Quais os limites de simulação numérica do sistema?",
+    "answer": "A simulação Renode possui limites como ausência de hardware físico e divergência de 1 LSB.",
+    "contexts": [
+      "A simulacao Renode possui limites como ausencia de hardware fisico e divergencia de 1 LSB."
+    ],
+    "ground_truth": "A simulacao Renode possui limites como ausencia de hardware fisico e divergencia de 1 LSB.",
+    "expected_chunk_ids": [
+      "simulation_limits"
+    ],
+    "expected_sources": [
+      "docs/SIMULATION_LIMITS.md"
+    ]
+  },
+  {
+    "question": "O que está especificado na Fase 1 para os agentes?",
+    "answer": "A Fase 1 especifica o pipeline de dados e ciência de dados até o modelo pronto para TFLM.",
+    "contexts": [
+      "A Fase 1 especifica o pipeline de dados e ciencia de dados ate o modelo pronto para TFLM."
+    ],
+    "ground_truth": "A Fase 1 especifica o pipeline de dados e ciencia de dados ate o modelo pronto para TFLM.",
+    "expected_chunk_ids": [
+      "especificacao_fase1"
+    ],
+    "expected_sources": [
+      "docs/ESPECIFICACAO_Fase1_Agentes-v1.1.md"
+    ]
+  },
+  {
+    "question": "Por que a classe Q é excluída da classificação final?",
+    "answer": "A classe Q é excluída da classificação final por insuficiência estatística de amostras.",
+    "contexts": [
+      "A classe Q e excluida da classificacao final por insuficiencia estatistica de amostras."
+    ],
+    "ground_truth": "A classe Q e excluida da classificacao final por insuficiencia estatistica de amostras.",
+    "expected_chunk_ids": [
+      "adr_stage1_q_class"
+    ],
+    "expected_sources": [
+      "docs/adr_stage1_thresholds_v2.1.md"
+    ]
+  },
+  {
+    "question": "Qual a decisão sobre QAT versus PTQ no projeto?",
+    "answer": "O projeto adota PTQ INT8 como padrão, com tentativa de QAT e fallback automático.",
+    "contexts": [
+      "O projeto adota PTQ INT8 como padrao, com tentativa de QAT e fallback automatico."
+    ],
+    "ground_truth": "O projeto adota PTQ INT8 como padrao, com tentativa de QAT e fallback automatico.",
+    "expected_chunk_ids": [
+      "adr_qat_ptq"
+    ],
+    "expected_sources": [
+      "docs/adr_qat_ptq_v2.0.md"
+    ]
+  },
+  {
+    "question": "Como é feito o versionamento de datasets com DVC?",
+    "answer": "O versionamento de datasets com DVC rastreia arquivos .dvc no Git e binários em remote.",
+    "contexts": [
+      "O versionamento de datasets com DVC rastreia arquivos .dvc no Git e binarios em remote."
+    ],
+    "ground_truth": "O versionamento de datasets com DVC rastreia arquivos .dvc no Git e binarios em remote.",
+    "expected_chunk_ids": [
+      "c01_dvc_versioning"
+    ],
+    "expected_sources": [
+      "docs/Camada-01-Ingestao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o propósito do SMOTE no pipeline de features?",
+    "answer": "O SMOTE balanceia classes minoritárias no espaço de features.",
+    "contexts": [
+      "O SMOTE balanceia classes minoritarias no espaco de features."
+    ],
+    "ground_truth": "O SMOTE balanceia classes minoritarias no espaco de features.",
+    "expected_chunk_ids": [
+      "c03_smote_features"
+    ],
+    "expected_sources": [
+      "docs/Camada-03-Feature-Engineering-v1.1.md"
+    ]
+  },
+  {
+    "question": "Por que padding com zeros é proibido no preprocessamento?",
+    "answer": "O padding com zeros é proibido no preprocessamento para evitar descontinuidades.",
+    "contexts": [
+      "Padding com zeros e proibido no preprocessamento para evitar descontinuidades."
+    ],
+    "ground_truth": "Padding com zeros e proibido no preprocessamento para evitar descontinuidades.",
+    "expected_chunk_ids": [
+      "c02_no_zero_padding"
+    ],
+    "expected_sources": [
+      "docs/Camada-02-Resample-Preprocessamento-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quais bibliotecas de ML embarcado são utilizadas?",
+    "answer": "As bibliotecas de ML embarcado utilizadas são TFLM, CMSIS-DSP e CMSIS-NN.",
+    "contexts": [
+      "As bibliotecas de ML embarcado utilizadas sao TFLM, CMSIS-DSP e CMSIS-NN."
+    ],
+    "ground_truth": "As bibliotecas de ML embarcado utilizadas sao TFLM, CMSIS-DSP e CMSIS-NN.",
+    "expected_chunk_ids": [
+      "c08_cmsis_nn"
+    ],
+    "expected_sources": [
+      "docs/Camada-08-Firmware-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como é garantida a bit-exatidão entre firmware e Python?",
+    "answer": "A bit-exatidão entre firmware e Python é validada dentro de 1 LSB.",
+    "contexts": [
+      "A bit-exatidao entre firmware e Python e validada dentro de 1 LSB."
+    ],
+    "ground_truth": "A bit-exatidao entre firmware e Python e validada dentro de 1 LSB.",
+    "expected_chunk_ids": [
+      "c08_qg8_bitexact"
+    ],
+    "expected_sources": [
+      "docs/Camada-08-Firmware-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o consumo médio máximo de corrente no hardware?",
+    "answer": "O consumo médio máximo de corrente no hardware é 50 mA.",
+    "contexts": [
+      "O consumo medio maximo de corrente no hardware e 50 mA."
+    ],
+    "ground_truth": "O consumo medio maximo de corrente no hardware e 50 mA.",
+    "expected_chunk_ids": [
+      "c09_current_limit"
+    ],
+    "expected_sources": [
+      "docs/Camada-09-Energia-v1.4.md"
+    ]
+  },
+  {
+    "question": "Quantas horas de autonomia mínima o dispositivo deve ter?",
+    "answer": "O dispositivo deve ter mais de 10 horas de autonomia.",
+    "contexts": [
+      "O dispositivo deve ter mais de 10 horas de autonomia."
+    ],
+    "ground_truth": "O dispositivo deve ter mais de 10 horas de autonomia.",
+    "expected_chunk_ids": [
+      "c09_autonomy"
+    ],
+    "expected_sources": [
+      "docs/Camada-09-Energia-v1.4.md"
+    ]
+  },
+  {
+    "question": "O que é o débito técnico de energia no Renode?",
+    "answer": "O débito técnico de energia no Renode é a falta de estimativa de consumo, tratada por modelagem externa.",
+    "contexts": [
+      "O debito tecnico de energia no Renode e a falta de estimativa de consumo, tratada por modelagem externa."
+    ],
+    "ground_truth": "O debito tecnico de energia no Renode e a falta de estimativa de consumo, tratada por modelagem externa.",
+    "expected_chunk_ids": [
+      "debito_tecnico_energia"
+    ],
+    "expected_sources": [
+      "docs/DEBITO_TECNICO_Energia_Renode-v1.4.md"
+    ]
+  },
+  {
+    "question": "Quais as regras de ouro do projeto?",
+    "answer": "As regras de ouro incluem GroupKFold, sem padding zero, SMOTE em features e FlatBuffer menor que 64KB.",
+    "contexts": [
+      "As regras de ouro incluem GroupKFold, sem padding zero, SMOTE em features e FlatBuffer menor que 64KB."
+    ],
+    "ground_truth": "As regras de ouro incluem GroupKFold, sem padding zero, SMOTE em features e FlatBuffer menor que 64KB.",
+    "expected_chunk_ids": [
+      "sdd_golden_rules"
+    ],
+    "expected_sources": [
+      "docs/SDD_Project-Lewis_v3.md"
+    ]
+  },
+  {
+    "question": "Como é calculado o checksum dos artefatos de memória?",
+    "answer": "O checksum dos artefatos de memória é calculado com SHA-256 e registrado no Artifact registry.",
+    "contexts": [
+      "O checksum dos artefatos de memoria e calculado com SHA-256 e registrado no Artifact registry."
+    ],
+    "ground_truth": "O checksum dos artefatos de memoria e calculado com SHA-256 e registrado no Artifact registry.",
+    "expected_chunk_ids": [
+      "memory_checksum"
+    ],
+    "expected_sources": [
+      "docs/SDD_Project-Lewis_v3.md"
+    ]
+  },
+  {
+    "question": "Qual o pipeline de duas etapas para classificação de arritmias?",
+    "answer": "O pipeline de duas etapas usa Estágio 1 N vs Anormal e Estágio 2 S vs V vs F.",
+    "contexts": [
+      "O pipeline de duas etapas usa Estagio 1 N vs Anormal e Estagio 2 S vs V vs F."
+    ],
+    "ground_truth": "O pipeline de duas etapas usa Estagio 1 N vs Anormal e Estagio 2 S vs V vs F.",
+    "expected_chunk_ids": [
+      "c04_two_stage_pipeline"
+    ],
+    "expected_sources": [
+      "docs/Camada-04-Modelagem-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como o sistema lida com dados ausentes ou corrompidos na ingestão?",
+    "answer": "O sistema envia registros com falhas de ingestão para a Dead Letter Queue.",
+    "contexts": [
+      "O sistema envia registros com falhas de ingestao para a Dead Letter Queue."
+    ],
+    "ground_truth": "O sistema envia registros com falhas de ingestao para a Dead Letter Queue.",
+    "expected_chunk_ids": [
+      "c01_dlq"
+    ],
+    "expected_sources": [
+      "docs/Camada-01-Ingestao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o propósito do dataset PTB-XL no projeto?",
+    "answer": "O dataset PTB-XL é fallback adicional para pré-treino do backbone.",
+    "contexts": [
+      "O dataset PTB-XL e fallback adicional para pre-treino do backbone."
+    ],
+    "ground_truth": "O dataset PTB-XL e fallback adicional para pre-treino do backbone.",
+    "expected_chunk_ids": [
+      "c01_ptbxl_fallback"
+    ],
+    "expected_sources": [
+      "docs/Camada-01-Ingestao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Como é feita a compressão dos mirrors de datasets?",
+    "answer": "A compressão dos mirrors usa tar.gz para backups offline e CI.",
+    "contexts": [
+      "A compressao dos mirrors usa tar.gz para backups offline e CI."
+    ],
+    "ground_truth": "A compressao dos mirrors usa tar.gz para backups offline e CI.",
+    "expected_chunk_ids": [
+      "c01_mirrors"
+    ],
+    "expected_sources": [
+      "docs/Camada-01-Ingestao-v1.1.md"
+    ]
+  },
+  {
+    "question": "Quais as métricas de qualidade do detector AMPT?",
+    "answer": "As métricas do detector AMPT são Sens > 96.5%, PPV > 99.0% e F1 > 97.5%.",
+    "contexts": [
+      "As metricas do detector AMPT sao Sens > 96.5%, PPV > 99.0% e F1 > 97.5%."
+    ],
+    "ground_truth": "As metricas do detector AMPT sao Sens > 96.5%, PPV > 99.0% e F1 > 97.5%.",
+    "expected_chunk_ids": [
+      "c03_ampt_metrics"
+    ],
+    "expected_sources": [
+      "docs/Camada-03-Feature-Engineering-v1.1.md"
+    ]
+  },
+  {
+    "question": "Qual o input shape esperado pelo modelo?",
+    "answer": "O input shape esperado pelo modelo é (500, 1).",
+    "contexts": [
+      "O input shape esperado pelo modelo e (500, 1)."
+    ],
+    "ground_truth": "O input shape esperado pelo modelo e (500, 1).",
+    "expected_chunk_ids": [
+      "c04_input_shape"
+    ],
+    "expected_sources": [
+      "docs/Camada-04-Modelagem-v1.1.md"
+    ]
+  }
+]

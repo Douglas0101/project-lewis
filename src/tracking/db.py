@@ -15,6 +15,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from src.tracking.models import Base
+from src.tracking.migrations import apply_migrations
 
 
 def _project_root() -> Path:
@@ -62,6 +63,7 @@ def session_scope(engine=None) -> Generator[Session, None, None]:
 
 
 def init_schema(engine=None) -> None:
-    """Cria todas as tabelas se não existirem."""
+    """Cria todas as tabelas se não existirem e aplica migrations pendentes."""
     target = engine or get_engine()
     Base.metadata.create_all(target)
+    apply_migrations(target)

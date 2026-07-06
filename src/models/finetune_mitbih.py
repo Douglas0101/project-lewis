@@ -20,6 +20,8 @@ from sklearn.utils.class_weight import compute_class_weight
 
 from src.data.augmentation import oversample_class, oversample_per_class
 
+from src.callbacks.f1_macro_checkpoint import F1MacroCheckpoint
+
 from .backbone_1d import freeze_conv_layers, save_model_config
 
 LOGGER = logging.getLogger("lewis.camada04.finetune")
@@ -87,6 +89,12 @@ class SparseCategoricalFocalLoss(tf.keras.losses.Loss):
         self.gamma = gamma
         self.from_logits = from_logits
         self.alpha = alpha
+        # Detecta se alpha é escalar em tempo de construção para evitar
+        # operações simbólicas no call (modo grafo).
+        self._alpha_is_scalar = (
+            alpha is not None
+            and (isinstance(alpha, (int, float)) or np.ndim(alpha) == 0)
+        )
 
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
         y_true = tf.cast(tf.reshape(y_true, [-1]), tf.int32)
@@ -99,6 +107,10 @@ class SparseCategoricalFocalLoss(tf.keras.losses.Loss):
         prob_true = tf.gather(y_pred, y_true, batch_dims=1)
         focal_weight = tf.pow(1.0 - prob_true, self.gamma)
         if self.alpha is not None:
+            # Aceita alpha como escalar float (focado na classe positiva) ou
+            # como vetor de pesos por classe.
+            if self._alpha_is_scalar:
+                return self.alpha * focal_weight * ce
             alpha_t = tf.gather(self.alpha, y_true)
             return alpha_t * focal_weight * ce
         return focal_weight * ce
@@ -142,20 +154,20 @@ def _build_train_dataset(
     augment: bool = True,
     seed: Optional[int] = None,
 ) -> tf.data.Dataset:
-    """Cria dataset de treino com shuffle e augmentation opcional.
+    """Cria dataset de treino com generator zero-copy sobre memmap.
 
-    Mantém a distribuição original das classes; o balanceamento é feito via
-    ``class_weight`` no ``model.fit`` para não forçar o modelo a superestimar
-    as minoritárias durante a validação imbalanciada.
+    O gerador lê uma amostra por vez do memmap, faz cast para float32 e
+    devolve ao TensorFlow. Dessa forma, apenas o batch ativo fica na RAM.
+    O balanceamento é feito via ``class_weight`` no ``model.fit``.
 
     Parameters
     ----------
     X : np.ndarray
-        Dados, shape (n, 500, 1).
+        Dados (pode ser memmap), shape (n, 500, 1).
     y : np.ndarray
         Labels inteiros.
     batch_size : int
-        Tamanho do batch.
+        Tamanho do batch final entregue ao modelo.
     augment : bool
         Se True, aplica augmentation leve.
     seed : int, optional
@@ -164,150 +176,34 @@ def _build_train_dataset(
     Returns
     -------
     tf.data.Dataset
-        Dataset shuffle + batched + prefetched.
+        Dataset gerador + batch + prefetch(1).
     """
-    ds = tf.data.Dataset.from_tensor_slices((X, y))
-    ds = ds.shuffle(buffer_size=max(1, len(y)), seed=seed, reshuffle_each_iteration=True)
-    ds = ds.repeat()
+    n = len(y)
+    rng = np.random.default_rng(seed)
+    # Pré-aloca índices para evitar recriar array a cada época.
+    indices = np.arange(n)
+    rng.shuffle(indices)
+
+    def _generator():
+        while True:
+            for idx in indices:
+                x = X[idx].astype(np.float32, copy=False)
+                yield x, int(y[idx])
+            rng.shuffle(indices)
+
+    output_signature = (
+        tf.TensorSpec(shape=X.shape[1:], dtype=tf.float32),
+        tf.TensorSpec(shape=(), dtype=tf.int64),
+    )
+    ds = tf.data.Dataset.from_generator(
+        _generator,
+        output_signature=output_signature,
+    )
     if augment:
         ds = ds.map(_augment, num_parallel_calls=tf.data.AUTOTUNE)
-    return ds.batch(batch_size).prefetch(tf.data.AUTOTUNE)
-
-
-class F1MacroCheckpoint(tf.keras.callbacks.Callback):
-    """Salva o melhor modelo segundo F1-macro AAMI na validação.
-
-    Substitui o ModelCheckpoint baseado em ``val_loss``, que é distorcido pelos
-    class weights. Monitora diretamente a métrica alvo do QG5.
-    """
-
-    def __init__(
-        self,
-        X_val: np.ndarray,
-        y_val: np.ndarray,
-        filepath: Path,
-        class_names: Optional[List[str]] = None,
-        thresholds: Optional[Dict[str, Any]] = None,
-        metric: str = "F1_macro",
-        patience: int = 10,
-        optimize_thresholds: bool = False,
-    ):
-        super().__init__()
-        self.X_val = X_val
-        self.y_val = y_val
-        self.filepath = Path(filepath)
-        self.class_names = class_names
-        self.thresholds = thresholds
-        self.metric = metric
-        self.patience = patience
-        self.optimize_thresholds = optimize_thresholds
-        self.best_score = -1.0
-        self.wait = 0
-        self.stopped_epoch = 0
-        self.best_threshold: Optional[float] = None
-        self.best_thresholds: Optional[Dict[str, float]] = None
-
-    def _extract_score(self, result: Dict[str, Any]) -> float:
-        """Extrai a métrica de seleção do resultado AAMI."""
-        if self.metric == "F1_macro":
-            return float(result["global"]["F1_macro"])
-        if self.metric.startswith("Se_") or self.metric.startswith("F1_"):
-            metric_name, cls = self.metric.split("_", 1)
-            return float(result["per_class"][cls][metric_name])
-        raise ValueError(f"Unsupported selection metric: {self.metric}")
-
-    def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
-        from .evaluate import (
-            evaluate_aami,
-            find_best_threshold,
-            find_best_thresholds_multiclass,
-        )
-
-        y_proba = self.model.predict(self.X_val, verbose=0)
-
-        # Para classificação binária, busca threshold que maximize F1-macro/QG5.
-        if self.class_names is not None and len(self.class_names) == 2:
-            result = find_best_threshold(
-                self.y_val,
-                y_proba[:, 1],
-                class_names=self.class_names,
-                thresholds=self.thresholds,
-                target_class_idx=1,
-            )
-            threshold = result["threshold"]
-            thresholds_dict = None
-        elif self.optimize_thresholds and self.class_names is not None:
-            result = find_best_thresholds_multiclass(
-                self.y_val,
-                y_proba,
-                class_names=self.class_names,
-                thresholds_cfg=self.thresholds,
-            )
-            threshold = None
-            thresholds_dict = result.get("thresholds")
-        else:
-            y_pred = np.argmax(y_proba, axis=1)
-            result = evaluate_aami(
-                self.y_val,
-                y_pred,
-                class_names=self.class_names,
-                thresholds=self.thresholds,
-            )
-            threshold = None
-            thresholds_dict = None
-
-        score = self._extract_score(result)
-        logs = logs or {}
-        logs[f"val_{self.metric}"] = score
-        threshold_str = (
-            f"{threshold:.2f}"
-            if threshold is not None
-            else (
-                str(thresholds_dict)
-                if thresholds_dict is not None
-                else "argmax"
-            )
-        )
-        LOGGER.info(
-            "Epoch %d | val_%s=%.4f | QG=%s | threshold=%s",
-            epoch + 1,
-            self.metric,
-            score,
-            result["passes_qg5"],
-            threshold_str,
-        )
-
-        if score > self.best_score:
-            self.best_score = score
-            self.wait = 0
-            self.model.save_weights(str(self.filepath))
-            if threshold is not None:
-                self.best_threshold = threshold
-                threshold_path = self.filepath.with_suffix(".threshold.json")
-                with threshold_path.open("w", encoding="utf-8") as fh:
-                    json.dump({"threshold": float(threshold)}, fh, indent=2)
-            elif thresholds_dict is not None:
-                self.best_thresholds = thresholds_dict
-                threshold_path = self.filepath.with_suffix(".threshold.json")
-                with threshold_path.open("w", encoding="utf-8") as fh:
-                    json.dump({"thresholds": thresholds_dict}, fh, indent=2)
-            LOGGER.info("%s improved -> saved weights to %s", self.metric, self.filepath)
-        else:
-            self.wait += 1
-            if self.wait >= self.patience:
-                self.stopped_epoch = epoch
-                self.model.stop_training = True
-                LOGGER.info(
-                    "Early stop at epoch %d (best %s=%.4f)",
-                    epoch + 1,
-                    self.metric,
-                    self.best_score,
-                )
-
-    def on_train_end(self, logs: Optional[dict] = None) -> None:
-        if self.filepath.exists():
-            LOGGER.info("Restoring best weights (best %s=%.4f)", self.metric, self.best_score)
-            self.model.load_weights(str(self.filepath))
+    ds = ds.batch(batch_size)
+    ds = ds.prefetch(buffer_size=1)
+    return ds
 
 
 def finetune_mitbih(
@@ -333,6 +229,9 @@ def finetune_mitbih(
     augment_config: Optional[Dict[str, Any]] = None,
     loss: str | tf.keras.losses.Loss = "sparse_categorical_crossentropy",
     optimize_thresholds: bool = False,
+    extra_callbacks: Optional[List[tf.keras.callbacks.Callback]] = None,
+    checkpoint_max_samples: Optional[int] = None,
+    checkpoint_predict_batch_size: int = 1024,
 ) -> Tuple[tf.keras.Model, dict]:
     """Fine-tuning com backbone opcionalmente congelado.
 
@@ -386,6 +285,10 @@ def finetune_mitbih(
     optimize_thresholds : bool
         Se True, realiza threshold tuning one-vs-rest na validação para
         classificação multiclasse.
+    extra_callbacks : list[tf.keras.callbacks.Callback], optional
+        Callbacks adicionais a serem incluídos junto aos callbacks padrão.
+        Útil para instrumentação (gradiente, calibração) sem alterar o
+        pipeline principal.
 
     Returns
     -------
@@ -393,6 +296,7 @@ def finetune_mitbih(
         (model, history_dict)
     """
     _set_seeds(seed)
+    tf.keras.backend.clear_session()
 
     if experiment_dir is None:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
@@ -419,9 +323,7 @@ def finetune_mitbih(
             augment_config,
             len(X_train),
         )
-        X_train, y_train = oversample_per_class(
-            X_train, y_train, config=augment_config, seed=seed
-        )
+        X_train, y_train = oversample_per_class(X_train, y_train, config=augment_config, seed=seed)
         LOGGER.info("Train size after class-specific augmentation=%d", len(X_train))
     elif augment_class is not None and augment_factor > 1:
         LOGGER.info(
@@ -447,7 +349,8 @@ def finetune_mitbih(
         class_weight = _compute_class_weights(y_train)
     LOGGER.info("Class weights: %s", class_weight)
 
-    # Compilar
+    # Compilar com Adam (melhor convergência com class weights desbalanceados
+    # e focal loss; o custo de memória extra é aceitável com batch pequeno).
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=learning_rate),
         loss=loss,
@@ -456,14 +359,9 @@ def finetune_mitbih(
 
     # Callbacks: usar F1-macro AAMI como critério principal de seleção
     # (val_loss é distorcido pelos class weights).
-    callbacks = [
-        tf.keras.callbacks.ReduceLROnPlateau(
-            monitor=monitor,
-            factor=0.5,
-            patience=5,
-            min_lr=1e-6,
-            verbose=1,
-        ),
+    # F1MacroCheckpoint vem antes de ReduceLROnPlateau para que o LR scheduler
+    # veja val_F1_macro no dict logs da mesma época.
+    callbacks: List[tf.keras.callbacks.Callback] = [
         F1MacroCheckpoint(
             X_val=X_val,
             y_val=y_val,
@@ -473,6 +371,16 @@ def finetune_mitbih(
             metric=selection_metric,
             patience=15,
             optimize_thresholds=optimize_thresholds,
+            max_samples=checkpoint_max_samples,
+            predict_batch_size=checkpoint_predict_batch_size,
+        ),
+        tf.keras.callbacks.ReduceLROnPlateau(
+            monitor=monitor,
+            mode="min" if "loss" in monitor.lower() else "max",
+            factor=0.5,
+            patience=5,
+            min_lr=1e-6,
+            verbose=1,
         ),
         tf.keras.callbacks.CSVLogger(
             filename=str(experiment_dir / "training.log"),
@@ -480,6 +388,10 @@ def finetune_mitbih(
             append=False,
         ),
     ]
+
+    if extra_callbacks:
+        callbacks = extra_callbacks + callbacks
+        LOGGER.info("Adicionados %d callbacks extras", len(extra_callbacks))
 
     # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
     if use_slha:
@@ -498,10 +410,11 @@ def finetune_mitbih(
             slha.ResourceMonitor(log_path=experiment_dir / "slha" / "resource_logs.jsonl")
         )
 
-    # Treinar
+    # Treinar sem validation_data explícito: a validação é feita pelo
+    # F1MacroCheckpoint com subset controlado, reduzindo o pico de memória do
+    # grafo TF/Keras.
     history = model.fit(
         train_ds,
-        validation_data=(X_val, y_val),
         epochs=epochs,
         steps_per_epoch=steps_per_epoch,
         class_weight=class_weight,

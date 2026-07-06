@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: "default"
+    folder: "Project-Lewis"
+    options:
+      path: /var/lib/grafana/dashboards

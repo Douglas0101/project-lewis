@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-lewis"
-version = "1.0.0"
+version = "3.1.0"
 description = "Sistema Cardíaco Autônomo de Borda — Pipeline de Dados + Ciência de Dados para ECG"
 readme = "README.md"
 license = { text = "MIT" }
@@ -43,6 +43,11 @@ dependencies = [
     "mcp>=1.6.0,<2.0.0",
     "tf-keras>=2.21.0",
     "tensorflow-model-optimization>=0.8.0,<0.9.0",
+    "sqlparse>=0.5.0",
+    "bleach>=6.0.0",
+    "prometheus-client>=0.20.0",
+    "fastapi>=0.110.0",
+    "uvicorn[standard]>=0.29.0",
 ]
 
 [project.urls]
@@ -50,10 +55,17 @@ Homepage = "https://github.com/douglas-souza/Project-Lewis"
 Repository = "https://github.com/douglas-souza/Project-Lewis"
 
 [dependency-groups]
+eval = [
+    "ragas>=0.1.0",
+    "openai>=1.0.0",
+    "datasets>=2.14.0",
+    "langchain-openai>=0.1.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-cov>=5.0.0",
     "pytest-xdist>=3.5.0",
+    "pytest-timeout>=2.3.0",
     "black>=24.0.0",
     "isort>=5.13.0",
     "flake8>=7.0.0",
@@ -147,4 +159,9 @@ markers = [
     "qg_c11: Quality Gate C11 — knowledge layer (RAG + sqlite-vec + MCP)",
     "smoke: Testes de fumaça rápidos (CI sem download de datasets)",
     "slow: Testes lentos (CI condicional)",
+    "integration: Testes de integracao que dependem de build externo",
+    "stress: Testes de stress com carga maliciosa ou volume extremo",
+    "security: Testes de seguranca (SQLi, XSS, injecao)",
+    "eval: Testes que precisam de dependências do grupo eval",
+    "observability: Testes de métricas e RAGAS",
 ]

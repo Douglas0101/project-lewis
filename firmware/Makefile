@@ -36,6 +36,7 @@ C_SOURCES_COMMON := \
 	$(SRC_DIR)/app/command_loop.c \
 	$(SRC_DIR)/utils/debug.c \
 	$(SRC_DIR)/dsp/adc_stub.c \
+	$(SRC_DIR)/dsp/adaptive_skipping.c \
 	$(SRC_DIR)/dsp/filter.c \
 	$(SRC_DIR)/dsp/normalizer.c \
 	$(SRC_DIR)/dsp/r_peak_detector.c
@@ -194,12 +195,14 @@ endif
 # Alvo nativo (host x86_64) — para iteracao rapida sem emulador
 # ---------------------------------------------------------------------------
 ifeq ($(LEWIS_USE_TFLM),1)
-CFLAGS_NAT := -DLEWIS_HOST_NATIVE -DTF_LITE_STATIC_MEMORY \
+# Native com TFLM real: desabilita adaptive skipping para garantir que todos os
+# beats do demo sejam processados nos testes de bit-exatidao (QG8/QG10).
+CFLAGS_NAT := -DLEWIS_HOST_NATIVE -DTF_LITE_STATIC_MEMORY -DADAPTIVE_SKIPPING_ENABLED=0 \
 	$(OPT) $(WARNINGS) -g -std=gnu11 \
 	$(INCLUDES) \
 	-include $(BUILD_NAT)/config.h
 
-CXXFLAGS_NAT := -DLEWIS_HOST_NATIVE -DTF_LITE_STATIC_MEMORY \
+CXXFLAGS_NAT := -DLEWIS_HOST_NATIVE -DTF_LITE_STATIC_MEMORY -DADAPTIVE_SKIPPING_ENABLED=0 \
 	$(OPT) $(WARNINGS) -g -fno-rtti -fno-exceptions -std=c++17 \
 	-Wno-undef -Wno-unused-parameter \
 	$(INCLUDES) \
@@ -229,7 +232,8 @@ HARNESS_MAIN := $(HARNESS_DIR)/harness_main.c
 HARNESS_C_SOURCES := \
 	$(HARNESS_DIR)/harness.c \
 	$(HARNESS_DIR)/test_dsp.c \
-	$(HARNESS_DIR)/test_r_peak.c
+	$(HARNESS_DIR)/test_r_peak.c \
+	$(HARNESS_DIR)/test_adaptive_skipping.c
 ifeq ($(LEWIS_USE_TFLM),1)
 HARNESS_C_SOURCES += $(HARNESS_DIR)/test_pipeline.c
 endif

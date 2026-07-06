@@ -32,8 +32,23 @@ class DocumentMeta(_BaseConfig):
     @classmethod
     def validate_layer(cls, v: str) -> str:
         allowed = {
-            "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10",
-            "SDD", "PRD", "UNIFIED", "ESPECIFICACAO", "SIMULATION", "DEBITO_TECNICO", "GENERAL",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "C06",
+            "C07",
+            "C08",
+            "C09",
+            "C10",
+            "SDD",
+            "PRD",
+            "UNIFIED",
+            "ESPECIFICACAO",
+            "SIMULATION",
+            "DEBITO_TECNICO",
+            "GENERAL",
         }
         if v not in allowed:
             raise ValueError(f"Layer '{v}' não é válida. Valores permitidos: {allowed}")
@@ -56,8 +71,23 @@ class QueryRequest(_BaseConfig):
         if v is None:
             return v
         allowed = {
-            "C01", "C02", "C03", "C04", "C05", "C06", "C07", "C08", "C09", "C10",
-            "SDD", "PRD", "UNIFIED", "ESPECIFICACAO", "SIMULATION", "DEBITO_TECNICO", "GENERAL",
+            "C01",
+            "C02",
+            "C03",
+            "C04",
+            "C05",
+            "C06",
+            "C07",
+            "C08",
+            "C09",
+            "C10",
+            "SDD",
+            "PRD",
+            "UNIFIED",
+            "ESPECIFICACAO",
+            "SIMULATION",
+            "DEBITO_TECNICO",
+            "GENERAL",
         }
         if v not in allowed:
             raise ValueError(f"Layer '{v}' não é válida.")

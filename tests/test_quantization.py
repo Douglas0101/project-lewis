@@ -267,11 +267,7 @@ class TestCHeader:
         header_path = tmp_path / "model.h"
         content = generate_c_header(tflite_model, header_path, array_name="test_model")
 
-        assert (
-            "alignas(16)" in content
-            or "aligned(16)" in content
-            or "LEWIS_ALIGN" in content
-        )
+        assert "alignas(16)" in content or "aligned(16)" in content or "LEWIS_ALIGN" in content
         assert "static const unsigned char test_model_tflite[]" in content
         assert "static const unsigned int test_model_len" in content
 

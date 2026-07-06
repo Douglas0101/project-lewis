@@ -35,6 +35,7 @@ void harness_assert_int8_eq(harness_result_t* r, int8_t expected, int8_t actual,
 void suite_dsp_register(void);
 void suite_r_peak_register(void);
 void suite_inference_register(void);
+void suite_adaptive_skipping_register(void);
 #if LEWIS_USE_TFLM
 void suite_pipeline_register(void);
 #endif

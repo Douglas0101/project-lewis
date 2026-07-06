@@ -33,9 +33,7 @@ def test_build_integrated_predictions(stage1_pred, stage2_pred, expected):
 def test_find_best_threshold_passes_qg():
     # Dados quase separáveis: N tem score baixo, Anormal tem score alto
     y_true = np.array([0] * 100 + [1] * 50)
-    y_score = np.concatenate(
-        [np.random.rand(100) * 0.4, 0.6 + np.random.rand(50) * 0.4]
-    )
+    y_score = np.concatenate([np.random.rand(100) * 0.4, 0.6 + np.random.rand(50) * 0.4])
     thresholds = {
         "min_acc": 0.85,
         "min_f1_macro": 0.80,

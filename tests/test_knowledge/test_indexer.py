@@ -114,9 +114,7 @@ class TestIndexerCoverage:
         assert any("Camada-04" in c.source for c in chunks)
         assert any("Camada-08" in c.source for c in chunks)
 
-    def test_load_code_documents_with_temp_files(
-        self, monkeypatch: Any, tmp_path: Path
-    ) -> None:
+    def test_load_code_documents_with_temp_files(self, monkeypatch: Any, tmp_path: Path) -> None:
         src = tmp_path / "src"
         firmware = tmp_path / "firmware" / "src"
         (src / "models").mkdir(parents=True)
@@ -125,9 +123,7 @@ class TestIndexerCoverage:
         (src / "models" / "stage1_binary.py").write_text(
             "def build_model(): return None\n", encoding="utf-8"
         )
-        (firmware / "main.c").write_text(
-            "int main(void) { while(1); }\n", encoding="utf-8"
-        )
+        (firmware / "main.c").write_text("int main(void) { while(1); }\n", encoding="utf-8")
 
         monkeypatch.setattr("src.knowledge.indexer.SRC_DIR", src)
         monkeypatch.setattr("src.knowledge.indexer.FIRMWARE_DIR", firmware)
@@ -187,9 +183,7 @@ class TestIndexerLineage:
 def _fetch_chunk_ids(db_path: Path) -> list[str]:
     conn: Any = get_connection(db_path)
     try:
-        rows = conn.execute(
-            "SELECT chunk_id FROM knowledge_chunks ORDER BY chunk_id"
-        ).fetchall()
+        rows = conn.execute("SELECT chunk_id FROM knowledge_chunks ORDER BY chunk_id").fetchall()
         return [row["chunk_id"] for row in rows]
     finally:
         conn.close()

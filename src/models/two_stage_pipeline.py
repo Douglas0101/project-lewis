@@ -177,9 +177,7 @@ def evaluate_two_stage(
     X_stage1 = X_stage1 if X_stage1 is not None else X
 
     # Estágio 1 (binário) — inclui Q como Anormal (ou S/V/F se exclude_q)
-    y_stage1_pred, _ = run_stage1(
-        stage1_model, stage1_scaler, X_stage1, threshold=stage1_threshold
-    )
+    y_stage1_pred, _ = run_stage1(stage1_model, stage1_scaler, X_stage1, threshold=stage1_threshold)
     y_stage1_true = np.where(y_aami == 0, 0, 1)
     stage1_result = evaluate_aami(
         y_stage1_true,

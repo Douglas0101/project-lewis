@@ -133,10 +133,14 @@ def mini_index_env(
     db_path = isolated_paths["db_path"]
     lineage_dir = isolated_paths["lineage_dir"]
 
+    experiments = root / "data" / "lineage" / "experiments"
+    experiments.mkdir(parents=True, exist_ok=True)
+
     monkeypatch.setattr(indexer_module, "PROJECT_ROOT", root)
     monkeypatch.setattr(indexer_module, "DOCS_DIR", docs)
     monkeypatch.setattr(indexer_module, "SRC_DIR", src)
     monkeypatch.setattr(indexer_module, "FIRMWARE_DIR", firmware)
+    monkeypatch.setattr(indexer_module, "EXPERIMENTS_DIR", experiments)
     monkeypatch.setattr(indexer_module, "KNOWLEDGE_DB", db_path)
     monkeypatch.setattr(indexer_module, "LINEAGE_DIR", lineage_dir)
     monkeypatch.setattr(indexer_module, "CONFIG_PATH", root / "knowledge_v2.0.yaml")
@@ -145,6 +149,7 @@ def mini_index_env(
     monkeypatch.setattr(db_module, "KNOWLEDGE_DB", db_path)
     monkeypatch.setattr(cli_module, "KNOWLEDGE_DB", db_path)
     monkeypatch.setattr(cli_module, "LINEAGE_DIR", lineage_dir)
+    monkeypatch.setattr(retriever_module, "KNOWLEDGE_DB", db_path)
     monkeypatch.setattr(retriever_module, "_get_model", lambda: test_embedding)
     monkeypatch.setattr(retriever_module, "LOG_QUERIES", tmp_path / "queries.jsonl")
 

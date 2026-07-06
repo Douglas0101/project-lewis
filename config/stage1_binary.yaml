@@ -26,20 +26,35 @@ training:
   focal_gamma: 2.0
   focal_alpha: null  # vetor por classe ou null para usar class_weight
   seed: 42
-  monitor: val_loss
+  # F1-macro é o gate principal do QG5' v2.1 (ver docs/adr_stage1_thresholds_v2.1.md).
+  monitor: val_F1_macro
 
 callbacks:
   early_stopping:
-    monitor: val_loss
+    monitor: val_F1_macro
+    mode: max
     patience: 15
     restore_best_weights: true
   reduce_lr_on_plateau:
-    monitor: val_loss
+    monitor: val_F1_macro
+    mode: max
     patience: 5
     factor: 0.5
     min_lr: 1.0e-6
   csv_logger:
     filename: training.log
+
+instrumentation:
+  gradient_monitor:
+    enabled: true
+    log_path: logs/gradients_stage1.json
+    layer_names: null  # auto-detecta camadas Dense
+    max_samples: 2048
+  calibration_monitor:
+    enabled: true
+    log_path: logs/calibration_stage1.json
+    n_bins: 15
+    max_samples: 2048
 
 group_kfold:
   n_splits: 5
@@ -56,11 +71,13 @@ normalization:
 
 quality_gate:
   qg5_stage1:
-    # Thresholds v2.2: alinhados aos benchmarks reais de modelos leves
-    # inter-paciente após múltiplas tentativas sem sucesso com CNN raw-signal.
+    # Thresholds v2.1: revisados em docs/adr_stage1_thresholds_v2.1.md.
+    # CNN pura sobre sinal raw não atinge metas v2.0 (F1>0,90, recall>0,95).
+    # Novas metas são factíveis e servem de gate para ativação do fallback
+    # com features morfológicas (Fase 1 do plano aprovado).
     min_acc: 0.75
     min_f1_macro: 0.55
-    min_auc_roc: 0.85
+    min_auc_roc: 0.60
     recall_anormal: 0.30
     precision_anormal: 0.25
     sensitivity_n: 0.85

@@ -89,9 +89,7 @@ def _synthetic_ecg(
     total_samples = rr_samples * n_beats + 500
 
     sig = np.zeros(total_samples, dtype=np.float64)
-    r_peaks = np.array(
-        [rr_samples * i + rr_samples // 2 for i in range(n_beats)], dtype=np.int64
-    )
+    r_peaks = np.array([rr_samples * i + rr_samples // 2 for i in range(n_beats)], dtype=np.int64)
 
     for rp in r_peaks:
         qrs_width = int(round(0.080 * fs))
@@ -217,6 +215,6 @@ class TestRPeakFirmware:
         tol_samples = int(round(0.150 * 500.0))
         metrics = _match_peaks(c_peaks, r_true, tol_samples)
 
-        assert metrics["Sens"] >= self.MIN_SENS, (
-            f"Sensibilidade vs ground-truth = {metrics['Sens']:.3f}"
-        )
+        assert (
+            metrics["Sens"] >= self.MIN_SENS
+        ), f"Sensibilidade vs ground-truth = {metrics['Sens']:.3f}"

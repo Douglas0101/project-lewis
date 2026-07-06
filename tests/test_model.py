@@ -117,9 +117,9 @@ class TestBackboneArchitecture:
         )
         info = TFLMConstraints.validate_model(model)
         assert info["total_params"] > 20_000
-        assert info["flatbuffer_kb_est"] <= TFLMConstraints.MAX_FLATBUFFER_KB, (
-            f"Estimated FlatBuffer={info['flatbuffer_kb_est']}KB exceeds limit"
-        )
+        assert (
+            info["flatbuffer_kb_est"] <= TFLMConstraints.MAX_FLATBUFFER_KB
+        ), f"Estimated FlatBuffer={info['flatbuffer_kb_est']}KB exceeds limit"
 
     def test_backbone_with_features_passes_tflm_constraints(self):
         """QG4: backbone com features morfológicas adicionais cabe em <64KB."""
@@ -133,9 +133,9 @@ class TestBackboneArchitecture:
             dense_units=96,
         )
         info = TFLMConstraints.validate_model(model)
-        assert info["flatbuffer_kb_est"] <= TFLMConstraints.MAX_FLATBUFFER_KB, (
-            f"Estimated FlatBuffer={info['flatbuffer_kb_est']}KB exceeds limit"
-        )
+        assert (
+            info["flatbuffer_kb_est"] <= TFLMConstraints.MAX_FLATBUFFER_KB
+        ), f"Estimated FlatBuffer={info['flatbuffer_kb_est']}KB exceeds limit"
         assert len(model.inputs) == 2
 
     def test_forward_pass(self):

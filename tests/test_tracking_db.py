@@ -33,9 +33,7 @@ def session() -> Session:
 
 def test_create_experiment(session: Session) -> None:
     repo = ExperimentRepository(session)
-    exp = repo.create(
-        ExperimentCreate(name="exp_test", stage="stage1", config_path="config.yaml")
-    )
+    exp = repo.create(ExperimentCreate(name="exp_test", stage="stage1", config_path="config.yaml"))
     assert exp.id is not None
     assert exp.name == "exp_test"
     assert exp.stage == "stage1"
@@ -55,9 +53,7 @@ def test_create_run_and_metrics(session: Session) -> None:
     exp = exp_repo.create(ExperimentCreate(name="exp", stage="finetune"))
 
     run_repo = RunRepository(session)
-    run = run_repo.create(
-        RunCreate(experiment_id=exp.id, run_type="test", fold_idx=2)
-    )
+    run = run_repo.create(RunCreate(experiment_id=exp.id, run_type="test", fold_idx=2))
     assert run.experiment_id == exp.id
     assert run.fold_idx == 2
 

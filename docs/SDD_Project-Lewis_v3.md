@@ -1,11 +1,13 @@
 # SDD — Project-Lewis: Classificação de Arritmias ECG em Edge
 ## Arquitetura de Instrução para Agentes de Coding AI (Kimi Code / OpenCode)
 
-**Versão:** 3.0 | **Data:** 2026-06-19 | **Arquiteto:** Douglas Souza  
+**Versão:** 3.1 | **Data:** 2026-06-30 | **Arquiteto:** Douglas Souza  
 **Projeto:** Project-Lewis — Pipeline de Dados + Ciência de Dados + Firmware Embarcado  
 **Hardware Dev:** Lenovo IdeaPad 3 15ITL6 | Zorin OS 18.1 (Ubuntu 24.04.3 LTS)  
 **Python:** 3.12.x (system Python — não usar 3.13+)  
 **Ferramentas Alvo:** Kimi Code (Moonshot AI) | OpenCode (Open Source)
+
+> **Nota de versão 3.1:** Atualização da Fase 5 (v2.0) — inclusão do pipeline de inferência duas etapas, callbacks de instrumentação, análise dinâmica pós-treinamento, pruning/QAT-PTQ, adaptive inference skipping e quality gates revisados (QG5'). As camadas C01–C10 permanecem válidas; a seção 3.11 detalha as evoluções aprovadas no `UNIFIED_DOCUMENT_v2.0.md`.
 
 ---
 
@@ -26,6 +28,7 @@ O Project-Lewis é um sistema de classificação de arritmias cardíacas via ECG
 | Fase 1 | C07 — Integração/DevOps | Makefile, uv, Docker, DVC, CI/CD GitHub Actions, pre-commit | Pipeline reprodutível end-to-end |
 | Fase 2 | C08 — Firmware | C bare-metal STM32F4: DSP + TFLM + pipeline de inferência | `lewis.bin` compilável |
 | Fase 2 | C09 — Simulação/Energia | Renode STM32F4Discovery, modelagem de consumo energético | Relatório de simulação + métricas |
+| **Fase 5** | **C04/C05/C08 — Pipeline v2.0** | Pipeline duas etapas (N vs Anormal → S/V/F), callbacks, pruning/QAT-PTQ, adaptive skipping | Modelos `stage{1,2}_float32_v2.0.keras` + FlatBuffers INT8 |
 
 ### 1.2 Stack Técnica Válida
 
@@ -533,6 +536,260 @@ Project-Lewis/
 
 ---
 
+## 3.11 Evoluções da Fase 5 v2.0 (Pipeline Duas Etapas e Otimizações)
+
+> **Escopo:** Esta seção complementa as camadas C01–C10 com as evoluções aprovadas no `UNIFIED_DOCUMENT_v2.0.md` (Fase 5, plano v2.0). Elas não substituem as camadas anteriores, mas documentam os artefatos, contratos e quality gates específicos do pipeline MIT-BIH/AAMI em duas etapas.
+
+### 3.11.1 Callbacks de Instrumentação (C04)
+
+**Responsável:** Ciência de Dados / ML Engineering  
+**Artefatos:** `src/callbacks/gradient_monitor.py`, `src/callbacks/calibration_monitor.py`, `src/callbacks/f1_macro_checkpoint.py`  
+**Quality Gate:** QG4, QG5'
+
+**Contexto:**
+O treinamento do pipeline v2.0 é monitorado por três callbacks Keras desacopláveis. Eles substituem o `ModelCheckpoint` baseado em `val_loss` (distorcido por class weights) e fornecem diagnósticos de gradiente, calibração e seleção de melhor modelo segundo métricas AAMI.
+
+| Callback | Função | Saída | Frequência |
+|----------|--------|-------|------------|
+| `GradientMonitor` | Computa normas L2, razão gradiente/peso, percentil 95 e média por classe (N, S, V, F) para camadas `Dense` | `logs/gradients*.json` | Fim de cada época |
+| `CalibrationMonitor` | Calcula ECE, MCE, Brier Score global e por classe, confiança média por classe e reliability diagram | `logs/calibration*.json` | Fim de cada época |
+| `F1MacroCheckpoint` | Avalia validação com `src/models/evaluate.py`, seleciona melhor modelo por métrica AAMI configurável e salva pesos + threshold | `.keras` (weights) + `.threshold.json` | Fim de cada época |
+
+**Contratos e Restrições:**
+- Nenhum callback altera a arquitetura do modelo.
+- Apenas dependências já aprovadas (`tensorflow`, `numpy`, `scipy`).
+- `GradientMonitor` amostra até `max_samples` do conjunto de validação (seed 42) para conter custo computacional.
+- `CalibrationMonitor` usa `n_bins=15` e thresholds de alerta: ECE > 0,15; MCE > 0,30; Brier(S/V/F) > 0,50.
+- `F1MacroCheckpoint` suporta seleção por `F1_macro`, `Se_Anormal`, `F1_V` etc., além de threshold tuning binário e one-vs-rest multiclasse.
+
+**Instruções para o Agente:**
+- Anexar os três callbacks no `model.fit()` de ambos os estágios (Estágio 1: monitor `val_recall_anormal`; Estágio 2: monitor `val_f1_macro`).
+- Garantir que os logs JSON sejam escritos em `logs/` com nomes distintos por estágio (ex.: `gradients_stage1_v2.0.json`).
+- Usar os logs como entrada para `scripts/analyze_training_dynamics.py`.
+
+**Acceptance Criteria (binário):**
+- [ ] Callbacks executam sem erro durante `model.fit()`.
+- [ ] `logs/gradients*.json` contém métricas por época e por camada.
+- [ ] `logs/calibration*.json` contém ECE, MCE, Brier e reliability bins.
+- [ ] Melhores pesos são restaurados ao final do treinamento (`F1MacroCheckpoint.on_train_end`).
+- [ ] Threshold adaptativo salvo em `.threshold.json` quando aplicável.
+
+---
+
+### 3.11.2 Análise Dinâmica Pós-Treinamento
+
+**Responsável:** Ciência de Dados / ML Engineering  
+**Artefato:** `scripts/analyze_training_dynamics.py`  
+**Quality Gate:** QG5' (diagnóstico)
+
+**Contexto:**
+Após o treinamento, o script correlaciona gradientes, calibração e métricas F1-macro para gerar insights acionáveis (vanishing/exploding gradient, miscalibration, recomendações de learning rate / temperature scaling / class weights).
+
+**Entradas:**
+- Log de treinamento Keras (`logs/finetune_*.log`).
+- Log de gradientes (`logs/gradients*.json`).
+- Log de calibração (`logs/calibration*.json`).
+
+**Saídas:**
+- `logs/figures/correlation_heatmap.png`
+- `logs/figures/ece_vs_f1_dual_axis.png`
+- `logs/figures/reliability_diagram.png`
+- `logs/training_dynamics_analysis.md`
+
+**Métricas de Correlação:**
+- `norm_ratio_<dense>_vs_f1_macro`
+- `ece_vs_f1_macro`
+- `brier_S/V/F_vs_f1_macro`
+
+**Instruções para o Agente:**
+- Executar o script automaticamente ao final de cada treinamento de estágio.
+- Usar o relatório gerado para decidir sobre learning rate, inicialização, temperature scaling ou ajuste de pesos de classe.
+- Preservar os artefados em `logs/` para rastreabilidade do experimento.
+
+**Acceptance Criteria (binário):**
+- [ ] Script roda com `--training_log`, `--gradients_log`, `--calibration_log`.
+- [ ] Relatório markdown gerado com correlações, insights e recomendações.
+- [ ] Pelo menos 3 figuras exportadas em `logs/figures/`.
+- [ ] Nenhum PII nos logs ou relatórios.
+
+---
+
+### 3.11.3 Pruning Estruturado e QAT/PTQ (C04/C05)
+
+**Responsável:** ML Engineering / Firmware Interface  
+**Artefatos:** `src/models/pruning_qat.py`, `scripts/apply_pruning_qat.py`  
+**Quality Gates:** QG5', QG6
+
+**Contexto:**
+A Fase 5 aprovou pruning estruturado de canais (30%) seguido de Quantization-Aware Training (QAT) como estratégia ideal. Entretanto, o ambiente `tf-keras` usado pelo TensorFlow 2.21 é incompatível com `tensorflow_model_optimization` (`ValueError: to_annotate can only be a keras.layers.Layer instance`). Por isso, o pipeline mantém QAT como tentativa automática e fallback para PTQ full-integer INT8.
+
+```mermaid
+flowchart LR
+    A["Modelo Keras float32"] --> B["Pruning estruturado 30%"]
+    B --> C["Fine-tuning pós-pruning"]
+    C --> D{"QAT aplicável?"}
+    D -->|Sim| E["QAT + fine-tune"]
+    D -->|Não| F["Fallback PTQ INT8"]
+    E --> G["Conversão TFLite INT8"]
+    F --> G
+    G --> H["FlatBuffer + quantization_params.json"]
+```
+
+**Pruning Estruturado:**
+- Remove filtros inteiros das camadas `Conv1D` com base na norma L1 do kernel.
+- Reconstrói o modelo funcionalmente, ajustando dimensões de entrada das camadas subsequentes.
+- Default `target_sparsity=0.30`; pode ser configurado por camada via `layer_sparsity`.
+
+**QAT / PTQ:**
+- `apply_qat()` tenta envolver o modelo com `tfmot.quantization.keras.quantize_model`.
+- Se falhar, retorna `qat_applied=False` e o pipeline prossegue com PTQ.
+- Conversão INT8 usa `TFLITE_BUILTINS_INT8`, entrada/saída `int8`, dataset representativo a partir de `X_val`.
+
+**Instruções para o Agente:**
+- Sempre verificar a chave `qat_applied` no resultado do pipeline.
+- Comparar F1-macro do modelo podado/quantizado vs baseline; se ΔF1-macro > 2%, reduzir sparsity ou aumentar calibration samples.
+- Exportar `quantization_params.json` com escalas e zero-points para geração de `quantization_params.h` do firmware.
+
+**Acceptance Criteria (binário):**
+- [ ] Pruning reduz parâmetros em ~30% sem quebrar o grafo Keras.
+- [ ] Modelo podado atinge F1-macro dentro de 2 pontos percentuais do baseline (QG5').
+- [ ] FlatBuffer INT8 < 64KB (QG6).
+- [ ] ΔF1-macro entre float32 e INT8 < 2% (QG6).
+- [ ] `quantization_params.json` gerado com `input_scale`, `input_zero_point`, `output_scale`, `output_zero_point`.
+
+---
+
+### 3.11.4 Pipeline de Inferência Python (src/inference/)
+
+**Responsável:** ML Engineering / Inference Interface  
+**Artefatos:** `src/inference/two_stage_pipeline.py`, `src/inference/quantized_runner.py`  
+**Quality Gates:** QG5', QG6, QG10
+
+**Contexto:**
+O pipeline canônico de inferência em duas etapas substitui o classificador mono-etapa de 5 classes. Ele é implementado em Python para validação, benchmarking e referência do firmware.
+
+```mermaid
+flowchart TD
+    X["Entrada ECG<br/>(n, 500, 1)"] --> S1["Estágio 1<br/>N vs Anormal"]
+    S1 -->|Normal| OUT_N["Classe: N"]
+    S1 -->|Anormal| S2["Estágio 2<br/>S vs V vs F"]
+    S2 --> OUT_CLS["Classe: S | V | F"]
+```
+
+**Classes e Responsabilidades:**
+
+| Componente | Arquivo | Responsabilidade |
+|------------|---------|------------------|
+| `TwoStageInferencePipeline` | `two_stage_pipeline.py` | Orquestra Estágio 1 e Estágio 2, carrega modelos Keras ou TFLite, normaliza entrada, combina predições |
+| `QuantizedModelRunner` | `quantized_runner.py` | Executa modelos `.tflite` INT8 full-integer: quantiza entrada, invoca interpretador, dequantiza saída |
+
+**Contratos:**
+- Entrada: tensor shape `(500, 1)` ou `(n, 500, 1)`, `float32`.
+- Saída: dicionário com `class`, `stage1_score`, `stage2_scores`, `stage1_threshold`, `stage2_labels`.
+- Estágio 1: binário (0=N, 1=Anormal); threshold adaptativo carregado de `stage1_threshold_v2.0.json`.
+- Estágio 2: multiclasse (0=S, 1=V, 2=F); executado apenas para amostras classificadas como Anormal no Estágio 1.
+- Suporte a modelos float32 (Keras) e quantizados (TFLite INT8) via flag `use_quantized`.
+
+**Artefatos Esperados em `models/`:**
+- `stage1_float32_v2.0.keras`
+- `stage2_float32_v2.0.keras`
+- `input_scaler_stage1_v2.0.pkl`
+- `input_scaler_stage2_v2.0.pkl`
+- `stage1_threshold_v2.0.json`
+- `quantized/stage1_int8_v2.0.tflite`
+- `quantized/stage2_int8_v2.0.tflite`
+
+**Acceptance Criteria (binário):**
+- [ ] `TwoStageInferencePipeline.from_directory(models_dir).load()` carrega ambos os estágios.
+- [ ] Predições integradas mapeiam N=0, S=1, V=2, F=3.
+- [ ] Modelos INT8 produzem saída dentro de 1 LSB vs interpretador Python (QG6/QG10).
+- [ ] Bit-exatidão: cosine similarity médio > 0,99 vs float32 (QG10).
+
+---
+
+### 3.11.5 Adaptive Inference Skipping no Firmware (C08)
+
+**Responsável:** Firmware / Embedded ML Engineering  
+**Artefatos:** `firmware/src/dsp/adaptive_skipping.c`, `firmware/src/dsp/adaptive_skipping.h`  
+**Quality Gate:** QG9, QG19
+
+**Contexto:**
+O adaptive skipping reduz consumo energético em ritmos estáveis: quando a variação dos últimos intervalos RR está abaixo de um limiar, o firmware repete a última classe predita em vez de executar nova inferência.
+
+**API C:**
+
+```c
+lewis_adaptive_skipping_t ctx;
+lewis_adaptive_skipping_init(&ctx);
+
+bool skip = lewis_adaptive_skipping_should_skip(&ctx, rr_ms, threshold_ms, threshold_ratio);
+// ... executa inferência ou repete última classe ...
+lewis_adaptive_skipping_update_class(&ctx, class_id);
+```
+
+**Parâmetros:**
+- `LEWIS_ADAPTIVE_SKIPPING_MAX_WINDOW = 5`: tamanho do histórico circular de RR.
+- `LEWIS_ADAPTIVE_SKIPPING_MIN_CYCLES = 3`: mínimo de ciclos para confiar na estabilidade.
+- `threshold_ms`: limiar de variação absoluta (ms).
+- `threshold_ratio`: limiar de variação relativa (`max_dev / mean`).
+- `ADAPTIVE_SKIPPING_ENABLED`: macro de compilação; pode ser sobrescrita para desabilitar o recurso sem remover código.
+
+**Restrições:**
+- Sem alocação dinâmica (arrays estáticos).
+- Estado escalar ocupa < 100 bytes de RAM persistente.
+- Skipping é interrompido periodicamente (forçar inferência a cada N ciclos) para evitar permanência em estado obsoleto.
+
+**Acceptance Criteria (binário):**
+- [ ] `lewis_adaptive_skipping_should_skip` retorna `false` com histórico insuficiente.
+- [ ] Retorna `true` apenas quando RR estável e `has_last_class == true`.
+- [ ] Estado permanece consistente após wrap-around do buffer circular.
+- [ ] Consumo energético reduzido em cenário estável (target: -70% em condições ideais, conforme QG19).
+
+---
+
+### 3.11.6 Testes de Quality Gates v2.0
+
+**Responsável:** QA / Arquiteto  
+**Artefatos:** `tests/test_quantization_degradation.py`, `tests/test_bit_exact_python_tflm.py`, `tests/test_two_stage_qg5.py`, `tests/test_firmware_filters_python.py`  
+**Quality Gates:** QG5', QG6, QG8, QG10, QG16
+
+**Contexto:**
+A Fase 5 introduziu quality gates revisados (QG5') e testes específicos para validar o pipeline duas etapas, a equivalência numérica entre Python e TFLite/TFLM e a fidelidade dos filtros C vs Python.
+
+| Teste | Arquivo | QG | O que valida |
+|-------|---------|----|--------------|
+| `test_quantization_degradation_stage1/2` | `test_quantization_degradation.py` | QG6 | ΔF1-macro < 2% entre float32 e INT8 nos dois estágios |
+| `test_bit_exact_logits` | `test_bit_exact_python_tflm.py` | QG10 | Cosine similarity médio > 0,99 e argmatch > 94% entre Keras e TFLite INT8 |
+| `test_two_stage_qg5_end_to_end` | `test_two_stage_qg5.py` | QG5' | Estágio 1 Recall(Anormal) ≥ 0,30; Estágio 2 F1-macro ≥ 0,45 |
+| `test_filter_chain_rmse_vs_c` | `test_firmware_filters_python.py` | QG16 | RMSE < 1e-6 entre cadeia de filtros C e Python |
+
+**Thresholds QG5' v2.0 (referência):**
+
+| Métrica | Threshold |
+|---------|-----------|
+| Estágio 1 — Recall(Anormal) | > 0,95 (desejável) / ≥ 0,30 (smoke test) |
+| Estágio 1 — F1-macro | > 0,90 |
+| Estágio 2 — F1-macro | > 0,50 |
+| Estágio 2 — F1(S) | > 0,45 |
+| Estágio 2 — F1(V) | > 0,70 |
+| Estágio 2 — F1(F) | > 0,30 |
+
+> **Nota:** Os valores de smoke test (`test_two_stage_qg5.py`) são menos exigentes que as metas finais do `UNIFIED_DOCUMENT_v2.0.md` para permitir execução rápida em CI enquanto o treinamento final está em andamento.
+
+**Instruções para o Agente:**
+- Adicionar marcadores pytest (`@pytest.mark.qg5`, `@pytest.mark.qg6`, `@pytest.mark.qg10`, `@pytest.mark.qg16`) aos testes correspondentes.
+- Usar `pytest.skip()` quando artefatos de modelo ou dados não estiverem disponíveis; nunca falhar por ausência de artefato em ambiente de desenvolvimento.
+- Reportar métricas numéricas nos logs para rastreabilidade.
+
+**Acceptance Criteria (binário):**
+- [ ] `pytest -m qg5 tests/test_two_stage_qg5.py` passa (smoke thresholds).
+- [ ] `pytest -m qg6 tests/test_quantization_degradation.py` passa.
+- [ ] `pytest -m qg10 tests/test_bit_exact_python_tflm.py` passa.
+- [ ] `pytest -m qg16 tests/test_firmware_filters_python.py` passa.
+- [ ] Todos os testes printam métricas comparativas para baseline futuro.
+
+---
+
 ## 4. Prompts de System Context Específicos
 
 ### 4.1 Kimi Code — `.kimi/sdd-context.md`
@@ -602,16 +859,20 @@ O Project-Lewis é um sistema de classificação de arritmias ECG em edge (STM32
 - SMOTE/ADASYN no feature space (nunca no sinal bruto)
 
 ### C04 — Modelagem
-- Backbone 1D-CNN: ~13K–20K params, input (500,1), 5 classes AAMI
+- Backbone 1D-CNN: ~13K–20K params, input (500,1)
 - Pré-treino Chapman: 5 superclasses SCP-ECG, sigmoid multi-label
-- Fine-tuning MIT-BIH+: backbone congelado, GroupKFold por paciente
+- Fine-tuning MIT-BIH+ v2.0: pipeline duas etapas (N vs Anormal → S/V/F)
+- GroupKFold por paciente obrigatório, seed 42
 - Métricas primárias: F1-macro e MCC (não Acc global)
-- Thresholds: Acc > 93%, F1-macro > 85%, MCC > 0.80
+- Callbacks: GradientMonitor, CalibrationMonitor, F1MacroCheckpoint
+- Análise dinâmica pós-treinamento via `scripts/analyze_training_dynamics.py`
+- Thresholds QG5' v2.0: Estágio 1 Recall(Anormal) > 0,95; Estágio 2 F1-macro > 0,50
 
 ### C05 — Quantização/Exportação
-- PTQ INT8 per-channel, 512 amostras estratificadas
+- PTQ INT8 per-channel como padrão; QAT tentado automaticamente com fallback PTQ
+- Pruning estruturado 30% opcional via `src/models/pruning_qat.py`
 - ΔAcc < 1%, ΔF1-macro < 2%
-- Exportar `model_data.h` + `quantization_params.h` (alignas(16))
+- Exportar `model_data.h` + `quantization_params.h` (alignas(16)) + `quantization_params.json`
 - Validar compilação: `arm-none-eabi-gcc -c -Werror`
 
 ### C06 — Validação/QG
@@ -628,7 +889,9 @@ O Project-Lewis é um sistema de classificação de arritmias ECG em edge (STM32
 ### C08 — Firmware
 - C bare-metal STM32F4; sem printf/semihosting
 - Pipeline: Aquisição → DSP → Quantização → TFLM → Dequantização → Argmax
+- Pipeline v2.0: Estágio 1 (N vs Anormal) + Estágio 2 (S/V/F) + Adaptive Skipping
 - Arena TFLM 64KB estática; CMSIS-NN ativado
+- Adaptive skipping: `firmware/src/dsp/adaptive_skipping.c/h`
 - Build: `make -C firmware LEWIS_USE_TFLM=1`
 
 ### C09 — Simulação/Energia
@@ -712,19 +975,23 @@ O projeto segue uma arquitetura SDD de 9 camadas, do download de datasets biomé
 ### C04 — Modelagem
 - Backbone 1D-CNN enxuto (~13K–20K params)
 - Pré-treino Chapman (SCP-ECG 5 classes, sigmoid)
-- Fine-tuning MIT-BIH+ (AAMI 5 classes, softmax)
+- Fine-tuning MIT-BIH+ v2.0: pipeline duas etapas (N vs Anormal → S/V/F)
 - GroupKFold por paciente obrigatório, seed 42
 - Métricas: F1-macro e MCC primárias
+- Callbacks: GradientMonitor, CalibrationMonitor, F1MacroCheckpoint
+- Análise dinâmica pós-treinamento via `scripts/analyze_training_dynamics.py`
 
 ### C05 — Quantização/Exportação
-- PTQ INT8 per-channel, 512 amostras estratificadas
+- PTQ INT8 per-channel como padrão; QAT tentado automaticamente com fallback PTQ
+- Pruning estruturado 30% opcional via `src/models/pruning_qat.py`
 - ΔAcc < 1%, ΔF1-macro < 2%
-- Exportar headers C com `alignas(16)`
+- Exportar headers C com `alignas(16)` + `quantization_params.json`
 - Validar compilação ARM
 
 ### C06 — Validação/QG
 - Pirâmide 70/20/10, TDD/BDD
 - CI GitHub Actions: lint → unit → integration → QG4–QG6
+- Testes v2.0: `test_two_stage_qg5.py`, `test_quantization_degradation.py`, `test_bit_exact_python_tflm.py`
 - DLQ para falhas
 
 ### C07 — DevOps
@@ -735,7 +1002,9 @@ O projeto segue uma arquitetura SDD de 9 camadas, do download de datasets biomé
 ### C08 — Firmware
 - C bare-metal, sem printf/semihosting
 - Pipeline DSP + TFLM completo
+- Pipeline v2.0: Estágio 1 + Estágio 2 + Adaptive Skipping
 - Arena 64KB, CMSIS-NN ativado
+- Adaptive skipping: `firmware/src/dsp/adaptive_skipping.c/h`
 - Build via `make -C firmware LEWIS_USE_TFLM=1`
 
 ### C09 — Simulação/Energia
@@ -812,6 +1081,7 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 8. **C08 — Firmware** — `docs/Camada-08-Firmware-v1.1.md`
 9. **C09 — Simulação/Energia** — `docs/Camada-09-Simulacao-v1.1.md` / `docs/Camada-09-Energia-v1.4.md`
 10. **C10 — Test Harness** — `docs/SDD_Project-Lewis_v3.md` (seção 3.10)
+11. **C11 — Evoluções Fase 5 v2.0** — `docs/SDD_Project-Lewis_v3.md` (seção 3.11)
 
 ## Quality Gates (QG0–QG19)
 | QG | Camada | Critério | Threshold |
@@ -821,7 +1091,7 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 | QG2 | C03 | AMPT @ 500Hz | Sens > 96.5%, PPV > 99.0%, F1 > 97.5% |
 | QG3 | C03 | Features | Janela 1000ms, ≥10 dimensões, sem NaN, SMOTE em feature space |
 | QG4 | C04 | Pré-treino Chapman | AUC-ROC macro > 0.85, loss < 0.15 |
-| QG5 | C04 | Fine-tuning MIT-BIH+ | Acc > 93%, F1-macro > 85%, MCC > 0.80 |
+| QG5' | C04 | Fine-tuning MIT-BIH+ v2.0 (4 classes, pipeline duas etapas) | Estágio 1: Recall(Anormal) > 0,95; Estágio 2: F1-macro > 0,50, F1(S) > 0,45, F1(V) > 0,70, F1(F) > 0,30 |
 | QG6 | C05 | Quantização + Exportação | ΔF1-macro < 2%, FlatBuffer < 64KB, header compilável |
 | QG7 | C08 | Build firmware | Sem warnings (-Werror), FlatBuffer < 64KB |
 | QG8 | C08 | Bit-exatidão | int8 vs Python BUILTIN_REF |
@@ -837,6 +1107,8 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 | QG18 | C08 | Detector R-peak | Sens/PPV ≥ 90% vs AMPT Python |
 | QG19 | C09 | Consumo energético | < 50 mA médio, < 165 mJ/batimento, > 10 h autonomia |
 
+> **Nota sobre QG5':** A Fase 5 v2.0 revisou o QG5 para o pipeline duas etapas (4 classes AAMI, excluindo Q). Os thresholds v1.1 (Acc > 93%, F1-macro > 85%, 5 classes) foram substituídos pelas metas do Estágio 1 e Estágio 2 detalhadas na seção 3.11.6. Os artefatos v2.0 residem em `models/stage{1,2}_float32_v2.0.keras`.
+>
 > **Nota sobre QG14 e QG15:** Estes quality gates estão reservados para implementação futura. Na arquitetura atual do Project-Lewis não há camada de autenticação, interface web/API pública nem mecanismo OTA; portanto, QG14 e QG15 não são aplicáveis nesta fase. Se forem introduzidos, devem passar por revisão humana obrigatória (Regra 15).
 
 ## Regras de Ouro

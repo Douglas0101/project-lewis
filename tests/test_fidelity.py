@@ -226,15 +226,11 @@ class TestFidelity:
             )
 
         expected_int8 = np.fromfile(expected_path, dtype=np.int8)
-        assert expected_int8.shape == (RESPONSE_LEN,), (
-            f"Formato inesperado: {expected_int8.shape}"
-        )
+        assert expected_int8.shape == (RESPONSE_LEN,), f"Formato inesperado: {expected_int8.shape}"
 
         log_bytes = _run_robot_for_beat(idx)
         firmware_int8 = _extract_response_frame(log_bytes)
-        assert firmware_int8.shape == (RESPONSE_LEN,), (
-            f"Resposta inesperada: {firmware_int8.shape}"
-        )
+        assert firmware_int8.shape == (RESPONSE_LEN,), f"Resposta inesperada: {firmware_int8.shape}"
 
         expected_f32 = _dequantize(expected_int8, output_scale, output_zero_point)
         firmware_f32 = _dequantize(firmware_int8, output_scale, output_zero_point)

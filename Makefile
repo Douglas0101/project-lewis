@@ -7,7 +7,10 @@
         verify-renode \
         knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
         knowledge-reindex-if-docs-changed \
+        hybrid-eval \
+        ragas-eval \
         memory-commit \
+        observability-up observability-down \
         test-e2e
 
 # Detecta ambiente virtual se existente; caso contrario usa python3/pytest do sistema.
@@ -140,6 +143,18 @@ test: ## Run the Python test suite
 test-e2e: ## Run slow and integration tests
 	$(PYTEST) tests/ -m "slow or integration" -v --tb=short
 
+stress-test: ## Run stress tests (RAG, SQL, Timeline)
+	$(PYTEST) tests/stress/ -v -m stress --timeout=120 -x
+
+stress-test-p1: ## Run stress tests for Ponte 1 (RAG)
+	$(PYTEST) tests/stress/test_ponte1_rag.py -v -m stress --timeout=120 -x
+
+stress-test-p2: ## Run stress tests for Ponte 2 (NL -> SQL)
+	$(PYTEST) tests/stress/test_ponte2_sql.py -v -m stress --timeout=120 -x
+
+stress-test-p3: ## Run stress tests for Ponte 3 (Timeline)
+	$(PYTEST) tests/stress/test_ponte3_timeline.py -v -m stress --timeout=120 -x
+
 quality-report: ## Generate project quality report
 	$(UV) run python scripts/generate_quality_report.py
 
@@ -253,11 +268,26 @@ knowledge-reindex-if-docs-changed:
 		echo "$$CURRENT" > data/lineage/.knowledge_checksum; \
 	fi
 
+hybrid-eval: ## Avalia hybrid search no golden dataset
+	$(UV) run python scripts/eval_hybrid.py
+
+ragas-eval: ## Avalia qualidade do RAG com golden dataset
+	$(UV) run python -m src.observability.ragas_eval_cli data/eval/golden_dataset.json
+
 # ---------------------------------------------------------------------------
 # Memory / ArtifactRegistry
 # ---------------------------------------------------------------------------
 memory-commit:
 	$(UV) run python scripts/memory_commit.py --run-id $(RUN_ID) --path $(ARTIFACT_PATH) --type $(ARTIFACT_TYPE)
+
+# ---------------------------------------------------------------------------
+# Observabilidade (Prometheus + Grafana)
+# ---------------------------------------------------------------------------
+observability-up: ## Sobe Prometheus + Grafana + app de métricas
+	docker compose up -d observability prometheus grafana
+
+observability-down: ## Derruba stack de observabilidade
+	docker compose down observability prometheus grafana
 
 all: env download-all catalog test quality-report ## Run full pipeline: env, download, catalog, test and report
 

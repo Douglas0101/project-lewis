@@ -11,7 +11,6 @@ import pytest
 
 from src.data.aggregator import ECGAggregator
 
-
 RAW_DIRS = {
     "mitdb": Path("data/raw_mitbih"),
     "svdb": Path("data/raw_svdb"),

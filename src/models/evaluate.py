@@ -458,9 +458,7 @@ def evaluate_fold(
             thresholds=thresholds,
             target_class_idx=target_class_idx,
         )
-        result["y_pred"] = (
-            (y_score >= result["threshold"]).astype(np.int64).tolist()
-        )
+        result["y_pred"] = (y_score >= result["threshold"]).astype(np.int64).tolist()
     elif optimize_thresholds and class_names is not None:
         result = find_best_thresholds_multiclass(
             y_test,
@@ -470,8 +468,6 @@ def evaluate_fold(
         )
     else:
         y_pred = np.argmax(y_pred_proba, axis=1)
-        result = evaluate_aami(
-            y_test, y_pred, class_names=class_names, thresholds=thresholds
-        )
+        result = evaluate_aami(y_test, y_pred, class_names=class_names, thresholds=thresholds)
         result["y_pred"] = y_pred.tolist()
     return result
