@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "project-lewis"
-version = "1.0.0"
+version = "3.1.0"
 description = "Sistema Cardíaco Autônomo de Borda — Pipeline de Dados + Ciência de Dados para ECG"
 readme = "README.md"
 license = { text = "MIT" }

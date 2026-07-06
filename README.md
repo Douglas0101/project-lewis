@@ -657,7 +657,7 @@ Consulte [`docs/SIMULATION_LIMITS.md`](docs/SIMULATION_LIMITS.md) para detalhes 
 
 ## 📌 Versão Atual
 
-`v2.2+c11+fase2` — pipeline de classificação em duas etapas (Stage 1: N vs Anormal; Stage 2: S vs V vs F) atingindo todos os thresholds v2.2, firmware STM32F4 validado via Renode, Camada C11 com hybrid search (BM25 + vector + RRF), RLS/audit, observabilidade Prometheus/Grafana e stress tests adversariais para suporte a agentes de coding. (O caminho CNN raw-signal está sob revisão; o fallback MLP-features está documentado em `reports/stage1_v2_training_analysis.md`.)
+`v3.1.0` — release consolidando a Fase 2 (observabilidade Prometheus/Grafana, RLS/audit, hybrid search BM25 + vector + RRF, timeline materializada) e o Data-Centric AI cleanup (clipping ±5mV, Z-score global train-only, StandardScaler para MLP, cache invalidation, redução de duplicação no SonarCloud). O pipeline de classificação em duas etapas (Stage 1: N vs Anormal; Stage 2: S vs V vs F) e o firmware STM32F4 validado via Renode permanecem como base; o fallback MLP-features está documentado em `reports/stage1_v2_training_analysis.md`.
 
 ---
 

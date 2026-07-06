@@ -11,7 +11,7 @@ simulação: `v1.2-sim-locked` e `v1.3-sim-deep`. A versão do pipeline de ML
 reportada no README é `v2.2+c11+fase2` e evolui independentemente dos marcos
 deste changelog.
 
-## [Unreleased] — Fase 2
+## [3.1.0] — 2026-07-06
 
 ### Adicionado
 
@@ -89,4 +89,5 @@ deste changelog.
 
 - Camada C11 — Knowledge Layer com RAG local (`sqlite-vec`), indexador semântico, retriever com filtros 3D e MCP server.
 
-[Unreleased]: https://github.com/Douglas0101/project-lewis/compare/v1.3-sim-deep...HEAD
+[Unreleased]: https://github.com/Douglas0101/project-lewis/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/Douglas0101/project-lewis/compare/v3.0.0...v3.1.0

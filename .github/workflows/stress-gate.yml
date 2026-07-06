@@ -2,7 +2,7 @@ name: Stress Gate
 
 on:
   pull_request:
-    branches: [main]
+    branches: [master]
     paths:
       - 'src/knowledge/**'
       - 'src/tracking/**'
