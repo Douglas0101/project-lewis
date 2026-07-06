@@ -116,6 +116,11 @@ def run_stage_script(
     X, y, df = make_toy_data(n_classes=2 if stage == "stage1" else 3)
     summary = make_summary()
 
+    load_config_module = (
+        "scripts.run_stage1_training._load_config"
+        if stage == "stage1"
+        else "scripts.run_stage2_training._load_config"
+    )
     load_features_module = (
         "scripts.run_stage1_training._load_features"
         if stage == "stage1"
@@ -125,6 +130,16 @@ def run_stage_script(
         "scripts.run_stage1_training.train_group_kfold"
         if stage == "stage1"
         else "scripts.run_stage2_training.train_group_kfold"
+    )
+    write_lineage_module = (
+        "scripts.run_stage1_training.write_lineage"
+        if stage == "stage1"
+        else "scripts.run_stage2_training.write_lineage"
+    )
+    copy_best_fold_module = (
+        "scripts.run_stage1_training._copy_best_fold"
+        if stage == "stage1"
+        else "scripts.run_stage2_training._copy_best_fold"
     )
 
     argv = [
@@ -139,12 +154,11 @@ def run_stage_script(
 
     with ExitStack() as stack:
         stack.enter_context(patch("yaml.safe_load", return_value=cfg))
+        stack.enter_context(patch(load_config_module, return_value=cfg))
         stack.enter_context(patch(load_features_module, return_value=(X, y, df)))
         mock_train = stack.enter_context(patch(train_module, return_value=summary))
-        stack.enter_context(patch("pathlib.Path.mkdir", MagicMock()))
-        stack.enter_context(patch("pathlib.Path.open", MagicMock()))
-        stack.enter_context(patch("json.dump", MagicMock()))
-        stack.enter_context(patch("shutil.copy", MagicMock()))
+        stack.enter_context(patch(write_lineage_module, MagicMock()))
+        stack.enter_context(patch(copy_best_fold_module, MagicMock()))
         if patch_tracking:
             stack.enter_context(
                 patch("src.tracking.integrations.start_tracking_experiment", return_value=1)
