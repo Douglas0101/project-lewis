@@ -42,10 +42,15 @@ def _synthetic_ecg_segment(
     r_idx = n_samples // 2
     seg = np.zeros(n_samples, dtype=np.float32)
 
-    # QRS: narrow Gaussian at center
-    qrs_width = int(round(0.080 * fs))
-    qrs_indices = np.arange(max(0, r_idx - qrs_width), min(n_samples, r_idx + qrs_width + 1))
-    seg[qrs_indices] += 1.0 * np.exp(-0.5 * ((qrs_indices - r_idx) / (qrs_width / 3)) ** 2)
+    # QRS: sine burst ~80 ms (produces stronger 5-30 Hz content for the detector)
+    qrs_width_ms = 80.0
+    half = int(round((qrs_width_ms / 1000.0) * fs / 2.0))
+    qrs_onset = r_idx - half
+    qrs_offset = r_idx + half
+    if qrs_onset >= 0 and qrs_offset <= n_samples:
+        seg[qrs_onset:qrs_offset] = np.sin(
+            np.linspace(0, np.pi, qrs_offset - qrs_onset)
+        ).astype(np.float32)
 
     # T-wave: ~300ms after R
     tw_start = r_idx + int(round(0.25 * fs))
@@ -178,6 +183,9 @@ class TestMorphologicalFeatures:
                 "qrs_area",
                 "st_slope_mV_s",
                 "j_point",
+                "qrs_asymmetry_index",
+                "t_r_ratio",
+                "qrs_raggedness",
             }
 
     def test_r_amplitude_positive(self):
@@ -507,6 +515,8 @@ class TestNoNaNInf:
 
         for m in morphological:
             for k, v in m.items():
-                if k != "qrs_width_ms" and k != "qrs_area":  # NaN allowed for failed QRS
-                    assert not np.isnan(v), f"NaN in morphological {k}"
-                    assert not np.isinf(v), f"Inf in morphological {k}"
+                # NaN/Inf allowed for features that depend on successful QRS detection
+                if k in ("qrs_width_ms", "qrs_area", "qrs_asymmetry_index", "qrs_raggedness"):
+                    continue
+                assert not np.isnan(v), f"NaN in morphological {k}"
+                assert not np.isinf(v), f"Inf in morphological {k}"
