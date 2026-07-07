@@ -6,6 +6,7 @@ sobre sinal raw falha em separar N vs Anormal.
 
 from __future__ import annotations
 
+import argparse
 import json
 import logging
 import os
@@ -40,10 +41,10 @@ def _resolve_output_dir(output_dir: str) -> Path:
     return resolved
 
 
-def build_mlp(input_dim: int, num_classes: int = 2) -> tf.keras.Model:
+def build_mlp(input_dim: int, num_classes: int = 2, hidden_units: int = 32) -> tf.keras.Model:
     """MLP leve para classificação binária com features."""
     inputs = tf.keras.Input(shape=(input_dim,), name="features")
-    x = tf.keras.layers.Dense(32, activation="relu", name="dense_1")(inputs)
+    x = tf.keras.layers.Dense(hidden_units, activation="relu", name="dense_1")(inputs)
     x = tf.keras.layers.Dropout(0.3, name="dropout")(x)
     outputs = tf.keras.layers.Dense(
         num_classes, activation="softmax", name="output"
@@ -52,13 +53,13 @@ def build_mlp(input_dim: int, num_classes: int = 2) -> tf.keras.Model:
     return model
 
 
-def compute_class_weights(y: np.ndarray) -> dict:
-    """Pesos balanceados limitados a max_weight=20."""
+def compute_class_weights(y: np.ndarray, max_weight: float = 20.0) -> dict:
+    """Pesos balanceados limitados a max_weight."""
     classes = np.unique(y)
     counts = np.array([np.sum(y == c) for c in classes])
     weights = 1.0 / counts
     weights = weights / weights.min()
-    weights = np.minimum(weights, 20.0)
+    weights = np.minimum(weights, max_weight)
     return {int(c): float(w) for c, w in zip(classes, weights)}
 
 
@@ -71,9 +72,10 @@ def train_fold(
     fold_idx: int,
     output_dir: Path,
     scaler=None,
+    hidden_units: int = 32,
 ) -> dict:
     """Treina um único fold."""
-    model = build_mlp(input_dim=X_train.shape[1], num_classes=2)
+    model = build_mlp(input_dim=X_train.shape[1], num_classes=2, hidden_units=hidden_units)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         loss="sparse_categorical_crossentropy",
@@ -136,6 +138,27 @@ def train_fold(
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Treina Estágio 1 MLP sobre features.")
+    parser.add_argument(
+        "--hidden-units",
+        type=int,
+        default=32,
+        help="Número de unidades na camada oculta.",
+    )
+    parser.add_argument(
+        "--max-weight",
+        type=float,
+        default=20.0,
+        help="Teto para pesos de classe.",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        default="experiments/stage1_mlp_features_v2.3",
+        help="Diretório para salvar modelos e summary.",
+    )
+    args = parser.parse_args()
+
     npz = np.load("data/features/stage1_binary_features.npz")
     X, y, groups = npz["X"], npz["y"], npz["groups"]
     feature_names = json.loads(
@@ -144,8 +167,9 @@ def main() -> int:
 
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %s", feature_names)
+    LOGGER.info("Config: hidden_units=%d, max_weight=%.1f", args.hidden_units, args.max_weight)
 
-    output_dir = _resolve_output_dir("experiments/stage1_mlp_features_v2.1")
+    output_dir = _resolve_output_dir(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     n_splits = 5
@@ -161,10 +185,11 @@ def main() -> int:
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
 
-        class_weight = compute_class_weights(y_train)
+        class_weight = compute_class_weights(y_train, max_weight=args.max_weight)
         result = train_fold(
             X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir,
             scaler=scaler,
+            hidden_units=args.hidden_units,
         )
         fold_results.append(result)
 
@@ -174,8 +199,9 @@ def main() -> int:
     aucs = [r["auc"] for r in fold_results]
 
     summary = {
-        "experiment": "stage1_mlp_features_v2.1",
+        "experiment": "stage1_mlp_features_v2.3",
         "feature_names": feature_names,
+        "hidden_units": args.hidden_units,
         "folds": fold_results,
         "mean": {
             "Acc": float(np.mean(accs)),

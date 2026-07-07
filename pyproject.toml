@@ -159,6 +159,7 @@ markers = [
     "qg_c11: Quality Gate C11 — knowledge layer (RAG + sqlite-vec + MCP)",
     "smoke: Testes de fumaça rápidos (CI sem download de datasets)",
     "slow: Testes lentos (CI condicional)",
+    "mlp: Testes do pipeline two-stage baseado em features MLP",
     "integration: Testes de integracao que dependem de build externo",
     "stress: Testes de stress com carga maliciosa ou volume extremo",
     "security: Testes de seguranca (SQLi, XSS, injecao)",

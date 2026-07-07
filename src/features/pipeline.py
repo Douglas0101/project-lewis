@@ -161,12 +161,19 @@ def _build_beat_records(
         r_global = int(r_peaks[beat_i])
         r_in_seg = int(np.argmax(np.abs(X[seg_i])))
         morph_raw = morph_feats[seg_i]
+
+        def _none_if_nan(value: float) -> Optional[float]:
+            return None if isinstance(value, float) and np.isnan(value) else float(value)
+
         morph_clean = {
             **morph_raw,
             "qrs_width_ms": (
                 0.0 if np.isnan(morph_raw["qrs_width_ms"]) else float(morph_raw["qrs_width_ms"])
             ),
             "qrs_area": 0.0 if np.isnan(morph_raw["qrs_area"]) else float(morph_raw["qrs_area"]),
+            "qrs_asymmetry_index": _none_if_nan(morph_raw["qrs_asymmetry_index"]),
+            "t_r_ratio": _none_if_nan(morph_raw["t_r_ratio"]),
+            "qrs_raggedness": _none_if_nan(morph_raw["qrs_raggedness"]),
         }
         records.append(
             BeatRecord(
@@ -219,6 +226,9 @@ def _records_to_dataframe(records: List[BeatRecord]) -> pd.DataFrame:
                 "qrs_area": rec.morph.qrs_area,
                 "st_slope_mV_s": rec.morph.st_slope_mV_s,
                 "j_point": rec.morph.j_point,
+                "qrs_asymmetry_index": rec.morph.qrs_asymmetry_index,
+                "t_r_ratio": rec.morph.t_r_ratio,
+                "qrs_raggedness": rec.morph.qrs_raggedness,
                 "lineage_path": rec.lineage_path,
             }
         )

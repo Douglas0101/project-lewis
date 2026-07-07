@@ -117,6 +117,15 @@ class MorphologicalFeatures(BaseModel):
     qrs_area: float = Field(..., ge=0, description="Absolute QRS area in mV·s")
     st_slope_mV_s: float = Field(..., description="ST slope from J+60ms to J+80ms in mV/s")
     j_point: int = Field(..., ge=0, description="QRS offset sample index within segment")
+    qrs_asymmetry_index: Optional[float] = Field(
+        None, description="QRS asymmetry (R-onset)/(offset-R); None if detection failed"
+    )
+    t_r_ratio: Optional[float] = Field(
+        None, description="T-wave amplitude over R-wave absolute amplitude; None if R=0"
+    )
+    qrs_raggedness: Optional[float] = Field(
+        None, description="Std of absolute QRS segment; None if onset/offset failed"
+    )
 
 
 # ---------------------------------------------------------------------------

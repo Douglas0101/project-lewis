@@ -55,6 +55,8 @@ class FeatureExtractor:
         self,
         segments: np.ndarray,
         r_peaks: Optional[np.ndarray] = None,
+        record_ids: Optional[np.ndarray] = None,
+        precomputed_temporal: Optional[List[Dict[str, float]]] = None,
     ) -> Dict[str, np.ndarray]:
         """Extract features from raw beat segments.
 
@@ -63,9 +65,15 @@ class FeatureExtractor:
         segments : np.ndarray
             Beat segments with shape ``(n, 500)`` or ``(n, 500, 1)``.
         r_peaks : np.ndarray, optional
-            Global R-peak sample indices for the whole record.  If provided,
-            time-domain (RR) features are computed from them; otherwise RR
-            features are zero-filled and a warning is emitted.
+            Global R-peak sample indices for each beat. Used together with
+            ``record_ids`` to compute time-domain features when
+            ``precomputed_temporal`` is not provided.
+        record_ids : np.ndarray, optional
+            Identifier of the source record for each beat.
+        precomputed_temporal : list[dict], optional
+            Pre-computed time-domain features (rr_prev, rr_next, etc.) for
+            each beat. When provided, it takes precedence and avoids
+            re-computing RR features from sparse R-peak subsets.
 
         Returns
         -------
@@ -85,9 +93,19 @@ class FeatureExtractor:
         # Morphological features from individual segments.
         morph_list = self.morph.extract(segments, fs=self.fs)
 
-        # Time-domain features require R-peak positions in the full record.
-        if r_peaks is not None and len(r_peaks) == n:
-            temporal_list = self.temporal.extract(r_peaks, fs=self.fs)
+        # Time-domain features: prefer pre-computed, fall back to extraction.
+        if precomputed_temporal is not None:
+            if len(precomputed_temporal) != n:
+                raise ValueError(
+                    f"precomputed_temporal length ({len(precomputed_temporal)}) "
+                    f"differs from segments ({n})"
+                )
+            temporal_list = precomputed_temporal
+        elif r_peaks is not None and len(r_peaks) == n:
+            if record_ids is not None and len(record_ids) == n:
+                temporal_list = self._extract_temporal_per_record(r_peaks, record_ids)
+            else:
+                temporal_list = self.temporal.extract(r_peaks, fs=self.fs)
         else:
             if r_peaks is not None and len(r_peaks) != n:
                 LOGGER.warning(
@@ -98,7 +116,7 @@ class FeatureExtractor:
                 )
             elif r_peaks is None:
                 LOGGER.warning(
-                    "No r_peaks provided; RR features are zero-filled. "
+                    "No r_peaks or precomputed_temporal provided; RR features are zero-filled. "
                     "Supply pre-computed features for best accuracy."
                 )
             temporal_list = [
@@ -130,6 +148,35 @@ class FeatureExtractor:
                 features[name] = np.array([m[name] for m in morph_list], dtype=np.float32)
 
         return features
+
+    def _extract_temporal_per_record(
+        self,
+        r_peaks: np.ndarray,
+        record_ids: np.ndarray,
+    ) -> List[Dict[str, float]]:
+        """Compute time-domain features grouped by record, preserving input order.
+
+        .. warning::
+            This helper assumes ``r_peaks`` contains *consecutive* R-peaks of
+            each record. If the input is a sparse subset (e.g. only abnormal
+            beats), the computed RR features will be wrong. Use
+            ``precomputed_temporal`` in that case.
+        """
+        r_peaks = np.asarray(r_peaks, dtype=np.int64)
+        record_ids = np.asarray(record_ids)
+        order = np.arange(len(record_ids))
+        temporal: Dict[int, Dict[str, float]] = {}
+        for rec in np.unique(record_ids):
+            mask = record_ids == rec
+            idx = order[mask]
+            # Sort by r_peak within record to get correct RR sequence.
+            sort_order = np.argsort(r_peaks[idx])
+            sorted_idx = idx[sort_order]
+            sorted_r_peaks = r_peaks[sorted_idx]
+            feats_sorted = self.temporal.extract(sorted_r_peaks, fs=self.fs)
+            for original_pos, feat in zip(sorted_idx, feats_sorted):
+                temporal[int(original_pos)] = feat
+        return [temporal[i] for i in range(len(record_ids))]
 
     @staticmethod
     def features_to_array(

@@ -120,9 +120,10 @@ def train_fold(
     fold_idx: int,
     output_dir: Path,
     scaler=None,
+    hidden_units: int = 32,
 ) -> dict:
     """Treina um único fold."""
-    model = build_mlp(input_dim=X_train.shape[1], num_classes=3)
+    model = build_mlp(input_dim=X_train.shape[1], num_classes=3, hidden_units=hidden_units)
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
         loss="sparse_categorical_crossentropy",
@@ -215,9 +216,15 @@ def main() -> int:
         help="Max class weight cap for balanced weighting.",
     )
     parser.add_argument(
+        "--hidden-units",
+        type=int,
+        default=32,
+        help="Número de unidades na camada oculta.",
+    )
+    parser.add_argument(
         "--output-dir",
         type=str,
-        default="experiments/stage2_mlp_features_v2.1",
+        default="experiments/stage2_mlp_features_v2.3",
         help="Directory to save fold models and summary.",
     )
     args = parser.parse_args()
@@ -231,12 +238,13 @@ def main() -> int:
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %s", feature_names)
     LOGGER.info(
-        "Mitigation config: f_oversample_ratio=%s, s_weight=%s, v_weight=%s, f_weight=%s, max_weight=%s",
+        "Mitigation config: f_oversample_ratio=%s, s_weight=%s, v_weight=%s, f_weight=%s, max_weight=%s, hidden_units=%s",
         args.f_oversample_ratio,
         args.s_weight,
         args.v_weight,
         args.f_weight,
         args.max_weight,
+        args.hidden_units,
     )
 
     output_dir = _resolve_output_dir(args.output_dir)
@@ -274,6 +282,7 @@ def main() -> int:
         result = train_fold(
             X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir,
             scaler=scaler,
+            hidden_units=args.hidden_units,
         )
         fold_results.append(result)
 
@@ -286,8 +295,9 @@ def main() -> int:
     }
 
     summary = {
-        "experiment": "stage2_mlp_features_v2.1",
+        "experiment": "stage2_mlp_features_v2.3",
         "feature_names": feature_names,
+        "hidden_units": args.hidden_units,
         "folds": fold_results,
         "mean": {
             "Acc": float(np.mean(accs)),
