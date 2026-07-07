@@ -1,8 +1,8 @@
-"""Prepara dataset de features morfológicas + time-domain para o Estágio 1.
+"""Prepara dataset de features morfológicas + time-domain para o Estágio 2.
 
 As features já foram extraídas durante o pré-processamento e estão disponíveis
-em `data/features/stage1_binary.parquet`. Este script apenas as consolida em
-um formato NPZ adequado para treinamento de MLP.
+em `data/features/stage2_multiclass.parquet`. Este script as consolida em um
+formato NPZ adequado para treinamento de MLP (S vs V vs F).
 """
 
 from __future__ import annotations
@@ -22,7 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 logging.basicConfig(level=logging.INFO)
-LOGGER = logging.getLogger("prepare_stage1_features")
+LOGGER = logging.getLogger("prepare_stage2_features")
 
 
 FEATURE_COLUMNS = [
@@ -48,10 +48,10 @@ FEATURE_COLUMNS = [
 
 
 def main() -> int:
-    parquet_path = Path("data/features/stage1_binary.parquet")
-    npz_path = Path("data/features/stage1_binary.npz")
-    output_path = Path("data/features/stage1_binary_features.npz")
-    scaler_path = Path("data/features/stage1_binary_features_scaler.pkl")
+    parquet_path = Path("data/features/stage2_multiclass.parquet")
+    npz_path = Path("data/features/stage2_multiclass.npz")
+    output_path = Path("data/features/stage2_multiclass_features.npz")
+    scaler_path = Path("data/features/stage2_multiclass_features_scaler.pkl")
 
     if not parquet_path.exists():
         LOGGER.error("Parquet não encontrado: %s", parquet_path)
@@ -78,8 +78,11 @@ def main() -> int:
     features_df = df[FEATURE_COLUMNS].copy()
     x_features = features_df.values.astype(np.float32)
 
-    # Normaliza features com StandardScaler ajustado apenas no primeiro fold de treino.
-    from src.features.scaler_utils import fit_feature_scaler_on_train, scale_features
+    # O treinamento aplica seu próprio StandardScaler por fold; portanto o NPZ
+    # deve conter features RAW (não escaladas) para evitar dupla normalização.
+    # O scaler abaixo é apenas uma referência de sanity check/backup e não é
+    # usado pelo pipeline de treinamento.
+    from src.features.scaler_utils import fit_feature_scaler_on_train
 
     scaler, train_idx, _ = fit_feature_scaler_on_train(x_features, groups, n_splits=5)
 
@@ -99,31 +102,28 @@ def main() -> int:
             features_df[col] = features_df[col].fillna(col_median)
         x_features = features_df.values.astype(np.float32)
 
-    x_features_scaled = scale_features(x_features, scaler)
-
     scaler_path.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(scaler, scaler_path)
-    LOGGER.info("Scaler salvo em %s", scaler_path)
+    LOGGER.info("Scaler de referência salvo em %s", scaler_path)
 
     # Sanity check: distribuição de classes
     class_counts = dict(zip(*np.unique(y, return_counts=True)))
     LOGGER.info("Classes: %s", class_counts)
-    LOGGER.info("Features shape: %s", x_features_scaled.shape)
+    LOGGER.info("Features shape: %s", x_features.shape)
 
     # Mapeia record_id (string) para inteiros para compatibilidade com NPZ
-    # sem object arrays e com GroupKFold.
     unique_records = sorted(set(groups))
     record_to_idx = {r: i for i, r in enumerate(unique_records)}
     group_ids = np.array([record_to_idx[r] for r in groups], dtype=np.int64)
 
     np.savez(
         output_path,
-        X=x_features_scaled,
+        X=x_features,
         y=y,
         groups=group_ids,
     )
     # Salva nomes das features e mapeamento de grupos em JSON.
-    (output_path.parent / "stage1_binary_features.json").write_text(
+    (output_path.parent / "stage2_multiclass_features.json").write_text(
         json.dumps(
             {
                 "feature_names": FEATURE_COLUMNS,
