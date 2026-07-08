@@ -11,7 +11,10 @@
         ragas-eval \
         memory-commit \
         observability-up observability-down \
-        test-e2e
+        test-e2e \
+        mlp-logs-dir mlp-prepare-features mlp-train-stage1 mlp-train-stage2 mlp-train \
+        mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 \
+        mlp-features mlp-pipeline mlp-pipeline-fast mlp-clean
 
 # Detecta ambiente virtual se existente; caso contrario usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
@@ -24,6 +27,18 @@ endif
 UV      := uv
 DATA    := data
 FIRMWARE_DIR := firmware
+
+# ---------------------------------------------------------------------------
+# MLP v2.3 — variáveis configuráveis
+# ---------------------------------------------------------------------------
+MLP_HIDDEN_UNITS       ?= 64
+MLP_STAGE1_MAX_WEIGHT  ?= 20
+MLP_STAGE2_MAX_WEIGHT  ?= 10
+MLP_F_OVERSAMPLE_RATIO ?= 0.75
+MLP_N_CAL              ?= 500
+MLP_LOG                ?= logs/mlp_v2.3.log
+MLP_STAGE1_EXP         ?= experiments/stage1_mlp_features_v2.3
+MLP_STAGE2_EXP         ?= experiments/stage2_mlp_features_v2.3
 
 # ---------------------------------------------------------------------------
 # Help
@@ -121,6 +136,58 @@ process: ## Run resample and preprocessing pipeline
 
 features: ## Run feature engineering pipeline
 	$(PYTHON) -m src.features.pipeline
+
+# ---------------------------------------------------------------------------
+# MLP v2.3 — pipeline de treinamento, seleção, quantização e QG5'
+# ---------------------------------------------------------------------------
+
+mlp-logs-dir:
+	@mkdir -p logs
+
+mlp-prepare-features: mlp-logs-dir ## Prepara NPZs de features para treino MLP v2.3
+	$(PYTHON) scripts/prepare_stage1_features.py 2>&1 | tee -a $(MLP_LOG)
+	$(PYTHON) scripts/prepare_stage2_features.py 2>&1 | tee -a $(MLP_LOG)
+
+mlp-train-stage1: mlp-logs-dir ## Treina Estágio 1 MLP v2.3 (N vs Anormal)
+	$(PYTHON) scripts/train_stage1_mlp.py \
+		--hidden-units $(MLP_HIDDEN_UNITS) \
+		--max-weight $(MLP_STAGE1_MAX_WEIGHT) \
+		--output-dir $(MLP_STAGE1_EXP) 2>&1 | tee -a $(MLP_LOG)
+
+mlp-train-stage2: mlp-logs-dir ## Treina Estágio 2 MLP v2.3 (S vs V vs F)
+	$(PYTHON) scripts/train_stage2_mlp.py \
+		--hidden-units $(MLP_HIDDEN_UNITS) \
+		--f-oversample-ratio $(MLP_F_OVERSAMPLE_RATIO) \
+		--max-weight $(MLP_STAGE2_MAX_WEIGHT) \
+		--output-dir $(MLP_STAGE2_EXP) 2>&1 | tee -a $(MLP_LOG)
+
+mlp-train: mlp-train-stage1 mlp-train-stage2 ## Treina ambos os estágios
+
+mlp-select-best: mlp-logs-dir ## Seleciona melhor fold e publica em models/
+	$(PYTHON) scripts/select_best_mlp_fold.py \
+		--stage1-exp $(MLP_STAGE1_EXP) \
+		--stage2-exp $(MLP_STAGE2_EXP) 2>&1 | tee -a $(MLP_LOG)
+
+mlp-quantize: mlp-logs-dir ## Quantiza modelos v2.3 para INT8
+	$(PYTHON) scripts/quantize_mlp_features.py --n-cal $(MLP_N_CAL) 2>&1 | tee -a $(MLP_LOG)
+
+mlp-validate-quantized: mlp-logs-dir ## Valida ΔF1-macro < 2% entre float32 e INT8
+	$(PYTHON) scripts/validate_quantized_mlp.py 2>&1 | tee -a $(MLP_LOG)
+
+mlp-test-qg5: mlp-logs-dir ## Roda testes QG5' do pipeline MLP v2.3
+	$(PYTEST) tests/test_two_stage_mlp_qg5.py tests/test_morphological_features.py -v 2>&1 | tee -a $(MLP_LOG)
+
+mlp-features: features mlp-prepare-features ## Feature engineering completa + preparação de NPZs
+
+mlp-pipeline-fast: mlp-prepare-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline rápido (features já existem)
+
+mlp-pipeline: mlp-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline completo MLP v2.3
+
+mlp-clean: ## Remove artefatos v2.3 de experiments e models
+	rm -rf $(MLP_STAGE1_EXP) $(MLP_STAGE2_EXP)
+	rm -f models/*_v2.3*
+	rm -f models/quantized/*_v2.3*
+	rm -f $(MLP_LOG)
 
 audit-training-data: ## Audit training data quality
 	$(PYTHON) scripts/audit_training_data.py
