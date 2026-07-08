@@ -204,11 +204,14 @@ Mesma arquitetura do Stage 1, com saída `Dense(3, softmax)`.
 Comandos:
 
 ```bash
+# Pipeline produtivo atual (v2.3) — MLP sobre features
+make mlp-pipeline-fast
+
 # Pipeline legado (v1.1) — ainda disponível no Makefile
 make pretrain
 make finetune
 
-# Pipeline produtivo atual (v2.2)
+# Pipeline v2.2 (CNN sobre sinal raw) — scripts ainda presentes
 uv run python scripts/run_stage1_training.py
 uv run python scripts/run_stage2_training.py
 uv run python scripts/run_two_stage_pipeline.py
@@ -531,12 +534,21 @@ make process        # QG1
 ```bash
 make features       # QG2/QG3
 
-# Pipeline atual (v2.2) — duas etapas
+# Pipeline atual (v2.3) — MLP sobre features morfológicas + time-domain
+make mlp-pipeline-fast   # prepare → treino stage1/2 → seleção → quantização → validação → QG5'
+
+# Ou passo a passo
+make mlp-prepare-features
+make mlp-train
+make mlp-select-best
+make mlp-quantize
+make mlp-validate-quantized
+make mlp-test-qg5
+
+# Pipeline legado (v2.2 / v1.1) — ainda disponível
 uv run python scripts/run_stage1_training.py
 uv run python scripts/run_stage2_training.py
 uv run python scripts/run_two_stage_pipeline.py
-
-# Targets legados (v1.1) — ainda disponíveis
 make pretrain       # QG4
 make finetune       # QG5
 ```
