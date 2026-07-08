@@ -14,7 +14,7 @@
         test-e2e \
         mlp-logs-dir mlp-prepare-features mlp-train-stage1 mlp-train-stage2 mlp-train \
         mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 \
-        mlp-features mlp-pipeline mlp-pipeline-fast mlp-clean
+        mlp-features mlp-pipeline mlp-pipeline-with-features mlp-clean
 
 # Detecta ambiente virtual se existente; caso contrario usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
@@ -179,9 +179,9 @@ mlp-test-qg5: mlp-logs-dir ## Roda testes QG5' do pipeline MLP v2.3
 
 mlp-features: features mlp-prepare-features ## Feature engineering completa + preparação de NPZs
 
-mlp-pipeline-fast: mlp-prepare-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline rápido (features já existem)
+mlp-pipeline: mlp-prepare-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline padrão MLP v2.3 (usa features já geradas)
 
-mlp-pipeline: mlp-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline completo MLP v2.3
+mlp-pipeline-with-features: mlp-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline MLP v2.3 com regeneração de features
 
 mlp-clean: ## Remove artefatos v2.3 de experiments e models
 	rm -rf $(MLP_STAGE1_EXP) $(MLP_STAGE2_EXP)

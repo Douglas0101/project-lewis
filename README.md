@@ -205,7 +205,7 @@ Comandos:
 
 ```bash
 # Pipeline produtivo atual (v2.3) — MLP sobre features
-make mlp-pipeline-fast
+make mlp-pipeline
 
 # Pipeline legado (v1.1) — ainda disponível no Makefile
 make pretrain
@@ -535,7 +535,7 @@ make process        # QG1
 make features       # QG2/QG3
 
 # Pipeline atual (v2.3) — MLP sobre features morfológicas + time-domain
-make mlp-pipeline-fast   # prepare → treino stage1/2 → seleção → quantização → validação → QG5'
+make mlp-pipeline   # prepare → treino stage1/2 → seleção → quantização → validação → QG5'
 
 # Ou passo a passo
 make mlp-prepare-features
