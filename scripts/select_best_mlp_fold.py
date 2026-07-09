@@ -214,7 +214,11 @@ def main() -> int:
     )
     threshold_path = args.output_dir / "stage1_threshold_v2.3.json"
     threshold_path.write_text(
-        json.dumps({"threshold": threshold, "source": "youden_f1_macro_stage1"}, indent=2),
+        json.dumps(
+            {"threshold": threshold, "source": "youden_f1_macro_stage1"},
+            indent=2,
+            ensure_ascii=False,
+        ),
         encoding="utf-8",
     )
     LOGGER.info("Threshold salvo em %s", threshold_path)
