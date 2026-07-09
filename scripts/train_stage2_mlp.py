@@ -94,29 +94,57 @@ def _build_smote_strategy(
     return strategy
 
 
-def _optimize_thresholds_f1_macro(
+def _optimize_thresholds_max_min_f1(
     y_true: np.ndarray,
     y_score: np.ndarray,
     class_names: list[str],
     search_step: float = 0.05,
 ) -> dict[str, float]:
-    """Otimiza thresholds one-vs-rest maximizando F1-macro global.
+    """Otimiza thresholds one-vs-rest maximizando o menor F1 por classe.
 
-    Diferente de otimização per-classe, a busca conjunta considera o efeito
-    acoplado dos thresholds na decisão one-vs-rest e diretamente maximiza a
-    métrica de qualidade QG5' (F1-macro do Stage 2).
+    O critério max-min força equilíbrio entre S, V e F — se uma classe ficar
+    abaixo do threshold QG5', a métrica cai, independentemente das outras.
+    Isso aumenta a robustez do ponto de operação em subconjuntos de teste.
     """
-    from src.models.evaluate import find_best_thresholds_multiclass
+    n_classes = len(class_names)
+    candidate_taus = np.arange(0.05, 1.0, search_step)
+    best_min_f1 = -1.0
+    best_thresholds = {name: 0.5 for name in class_names}
 
-    result = find_best_thresholds_multiclass(
-        y_true,
-        y_score,
-        class_names=class_names,
-        metric="F1_macro",
-        search_step=search_step,
-        fallback_class=1,  # V é a classe majoritária de fallback
-    )
-    return result["thresholds"]
+    for tau_s in candidate_taus:
+        for tau_v in candidate_taus:
+            for tau_f in candidate_taus:
+                thresholds = np.array([tau_s, tau_v, tau_f], dtype=np.float32)
+                above = y_score >= thresholds
+                y_pred = np.full(len(y_true), 1, dtype=np.int64)
+                single = above.sum(axis=1) == 1
+                y_pred[single] = np.argmax(above[single], axis=1)
+                multi = above.sum(axis=1) > 1
+                if multi.any():
+                    masked = y_score.copy()
+                    masked[~above] = -1.0
+                    y_pred[multi] = np.argmax(masked[multi], axis=1)
+
+                f1_per_class = []
+                for i in range(n_classes):
+                    tp = int(((y_pred == i) & (y_true == i)).sum())
+                    fp = int(((y_pred == i) & (y_true != i)).sum())
+                    fn = int(((y_pred != i) & (y_true == i)).sum())
+                    precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
+                    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+                    f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
+                    f1_per_class.append(f1)
+
+                min_f1 = min(f1_per_class)
+                if min_f1 > best_min_f1:
+                    best_min_f1 = min_f1
+                    best_thresholds = {
+                        class_names[0]: float(tau_s),
+                        class_names[1]: float(tau_v),
+                        class_names[2]: float(tau_f),
+                    }
+
+    return best_thresholds
 
 
 def train_fold(
@@ -175,7 +203,7 @@ def train_fold(
 
     # Otimização de threshold maximizando F1 por classe sobre validação do fold.
     # Youden tende a thresholds muito baixos para F, destruindo precision e F1(F).
-    optimized_thresholds = _optimize_thresholds_f1_macro(
+    optimized_thresholds = _optimize_thresholds_max_min_f1(
         y_val, y_proba, class_names=["S", "V", "F"]
     )
 
@@ -196,13 +224,13 @@ def train_fold(
     threshold_path.write_text(
         json.dumps({
             "thresholds": optimized_thresholds,
-            "source": "f1_macro_joint",
+            "source": "max_min_f1",
             "fold": fold_idx,
         }, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
     LOGGER.info(
-        "Fold %d | F1-macro thresholds: %s",
+        "Fold %d | max-min F1 thresholds: %s",
         fold_idx,
         optimized_thresholds,
     )
