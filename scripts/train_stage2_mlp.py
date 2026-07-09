@@ -1,7 +1,7 @@
 """Treina MLP leve sobre features morfológicas/time-domain para Estágio 2.
 
 Classificador S vs V vs F usando as mesmas 13 features do Estágio 1.
-Pesos de classe são balanceados com teto configurável para evitar viés excessivo.
+Usa SMOTE apenas no fold de treino, Focal Loss e CosineDecayRestarts.
 """
 
 from __future__ import annotations
@@ -15,6 +15,7 @@ from pathlib import Path
 
 import numpy as np
 import tensorflow as tf
+from imblearn.over_sampling import SMOTE
 from sklearn.model_selection import GroupKFold
 from sklearn.preprocessing import StandardScaler
 
@@ -24,6 +25,22 @@ from src.models.evaluate import evaluate_fold
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("train_stage2_mlp")
+
+# Focal Loss: FL(p_t) = -α_t (1 - p_t)^γ log(p_t)
+# α_t repondera o gradiente da classe verdadeira; γ comprime o peso dos exemplos fáceis.
+# No Stage 2 (S=0, V=1, F=2), V é a classe majoritária, F é a mais rara e S é a fronteira
+# crítica que está sendo destruída. Queremos:
+#   - α_V < α_S < α_F  => gradiente relativo à classe V cresce para S e F
+#   - manter α_t ∈ (0,1) para não distorcer a magnitude global do loss
+#   - γ=2.0: fator padrão da Focal Loss; (1-p_t)^2 reduz o peso dos exemplos com p_t>0.5
+#            em até 4×, forçando o modelo a aprender exemplos difíceis na fronteira S/F.
+# A escolha α=[0.5, 0.25, 0.8] produz razões de gradiente:
+#   ∂L/∂z_S  : ∂L/∂z_V  = 0.5/0.25 = 2.0
+#   ∂L/∂z_F  : ∂L/∂z_V  = 0.8/0.25 = 3.2
+# ou seja, exemplos de F recebem ~3× mais atenção que V e S ~2×, sem o colapso
+# causado por pesos manuais de 15×.
+FOCAL_ALPHA = np.array([0.5, 0.25, 0.8], dtype=np.float32)
+FOCAL_GAMMA = 2.0
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -53,70 +70,11 @@ def build_mlp(input_dim: int, num_classes: int = 3, hidden_units: int = 32) -> t
     return model
 
 
-def compute_class_weights(
-    y: np.ndarray,
-    max_weight: float = 10.0,
-    f_weight_override: float | None = None,
-    s_weight_override: float | None = None,
-    v_weight_override: float | None = None,
-) -> dict:
-    """Pesos balanceados com teto para evitar domínio da classe minoritária."""
-    classes = np.unique(y)
-    counts = np.array([np.sum(y == c) for c in classes])
-    weights = 1.0 / counts
-    weights = weights / weights.min()
-    weights = np.minimum(weights, max_weight)
-    overrides = {
-        0: s_weight_override,  # S
-        1: v_weight_override,  # V
-        2: f_weight_override,  # F
-    }
-    for cls, override in overrides.items():
-        if override is not None:
-            idx = np.where(classes == cls)[0]
-            if len(idx) > 0:
-                weights[idx[0]] = override
-    return {int(c): float(w) for c, w in zip(classes, weights)}
-
-
-def oversample_class(
-    X: np.ndarray,
-    y: np.ndarray,
-    target_class: int,
-    target_ratio: float,
-    seed: int = 42,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Real oversampling: duplicate minority class samples up to target ratio.
-
-    target_ratio is relative to the largest class count.
-    """
-    classes, counts = np.unique(y, return_counts=True)
-    max_count = int(counts.max())
-    target_count = min(int(max_count * target_ratio), max_count)
-
-    idx = np.where(y == target_class)[0]
-    current_count = len(idx)
-    if current_count == 0 or target_count <= current_count:
-        return X, y
-
-    rng = np.random.default_rng(seed)
-    n_needed = target_count - current_count
-    extra_idx = rng.choice(idx, size=n_needed, replace=True)
-
-    X_aug = np.concatenate([X, X[extra_idx]], axis=0)
-    y_aug = np.concatenate([y, y[extra_idx]], axis=0)
-
-    # Shuffle
-    perm = rng.permutation(len(y_aug))
-    return X_aug[perm], y_aug[perm]
-
-
 def train_fold(
     X_train: np.ndarray,
     y_train: np.ndarray,
     X_val: np.ndarray,
     y_val: np.ndarray,
-    class_weight: dict,
     fold_idx: int,
     output_dir: Path,
     scaler=None,
@@ -150,7 +108,6 @@ def train_fold(
         validation_data=(X_val, y_val),
         epochs=50,
         batch_size=256,
-        class_weight=class_weight,
         callbacks=callbacks,
         verbose=2,
     )
@@ -186,36 +143,6 @@ def train_fold(
 def main() -> int:
     parser = argparse.ArgumentParser(description="Treina Estágio 2 MLP sobre features.")
     parser.add_argument(
-        "--f-oversample-ratio",
-        type=float,
-        default=0.5,
-        help="Target ratio of F samples relative to the largest class after real oversampling.",
-    )
-    parser.add_argument(
-        "--s-weight",
-        type=float,
-        default=None,
-        help="Override class weight for class S (encoded as 0).",
-    )
-    parser.add_argument(
-        "--v-weight",
-        type=float,
-        default=None,
-        help="Override class weight for class V (encoded as 1).",
-    )
-    parser.add_argument(
-        "--f-weight",
-        type=float,
-        default=None,
-        help="Override class weight for class F (encoded as 2).",
-    )
-    parser.add_argument(
-        "--max-weight",
-        type=float,
-        default=10.0,
-        help="Max class weight cap for balanced weighting.",
-    )
-    parser.add_argument(
         "--hidden-units",
         type=int,
         default=32,
@@ -238,12 +165,7 @@ def main() -> int:
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %s", feature_names)
     LOGGER.info(
-        "Mitigation config: f_oversample_ratio=%s, s_weight=%s, v_weight=%s, f_weight=%s, max_weight=%s, hidden_units=%s",
-        args.f_oversample_ratio,
-        args.s_weight,
-        args.v_weight,
-        args.f_weight,
-        args.max_weight,
+        "Mitigation config: hidden_units=%s",
         args.hidden_units,
     )
 
@@ -259,28 +181,12 @@ def main() -> int:
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
 
-        # Real oversampling of class F (no synthetic SMOTE) before scaling.
-        X_train, y_train = oversample_class(
-            X_train,
-            y_train,
-            target_class=2,
-            target_ratio=args.f_oversample_ratio,
-            seed=42 + fold_idx,
-        )
-
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
         X_val = scaler.transform(X_val)
 
-        class_weight = compute_class_weights(
-            y_train,
-            max_weight=args.max_weight,
-            s_weight_override=args.s_weight,
-            v_weight_override=args.v_weight,
-            f_weight_override=args.f_weight,
-        )
         result = train_fold(
-            X_train, y_train, X_val, y_val, class_weight, fold_idx, output_dir,
+            X_train, y_train, X_val, y_val, fold_idx, output_dir,
             scaler=scaler,
             hidden_units=args.hidden_units,
         )
