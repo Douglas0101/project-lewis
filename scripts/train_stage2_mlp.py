@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -21,7 +20,8 @@ from sklearn.preprocessing import StandardScaler
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from src.models.evaluate import evaluate_fold
+from src.inference.threshold_decision import predict_with_thresholds  # noqa: E402
+from src.models.evaluate import evaluate_aami  # noqa: E402
 
 logging.basicConfig(level=logging.INFO)
 LOGGER = logging.getLogger("train_stage2_mlp")
@@ -70,7 +70,11 @@ def build_mlp(input_dim: int, num_classes: int = 3, hidden_units: int = 32) -> t
     return model
 
 
-def _build_smote_strategy(y_train: np.ndarray, minority_classes: tuple[int, ...], target_ratio: float) -> dict[int, int]:
+def _build_smote_strategy(
+    y_train: np.ndarray,
+    minority_classes: tuple[int, ...],
+    target_ratio: float,
+) -> dict[int, int]:
     """Monta dict {classe: contagem_alvo} para SMOTE.
 
     O alvo é ``target_ratio`` vezes a contagem da classe majoritária. Classes que
@@ -142,12 +146,7 @@ def train_fold(
 
     model = build_mlp(input_dim=X_train.shape[1], num_classes=n_classes, hidden_units=hidden_units)
 
-    try:
-        CosineDecayRestarts = tf.keras.optimizers.schedules.CosineDecayRestarts
-    except AttributeError:
-        CosineDecayRestarts = tf.keras.experimental.CosineDecayRestarts
-
-    lr_schedule = CosineDecayRestarts(
+    lr_schedule = tf.keras.optimizers.schedules.CosineDecayRestarts(
         initial_learning_rate=1e-3,
         first_decay_steps=10,
         t_mul=1.0,
@@ -182,13 +181,21 @@ def train_fold(
         verbose=2,
     )
 
-    eval_result = evaluate_fold(
-        model, X_val, y_val, class_names=["S", "V", "F"], optimize_thresholds=False
-    )
     y_proba = model.predict(X_val, batch_size=1024, verbose=0)
 
     # Otimização de threshold via Youden J sobre validação do fold
     optimized_thresholds = _youden_thresholds(y_val, y_proba, class_names=["S", "V", "F"])
+
+    # Métricas de validação devem refletir o ponto de operação de produção
+    # (thresholds otimizados), não o argmax padrão.
+    y_pred_val = predict_with_thresholds(
+        y_proba,
+        optimized_thresholds,
+        class_names=["S", "V", "F"],
+        fallback_class=1,
+    )
+    eval_result = evaluate_aami(y_val, y_pred_val, class_names=["S", "V", "F"])
+    eval_result["y_pred"] = y_pred_val.tolist()
     fold_dir = output_dir / f"fold_{fold_idx}"
     fold_dir.mkdir(parents=True, exist_ok=True)
 
@@ -312,7 +319,9 @@ def main() -> int:
         "focal_alpha": FOCAL_ALPHA.tolist(),
         "focal_gamma": FOCAL_GAMMA,
         "smote_target_ratio": 0.5,
-        "optimized_thresholds_per_fold": {r["fold"]: r["optimized_thresholds"] for r in fold_results},
+        "optimized_thresholds_per_fold": {
+            r["fold"]: r["optimized_thresholds"] for r in fold_results
+        },
         "folds": fold_results,
         "mean": {
             "Acc": float(np.mean(accs)),
