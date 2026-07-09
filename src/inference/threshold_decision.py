@@ -46,8 +46,7 @@ def predict_with_thresholds(
         masked[~above] = -1.0
         y_pred[multi] = np.argmax(masked[multi], axis=1)
 
-    none_above = above.sum(axis=1) == 0
-    if none_above.any():
-        y_pred[none_above] = np.argmax(scores[none_above], axis=1)
+    # Quando nenhuma classe supera o limiar, mantém fallback_class.
+    # Isso alinha com evaluate_multiclass_at_thresholds em src/models/evaluate.py.
 
     return y_pred
