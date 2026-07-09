@@ -190,6 +190,8 @@ def train_fold(
     # Otimização de threshold via Youden J sobre validação do fold
     optimized_thresholds = _youden_thresholds(y_val, y_proba, class_names=["S", "V", "F"])
     fold_dir = output_dir / f"fold_{fold_idx}"
+    fold_dir.mkdir(parents=True, exist_ok=True)
+
     threshold_path = fold_dir / "stage2_threshold.json"
     threshold_path.write_text(
         json.dumps({
@@ -205,8 +207,6 @@ def train_fold(
         optimized_thresholds,
     )
 
-    fold_dir = output_dir / f"fold_{fold_idx}"
-    fold_dir.mkdir(parents=True, exist_ok=True)
     model.save(str(fold_dir / "model.keras"), save_format="keras")
     if scaler is not None:
         import joblib

@@ -9,6 +9,7 @@ Publica em ``models/``:
 - ``stage1_float32_v2.3.keras`` + ``input_scaler_stage1_v2.3.pkl``
 - ``stage2_float32_v2.3.keras`` + ``input_scaler_stage2_v2.3.pkl``
 - ``stage1_threshold_v2.3.json``
+- ``stage2_threshold_v2.3.json``
 """
 
 from __future__ import annotations
