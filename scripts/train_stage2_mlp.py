@@ -232,8 +232,6 @@ def train_fold(
         "fold": fold_idx,
         "eval_result": eval_result,
         "epochs_trained": len(history.history["loss"]),
-        "y_val": y_val,
-        "y_proba": y_proba,
         "optimized_thresholds": optimized_thresholds,
     }
 
