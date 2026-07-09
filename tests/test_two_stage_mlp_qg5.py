@@ -30,6 +30,7 @@ from sklearn.metrics import (
     recall_score,
 )
 
+from src.inference.threshold_decision import predict_with_thresholds
 from src.inference.two_stage_mlp_pipeline import TwoStageMLPPipeline
 
 # Thresholds QG5' v2.3
@@ -98,26 +99,12 @@ def _stage2_metrics(
     if thresholds is None:
         y_pred = np.argmax(proba, axis=1).astype(np.int64)
     else:
-        class_names = ["S", "V", "F"]
-        thresh_array = np.array(
-            [thresholds[name] for name in class_names], dtype=proba.dtype
+        y_pred = predict_with_thresholds(
+            proba,
+            thresholds,
+            class_names=["S", "V", "F"],
+            fallback_class=1,
         )
-        above = proba >= thresh_array
-        n_above = above.sum(axis=1)
-        n_samples = proba.shape[0]
-
-        y_pred = np.full(n_samples, 1, dtype=np.int64)
-
-        single_mask = n_above == 1
-        y_pred[single_mask] = np.argmax(above[single_mask], axis=1)
-
-        multi_mask = n_above > 1
-        if np.any(multi_mask):
-            masked_scores = np.where(above[multi_mask], proba[multi_mask], -np.inf)
-            y_pred[multi_mask] = np.argmax(masked_scores, axis=1)
-
-        none_mask = n_above == 0
-        y_pred[none_mask] = np.argmax(proba[none_mask], axis=1)
 
     return StageMetrics(
         recall=float(
@@ -209,12 +196,12 @@ def test_two_stage_mlp_qg5_stage2(published_artifacts: Dict[str, Path]) -> None:
     X, y = data["X"].astype(np.float32), data["y"].astype(np.int64)
 
     rng = np.random.default_rng(42)
-    selected: List[int] = []
+    selected_indices: List[int] = []
     for cls in range(3):
         idx = np.where(y == cls)[0]
         n = min(len(idx), STAGE2_MAX_SAMPLES_PER_CLASS)
-        selected.extend(rng.choice(idx, size=n, replace=False).tolist())
-    selected = np.array(selected)
+        selected_indices.extend(rng.choice(idx, size=n, replace=False).tolist())
+    selected = np.array(selected_indices)
     rng.shuffle(selected)
 
     stage2_thresholds: dict[str, float] | None = None

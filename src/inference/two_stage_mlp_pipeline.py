@@ -24,6 +24,7 @@ import tensorflow as tf
 
 from src.inference.feature_extractor import FeatureExtractor, FEATURE_NAMES
 from src.inference.quantized_runner import QuantizedModelRunner
+from src.inference.threshold_decision import predict_with_thresholds
 
 LOGGER = logging.getLogger("lewis.inference.two_stage_mlp_pipeline")
 
@@ -148,44 +149,19 @@ class TwoStageMLPPipeline:
         return y_pred, score_anormal
 
     def _run_stage2(self, X_features: np.ndarray) -> np.ndarray:
-        """Executa o Estágio 2 e retorna labels S/V/F.
-
-        Quando thresholds otimizados estão disponíveis, aplica decisão
-        one-vs-rest com fallback para a classe majoritária V e desempate pela
-        maior probabilidade.
-        """
+        """Executa o Estágio 2 e retorna labels S/V/F."""
         X_scaled = self.stage2_scaler.transform(X_features)
         scores = self._forward(self.stage2_model, X_scaled)
-        n_samples = scores.shape[0]
 
         if self.stage2_thresholds is None:
             return np.argmax(scores, axis=1).astype(np.int64)
 
-        thresholds = np.array(
-            [self.stage2_thresholds[name] for name in STAGE2_CLASS_NAMES],
-            dtype=scores.dtype,
+        return predict_with_thresholds(
+            scores,
+            self.stage2_thresholds,
+            class_names=STAGE2_CLASS_NAMES,
+            fallback_class=1,
         )
-        above = scores >= thresholds
-        n_above = above.sum(axis=1)
-
-        # Fallback majoritário (V=1) quando nenhum threshold é atingido.
-        y_pred = np.full(n_samples, 1, dtype=np.int64)
-
-        # Exatamente uma classe acima do threshold.
-        single_mask = n_above == 1
-        y_pred[single_mask] = np.argmax(above[single_mask], axis=1)
-
-        # Múltiplas classes acima: desempate pela maior probabilidade entre elas.
-        multi_mask = n_above > 1
-        if np.any(multi_mask):
-            masked_scores = np.where(above[multi_mask], scores[multi_mask], -np.inf)
-            y_pred[multi_mask] = np.argmax(masked_scores, axis=1)
-
-        # Nenhuma classe acima: argmax padrão.
-        none_mask = n_above == 0
-        y_pred[none_mask] = np.argmax(scores[none_mask], axis=1)
-
-        return y_pred
 
     def _stage2_scores(self, X_features: np.ndarray) -> np.ndarray:
         """Retorna scores do Estágio 2 para as amostras."""
