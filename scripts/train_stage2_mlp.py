@@ -70,6 +70,25 @@ def build_mlp(input_dim: int, num_classes: int = 3, hidden_units: int = 32) -> t
     return model
 
 
+def _build_smote_strategy(y_train: np.ndarray, minority_classes: tuple[int, ...], target_ratio: float) -> dict[int, int]:
+    """Monta dict {classe: contagem_alvo} para SMOTE.
+
+    O alvo é ``target_ratio`` vezes a contagem da classe majoritária. Classes que
+    já possuem contagem maior ou igual ao alvo são omitidas do dict, fazendo o
+    SMOTE mantê-las inalteradas.
+    """
+    classes, counts = np.unique(y_train, return_counts=True)
+    count_map = {int(c): int(n) for c, n in zip(classes, counts)}
+    majority_count = int(counts.max())
+    target = max(1, int(majority_count * target_ratio))
+
+    strategy: dict[int, int] = {}
+    for cls in minority_classes:
+        if cls in count_map and count_map[cls] < target:
+            strategy[cls] = target
+    return strategy
+
+
 def train_fold(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -180,6 +199,20 @@ def main() -> int:
         LOGGER.info("=== Fold %d/%d ===", fold_idx + 1, n_splits)
         X_train, X_val = X[train_idx], X[val_idx]
         y_train, y_val = y[train_idx], y[val_idx]
+
+        # SMOTE sintético APENAS no treino; validação/teste permanecem reais.
+        smote_strategy = _build_smote_strategy(
+            y_train,
+            minority_classes=(0, 2),  # S e F
+            target_ratio=0.5,         # até 50% da classe majoritária
+        )
+        if smote_strategy:
+            LOGGER.info("SMOTE strategy: %s", smote_strategy)
+            smote = SMOTE(sampling_strategy=smote_strategy, random_state=42 + fold_idx)
+            X_train, y_train = smote.fit_resample(X_train, y_train)
+            LOGGER.info("After SMOTE: %s", dict(zip(*np.unique(y_train, return_counts=True))))
+        else:
+            LOGGER.info("SMOTE skipped: minority classes already above target")
 
         scaler = StandardScaler()
         X_train = scaler.fit_transform(X_train)
