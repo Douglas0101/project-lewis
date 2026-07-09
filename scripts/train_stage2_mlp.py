@@ -12,6 +12,7 @@ import logging
 import sys
 from pathlib import Path
 
+import joblib
 import numpy as np
 import tensorflow as tf
 from imblearn.over_sampling import SMOTE
@@ -136,7 +137,7 @@ def train_fold(
     y_val: np.ndarray,
     fold_idx: int,
     output_dir: Path,
-    scaler=None,
+    scaler: StandardScaler | None = None,
     hidden_units: int = 32,
 ) -> dict:
     """Treina um único fold com Focal Loss e CosineDecayRestarts."""
@@ -216,7 +217,6 @@ def train_fold(
 
     model.save(str(fold_dir / "model.keras"), save_format="keras")
     if scaler is not None:
-        import joblib
         joblib.dump(scaler, fold_dir / "input_scaler.pkl")
 
     LOGGER.info(
