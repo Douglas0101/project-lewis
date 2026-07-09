@@ -250,6 +250,12 @@ def main() -> int:
         default="experiments/stage2_mlp_features_v2.3",
         help="Directory to save fold models and summary.",
     )
+    parser.add_argument(
+        "--smote-target-ratio",
+        type=float,
+        default=0.3,
+        help="Target ratio of minority classes relative to the majority class for SMOTE.",
+    )
     args = parser.parse_args()
 
     npz = np.load("data/features/stage2_multiclass_features.npz")
@@ -261,8 +267,9 @@ def main() -> int:
     LOGGER.info("Dataset: X=%s, y=%s", X.shape, y.shape)
     LOGGER.info("Features: %s", feature_names)
     LOGGER.info(
-        "Mitigation config: hidden_units=%s",
+        "Mitigation config: hidden_units=%s, smote_target_ratio=%s",
         args.hidden_units,
+        args.smote_target_ratio,
     )
 
     output_dir = _resolve_output_dir(args.output_dir)
@@ -280,8 +287,8 @@ def main() -> int:
         # SMOTE sintético APENAS no treino; validação/teste permanecem reais.
         smote_strategy = _build_smote_strategy(
             y_train,
-            minority_classes=(0, 2),  # S e F
-            target_ratio=0.5,         # até 50% da classe majoritária
+            minority_classes=(0, 2),
+            target_ratio=args.smote_target_ratio,
         )
         if smote_strategy:
             LOGGER.info("SMOTE strategy: %s", smote_strategy)
@@ -316,7 +323,7 @@ def main() -> int:
         "hidden_units": args.hidden_units,
         "focal_alpha": FOCAL_ALPHA.tolist(),
         "focal_gamma": FOCAL_GAMMA,
-        "smote_target_ratio": 0.5,
+        "smote_target_ratio": args.smote_target_ratio,
         "optimized_thresholds_per_fold": {
             r["fold"]: r["optimized_thresholds"] for r in fold_results
         },
