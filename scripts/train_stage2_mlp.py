@@ -94,37 +94,29 @@ def _build_smote_strategy(
     return strategy
 
 
-def _f1_thresholds(
+def _optimize_thresholds_f1_macro(
     y_true: np.ndarray,
     y_score: np.ndarray,
     class_names: list[str],
-    n_thresholds: int = 100,
+    search_step: float = 0.05,
 ) -> dict[str, float]:
-    """Otimiza thresholds one-vs-rest maximizando F1 por classe.
+    """Otimiza thresholds one-vs-rest maximizando F1-macro global.
 
-    Diferente de Youden (Sens + Spec - 1), o F1 equilibra diretamente
-    precision e recall, o que é crítico para classes raras como F onde
-    um threshold muito baixo infla os falsos positivos e destrói F1.
+    Diferente de otimização per-classe, a busca conjunta considera o efeito
+    acoplado dos thresholds na decisão one-vs-rest e diretamente maximiza a
+    métrica de qualidade QG5' (F1-macro do Stage 2).
     """
-    thresholds: dict[str, float] = {}
-    candidate_taus = np.linspace(0.0, 1.0, n_thresholds + 1)
-    for i, name in enumerate(class_names):
-        binary_true = (y_true == i).astype(np.int64)
-        best_f1 = -1.0
-        best_tau = 0.5
-        for tau in candidate_taus:
-            pred_pos = (y_score[:, i] >= tau).astype(np.int64)
-            tp = int(((pred_pos == 1) & (binary_true == 1)).sum())
-            fp = int(((pred_pos == 1) & (binary_true == 0)).sum())
-            fn = int(((pred_pos == 0) & (binary_true == 1)).sum())
-            precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-            recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
-            if f1 > best_f1:
-                best_f1 = f1
-                best_tau = float(tau)
-        thresholds[name] = best_tau
-    return thresholds
+    from src.models.evaluate import find_best_thresholds_multiclass
+
+    result = find_best_thresholds_multiclass(
+        y_true,
+        y_score,
+        class_names=class_names,
+        metric="F1_macro",
+        search_step=search_step,
+        fallback_class=1,  # V é a classe majoritária de fallback
+    )
+    return result["thresholds"]
 
 
 def train_fold(
@@ -183,7 +175,9 @@ def train_fold(
 
     # Otimização de threshold maximizando F1 por classe sobre validação do fold.
     # Youden tende a thresholds muito baixos para F, destruindo precision e F1(F).
-    optimized_thresholds = _f1_thresholds(y_val, y_proba, class_names=["S", "V", "F"])
+    optimized_thresholds = _optimize_thresholds_f1_macro(
+        y_val, y_proba, class_names=["S", "V", "F"]
+    )
 
     # Métricas de validação devem refletir o ponto de operação de produção
     # (thresholds otimizados), não o argmax padrão.
@@ -202,13 +196,13 @@ def train_fold(
     threshold_path.write_text(
         json.dumps({
             "thresholds": optimized_thresholds,
-            "source": "f1_per_class",
+            "source": "f1_macro_joint",
             "fold": fold_idx,
         }, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
     LOGGER.info(
-        "Fold %d | F1 thresholds: %s",
+        "Fold %d | F1-macro thresholds: %s",
         fold_idx,
         optimized_thresholds,
     )
