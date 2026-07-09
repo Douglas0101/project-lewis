@@ -89,6 +89,42 @@ def _build_smote_strategy(y_train: np.ndarray, minority_classes: tuple[int, ...]
     return strategy
 
 
+def _youden_thresholds(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    class_names: list[str],
+    n_thresholds: int = 100,
+) -> dict[str, float]:
+    """Otimiza thresholds one-vs-rest maximizando a estatística J de Youden.
+
+    Para cada classe c:
+        J(τ) = TPR_c(τ) - FPR_c(τ) = Sens_c(τ) - (1 - Spec_c(τ))
+    O threshold τ_c* é escolhido como o que maximiza J(τ), buscando o ponto que
+    melhor separa a classe c de todas as outras sem favorecer arbitrariamente
+    precision ou recall.
+    """
+    thresholds: dict[str, float] = {}
+    for i, name in enumerate(class_names):
+        binary_true = (y_true == i).astype(np.int64)
+        candidate_taus = np.linspace(0.0, 1.0, n_thresholds + 1)
+        best_j = -np.inf
+        best_tau = 0.5
+        for tau in candidate_taus:
+            pred_pos = (y_score[:, i] >= tau).astype(np.int64)
+            tp = int(((pred_pos == 1) & (binary_true == 1)).sum())
+            fp = int(((pred_pos == 1) & (binary_true == 0)).sum())
+            fn = int(((pred_pos == 0) & (binary_true == 1)).sum())
+            tn = int(((pred_pos == 0) & (binary_true == 0)).sum())
+            sens = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            spec = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+            j = sens - (1.0 - spec)
+            if j > best_j:
+                best_j = j
+                best_tau = float(tau)
+        thresholds[name] = best_tau
+    return thresholds
+
+
 def train_fold(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -151,6 +187,24 @@ def train_fold(
     )
     y_proba = model.predict(X_val, batch_size=1024, verbose=0)
 
+    # Otimização de threshold via Youden J sobre validação do fold
+    optimized_thresholds = _youden_thresholds(y_val, y_proba, class_names=["S", "V", "F"])
+    fold_dir = output_dir / f"fold_{fold_idx}"
+    threshold_path = fold_dir / "stage2_threshold.json"
+    threshold_path.write_text(
+        json.dumps({
+            "thresholds": optimized_thresholds,
+            "source": "youden_j_statistic",
+            "fold": fold_idx,
+        }, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    LOGGER.info(
+        "Fold %d | Youden thresholds: %s",
+        fold_idx,
+        optimized_thresholds,
+    )
+
     fold_dir = output_dir / f"fold_{fold_idx}"
     fold_dir.mkdir(parents=True, exist_ok=True)
     model.save(str(fold_dir / "model.keras"), save_format="keras")
@@ -173,6 +227,7 @@ def train_fold(
         "epochs_trained": len(history.history["loss"]),
         "y_val": y_val,
         "y_proba": y_proba,
+        "optimized_thresholds": optimized_thresholds,
     }
 
 
@@ -254,6 +309,10 @@ def main() -> int:
         "experiment": "stage2_mlp_features_v2.3",
         "feature_names": feature_names,
         "hidden_units": args.hidden_units,
+        "focal_alpha": FOCAL_ALPHA.tolist(),
+        "focal_gamma": FOCAL_GAMMA,
+        "smote_target_ratio": 0.5,
+        "optimized_thresholds_per_fold": {r["fold"]: r["optimized_thresholds"] for r in fold_results},
         "folds": fold_results,
         "mean": {
             "Acc": float(np.mean(accs)),
