@@ -198,6 +198,14 @@ def main() -> int:
         args.output_dir / "input_scaler_stage2_v2.3.pkl",
     )
 
+    stage2_threshold_src = args.stage2_exp / f"fold_{stage2_best['fold']}" / "stage2_threshold.json"
+    stage2_threshold_dst = args.output_dir / "stage2_threshold_v2.3.json"
+    if stage2_threshold_src.exists():
+        shutil.copy2(stage2_threshold_src, stage2_threshold_dst)
+        LOGGER.info("Publicado %s", stage2_threshold_dst)
+    else:
+        LOGGER.warning("Threshold Stage 2 não encontrado em %s", stage2_threshold_src)
+
     threshold = _compute_stage1_threshold(
         args.output_dir / "stage1_float32_v2.3.keras",
         args.output_dir / "input_scaler_stage1_v2.3.pkl",
