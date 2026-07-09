@@ -84,11 +84,40 @@ def _stage2_metrics(
     scaler: Any,
     X: np.ndarray,
     y: np.ndarray,
+    thresholds: dict[str, float] | None = None,
 ) -> StageMetrics:
-    """Avalia Estágio 2 (S vs V vs F)."""
+    """Avalia Estágio 2 (S vs V vs F).
+
+    Se ``thresholds`` for fornecido, aplica decisão one-vs-rest com fallback para
+    a classe majoritária V e desempate pela maior probabilidade, espelhando o
+    comportamento do pipeline de inferência.
+    """
     X_scaled = scaler.transform(X)
     proba = model.predict(X_scaled, batch_size=4096, verbose=0)
-    y_pred = np.argmax(proba, axis=1).astype(np.int64)
+
+    if thresholds is None:
+        y_pred = np.argmax(proba, axis=1).astype(np.int64)
+    else:
+        class_names = ["S", "V", "F"]
+        thresh_array = np.array(
+            [thresholds[name] for name in class_names], dtype=proba.dtype
+        )
+        above = proba >= thresh_array
+        n_above = above.sum(axis=1)
+        n_samples = proba.shape[0]
+
+        y_pred = np.full(n_samples, 1, dtype=np.int64)
+
+        single_mask = n_above == 1
+        y_pred[single_mask] = np.argmax(above[single_mask], axis=1)
+
+        multi_mask = n_above > 1
+        if np.any(multi_mask):
+            masked_scores = np.where(above[multi_mask], proba[multi_mask], -np.inf)
+            y_pred[multi_mask] = np.argmax(masked_scores, axis=1)
+
+        none_mask = n_above == 0
+        y_pred[none_mask] = np.argmax(proba[none_mask], axis=1)
 
     return StageMetrics(
         recall=float(
@@ -121,6 +150,7 @@ def published_artifacts() -> Dict[str, Path]:
         "stage2_model": project_root / "models" / "stage2_float32_v2.3.keras",
         "stage2_scaler": project_root / "models" / "input_scaler_stage2_v2.3.pkl",
         "stage1_threshold": project_root / "models" / "stage1_threshold_v2.3.json",
+        "stage2_threshold": project_root / "models" / "stage2_threshold_v2.3.json",
         "stage1_features": project_root / "data" / "features" / "stage1_binary_features.npz",
         "stage2_features": project_root / "data" / "features" / "stage2_multiclass_features.npz",
     }
@@ -187,7 +217,15 @@ def test_two_stage_mlp_qg5_stage2(published_artifacts: Dict[str, Path]) -> None:
     selected = np.array(selected)
     rng.shuffle(selected)
 
-    metrics = _stage2_metrics(model, scaler, X[selected], y[selected])
+    stage2_thresholds: dict[str, float] | None = None
+    if published_artifacts["stage2_threshold"].exists():
+        stage2_thresholds = json.loads(
+            published_artifacts["stage2_threshold"].read_text(encoding="utf-8")
+        ).get("thresholds")
+
+    metrics = _stage2_metrics(
+        model, scaler, X[selected], y[selected], thresholds=stage2_thresholds
+    )
 
     print("\n[QG5' v2.3] Estágio 2 MLP")
     print(
