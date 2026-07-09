@@ -99,11 +99,32 @@ def train_fold(
     scaler=None,
     hidden_units: int = 32,
 ) -> dict:
-    """Treina um único fold."""
-    model = build_mlp(input_dim=X_train.shape[1], num_classes=3, hidden_units=hidden_units)
+    """Treina um único fold com Focal Loss e CosineDecayRestarts."""
+    n_classes = 3
+    y_train_cat = tf.keras.utils.to_categorical(y_train, num_classes=n_classes)
+    y_val_cat = tf.keras.utils.to_categorical(y_val, num_classes=n_classes)
+
+    model = build_mlp(input_dim=X_train.shape[1], num_classes=n_classes, hidden_units=hidden_units)
+
+    try:
+        CosineDecayRestarts = tf.keras.optimizers.schedules.CosineDecayRestarts
+    except AttributeError:
+        CosineDecayRestarts = tf.keras.experimental.CosineDecayRestarts
+
+    lr_schedule = CosineDecayRestarts(
+        initial_learning_rate=1e-3,
+        first_decay_steps=10,
+        t_mul=1.0,
+        m_mul=0.9,
+    )
+
     model.compile(
-        optimizer=tf.keras.optimizers.Adam(learning_rate=1e-3),
-        loss="sparse_categorical_crossentropy",
+        optimizer=tf.keras.optimizers.Adam(learning_rate=lr_schedule),
+        loss=tf.keras.losses.CategoricalFocalCrossentropy(
+            alpha=FOCAL_ALPHA,
+            gamma=FOCAL_GAMMA,
+            from_logits=False,
+        ),
         metrics=["accuracy"],
     )
 
@@ -113,18 +134,12 @@ def train_fold(
             patience=10,
             restore_best_weights=True,
         ),
-        tf.keras.callbacks.ReduceLROnPlateau(
-            monitor="val_loss",
-            factor=0.5,
-            patience=5,
-            min_lr=1e-6,
-        ),
     ]
 
     history = model.fit(
         X_train,
-        y_train,
-        validation_data=(X_val, y_val),
+        y_train_cat,
+        validation_data=(X_val, y_val_cat),
         epochs=50,
         batch_size=256,
         callbacks=callbacks,
@@ -156,6 +171,8 @@ def train_fold(
         "fold": fold_idx,
         "eval_result": eval_result,
         "epochs_trained": len(history.history["loss"]),
+        "y_val": y_val,
+        "y_proba": y_proba,
     }
 
 
