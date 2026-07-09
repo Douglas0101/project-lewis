@@ -42,6 +42,7 @@ class TwoStageMLPPipeline:
         stage2_model_path: Path | str,
         stage2_scaler_path: Path | str,
         stage1_threshold_path: Path | str | None = None,
+        stage2_threshold_path: Path | str | None = None,
         use_quantized: bool = False,
         fs: float = 500.0,
     ) -> None:
@@ -52,10 +53,14 @@ class TwoStageMLPPipeline:
         self.stage1_threshold_path = (
             Path(stage1_threshold_path) if stage1_threshold_path is not None else None
         )
+        self.stage2_threshold_path = (
+            Path(stage2_threshold_path) if stage2_threshold_path is not None else None
+        )
         self.use_quantized = use_quantized
         self.fs = fs
 
         self.stage1_threshold = 0.5
+        self.stage2_thresholds: dict[str, float] | None = None
         self.stage1_model: tf.keras.Model | QuantizedModelRunner | None = None
         self.stage2_model: tf.keras.Model | QuantizedModelRunner | None = None
         self.stage1_scaler: Any = None
@@ -84,6 +89,7 @@ class TwoStageMLPPipeline:
             stage2_model_path=stage2_model,
             stage2_scaler_path=model_dir / "input_scaler_stage2_v2.3.pkl",
             stage1_threshold_path=model_dir / "stage1_threshold_v2.3.json",
+            stage2_threshold_path=model_dir / "stage2_threshold_v2.3.json",
             use_quantized=use_quantized,
         )
 
@@ -108,6 +114,13 @@ class TwoStageMLPPipeline:
         if self.stage1_threshold_path is not None:
             data = json.loads(Path(self.stage1_threshold_path).read_text(encoding="utf-8"))
             self.stage1_threshold = float(data.get("threshold", 0.5))
+
+        if self.stage2_threshold_path is not None and self.stage2_threshold_path.exists():
+            data = json.loads(Path(self.stage2_threshold_path).read_text(encoding="utf-8"))
+            self.stage2_thresholds = data.get("thresholds")
+            LOGGER.info("Thresholds Estágio 2: %s", self.stage2_thresholds)
+        else:
+            LOGGER.info("Thresholds Estágio 2: não fornecidos (usando argmax)")
 
         LOGGER.info("Threshold Estágio 1: %.4f", self.stage1_threshold)
         return self
@@ -135,10 +148,44 @@ class TwoStageMLPPipeline:
         return y_pred, score_anormal
 
     def _run_stage2(self, X_features: np.ndarray) -> np.ndarray:
-        """Executa o Estágio 2 e retorna labels S/V/F."""
+        """Executa o Estágio 2 e retorna labels S/V/F.
+
+        Quando thresholds otimizados estão disponíveis, aplica decisão
+        one-vs-rest com fallback para a classe majoritária V e desempate pela
+        maior probabilidade.
+        """
         X_scaled = self.stage2_scaler.transform(X_features)
-        logits = self._forward(self.stage2_model, X_scaled)
-        return np.argmax(logits, axis=1).astype(np.int64)
+        scores = self._forward(self.stage2_model, X_scaled)
+        n_samples = scores.shape[0]
+
+        if self.stage2_thresholds is None:
+            return np.argmax(scores, axis=1).astype(np.int64)
+
+        thresholds = np.array(
+            [self.stage2_thresholds[name] for name in STAGE2_CLASS_NAMES],
+            dtype=scores.dtype,
+        )
+        above = scores >= thresholds
+        n_above = above.sum(axis=1)
+
+        # Fallback majoritário (V=1) quando nenhum threshold é atingido.
+        y_pred = np.full(n_samples, 1, dtype=np.int64)
+
+        # Exatamente uma classe acima do threshold.
+        single_mask = n_above == 1
+        y_pred[single_mask] = np.argmax(above[single_mask], axis=1)
+
+        # Múltiplas classes acima: desempate pela maior probabilidade entre elas.
+        multi_mask = n_above > 1
+        if np.any(multi_mask):
+            masked_scores = np.where(above[multi_mask], scores[multi_mask], -np.inf)
+            y_pred[multi_mask] = np.argmax(masked_scores, axis=1)
+
+        # Nenhuma classe acima: argmax padrão.
+        none_mask = n_above == 0
+        y_pred[none_mask] = np.argmax(scores[none_mask], axis=1)
+
+        return y_pred
 
     def _stage2_scores(self, X_features: np.ndarray) -> np.ndarray:
         """Retorna scores do Estágio 2 para as amostras."""
