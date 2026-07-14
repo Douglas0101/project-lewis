@@ -1,0 +1,20 @@
+{
+  "which_python": "/home/douglas-souza/anaconda3/envs/ai_env/bin/python",
+  "python_command": {
+    "exit_code": 0,
+    "stdout": "/home/douglas-souza/anaconda3/envs/ai_env/bin/python\n3.13.13 | packaged by Anaconda, Inc. | (main, Apr 14 2026, 06:19:41) [GCC 14.3.0]\n",
+    "stderr": ""
+  },
+  "uv_python_command": {
+    "exit_code": 0,
+    "stdout": "/home/douglas-souza/PycharmProjects/Project-Lewis/.venv/bin/python3\nkeras 3.14.1 /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/keras/__init__.py\ntensorflow 2.21.0 /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/tensorflow/__init__.py\ntf.keras <KerasLazyLoader>\n",
+    "stderr": "WARNING: All log messages before absl::InitializeLog() is called are written to STDERR\nI0000 00:00:1783902731.656637 1698635 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\nI0000 00:00:1783902731.658707 1698635 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.\nI0000 00:00:1783902731.930863 1698635 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.\nTo enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.\nWARNING: All log messages before absl::InitializeLog() is called are written to STDERR\nI0000 00:00:1783902735.511448 1698635 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.\nI0000 00:00:1783902735.513615 1698635 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.\n"
+  },
+  "variables": {
+    "TF_USE_LEGACY_KERAS": null,
+    "KERAS_BACKEND": null,
+    "CUDA_VISIBLE_DEVICES": null,
+    "CONDA_PREFIX": "/home/douglas-souza/anaconda3/envs/ai_env",
+    "VIRTUAL_ENV": null
+  }
+}

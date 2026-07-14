@@ -1,0 +1,233 @@
+{
+  "mode": "training_true",
+  "model_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "fixture_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/artifacts/stage1_recall_investigation/R03/loader_fixture.npz",
+  "fixture_shape": [
+    11,
+    500,
+    1
+  ],
+  "fixture_dtype": "float32",
+  "trainable_weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_before": "26f358b7efc860f226404f7a1f4852cb7de57386bdb31a89e40c17a220e420a6",
+  "initial_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "26f358b7efc860f226404f7a1f4852cb7de57386bdb31a89e40c17a220e420a6",
+      "values": [
+        264561722,
+        0
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "run": {
+    "mode": "training_true",
+    "samples": [
+      {
+        "output_shape": [
+          11,
+          2
+        ],
+        "output_dtype": "float32",
+        "output_sha256": "8cbdb4be0f44cbf8d48cb7b4583166293bf45fcf8c0cb764998d3d28c8f30727",
+        "state_before": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "26f358b7efc860f226404f7a1f4852cb7de57386bdb31a89e40c17a220e420a6",
+            "values": [
+              264561722,
+              0
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "state_after": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "5fa74a7f19243c5b9fb0f9199a5cd47112387e4d3947b2e5f87336fd00e8475d",
+            "values": [
+              264561722,
+              1
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+        "weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+      },
+      {
+        "output_shape": [
+          11,
+          2
+        ],
+        "output_dtype": "float32",
+        "output_sha256": "1d6fce96c7262bea1906e090ddf5491dec0122d016b6a397d36d31e1ff91c6a3",
+        "state_before": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "5fa74a7f19243c5b9fb0f9199a5cd47112387e4d3947b2e5f87336fd00e8475d",
+            "values": [
+              264561722,
+              1
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "state_after": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "276fb5cf8ad6ae5edc35ec2893ad719cb1f7d68713ce4940faa83f385b8cf69f",
+            "values": [
+              264561722,
+              2
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+        "weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+      },
+      {
+        "output_shape": [
+          11,
+          2
+        ],
+        "output_dtype": "float32",
+        "output_sha256": "f82043f389e6d6114c1892f9f43b28ce17592ec3857fb2ca60ff12e53769fa53",
+        "state_before": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "276fb5cf8ad6ae5edc35ec2893ad719cb1f7d68713ce4940faa83f385b8cf69f",
+            "values": [
+              264561722,
+              2
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "state_after": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "9366eb616a389c92462bdbc2bca2130273536a377d0b69835d071060792faa09",
+            "values": [
+              264561722,
+              3
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+        "weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+      }
+    ],
+    "pairwise": [
+      {
+        "label": "training_true_1_vs_2",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.09039676189422607,
+        "mean_abs_delta": 0.037539042532444,
+        "p99_abs_delta": 0.09039673954248428,
+        "array_equal": false,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 1
+      },
+      {
+        "label": "training_true_1_vs_3",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.18438977003097534,
+        "mean_abs_delta": 0.05058535560965538,
+        "p99_abs_delta": 0.18438977003097534,
+        "array_equal": false,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 1
+      },
+      {
+        "label": "training_true_2_vs_3",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.19756649434566498,
+        "mean_abs_delta": 0.0336911641061306,
+        "p99_abs_delta": 0.19756647944450378,
+        "array_equal": false,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 0
+      }
+    ],
+    "trainable_weights_immutable": true,
+    "any_rng_state_changed": true
+  },
+  "trainable_weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_after": "9366eb616a389c92462bdbc2bca2130273536a377d0b69835d071060792faa09",
+  "final_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "9366eb616a389c92462bdbc2bca2130273536a377d0b69835d071060792faa09",
+      "values": [
+        264561722,
+        3
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "trainable_weights_immutable": true
+}

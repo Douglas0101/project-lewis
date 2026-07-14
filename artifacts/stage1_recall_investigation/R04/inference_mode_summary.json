@@ -1,0 +1,14 @@
+{
+  "predict_reproducible": true,
+  "training_false_reproducible": true,
+  "predict_vs_training_false_equal": true,
+  "predict_vs_training_false_max_delta": 0.0,
+  "predict_argmax_disagreements": 0,
+  "predict_threshold_disagreements": 0,
+  "training_true_weights_immutable": true,
+  "training_true_any_rng_state_changed": true,
+  "model_state_trainable_weights_immutable": true,
+  "rng_not_advanced_in_predict": true,
+  "rng_not_advanced_in_training_false": true,
+  "cross_process_first_training_true_identical": true
+}

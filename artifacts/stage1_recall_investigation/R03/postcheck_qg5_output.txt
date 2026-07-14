@@ -1,0 +1,134 @@
+$ uv run pytest tests/test_two_stage_qg5.py::test_two_stage_qg5_end_to_end -vv -s --tb=long
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.0, pluggy-1.6.0 -- /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/douglas-souza/PycharmProjects/Project-Lewis
+configfile: pyproject.toml
+plugins: xdist-3.8.0, hydra-core-1.3.3, cov-7.1.0, anyio-4.14.1, timeout-2.4.0
+collecting ... collected 1 item
+
+tests/test_two_stage_qg5.py::test_two_stage_qg5_end_to_end 
+[QG5' v2.2] Pipeline two-stage end-to-end
+  Estágio 1 | Recall(Anormal)=0.0661 Precision(Anormal)=1.0000 F1-macro=0.1245 Acc=0.1245 MCC=0.0664
+  Estágio 2 | F1-macro=0.6420 Acc=0.6578 MCC=0.5088 per-class F1={'S': 0.7168784029038112, 'V': 0.4626728110599078, 'F': 0.7465214761040533}
+FAILED
+
+=================================== FAILURES ===================================
+________________________ test_two_stage_qg5_end_to_end _________________________
+
+loaded_pipeline = <src.inference.two_stage_pipeline.TwoStageInferencePipeline object at 0x702547307980>
+test_subset = (array([[[0.6186013 ],
+        [0.6186013 ],
+        [0.6186013 ],
+        ...,
+        [0.49815097],
+        [0.49815097],
+        [0.49815097]],
+
+       [[0.57464415],
+        [0.57464415],
+        [0.57464415],
+        ...,
+        [0.6917156 ],
+        [0.6917156 ],
+        [0.6917156 ]],
+
+       [[0.2878815 ],
+        [0.2878815 ],
+        [0.2878815 ],
+        ...,
+        [0.461652  ],
+        [0.461652  ],
+        [0.461652  ]],
+
+       ...,
+
+       [[1.5388396 ],
+        [1.5388396 ],
+        [1.5388396 ],
+        ...,
+        [1.4972589 ],
+        [1.4972589 ],
+        [1.4972589 ]],
+
+       [[0.6832951 ],
+        [0.6832951 ],
+        [0.6832951 ],
+        ...,
+        [0.31124744],
+        [0.31124744],
+        [0.31124744]],
+
+       [[1.2908379 ],
+        [1.2908379 ],
+        [1.2908379 ],
+        ...,
+        [0.34871945],
+        [0.34871945],
+        [0.34871945]]], shape=(2048, 500, 1), dtype=float32), array([2, 1, 3, ..., 3, 2, 3], shape=(2048,)))
+
+    @pytest.mark.qg5
+    def test_two_stage_qg5_end_to_end(
+        loaded_pipeline: TwoStageInferencePipeline,
+        test_subset: tuple[np.ndarray, np.ndarray],
+    ) -> None:
+        """Avalia o pipeline two-stage end-to-end e verifica thresholds QG5' v2.2.
+    
+        O teste reporta métricas de ambos os estágios e falha caso os thresholds
+        configuráveis não sejam atingidos.
+        """
+        X, y_true_aami = test_subset
+    
+        result = loaded_pipeline.predict(X)
+        y_pred_aami = np.array(
+            [AAMI_FINAL_CLASSES.index(cls) for cls in result["class"]], dtype=np.int64
+        )
+    
+        # Estágio 1: métricas binárias derivadas das predições integradas.
+        stage1 = _evaluate_stage1(y_true_aami, y_pred_aami)
+    
+        # Estágio 2: métricas multiclasse avaliadas sobre todas as amostras
+        # verdadeiramente anormais, conforme definição canônica do QG5'.
+        abnormal_mask = np.isin(y_true_aami, [1, 2, 3])
+        X_abnormal = X[abnormal_mask]
+        y_stage2_pred = loaded_pipeline._run_stage2(X_abnormal)
+        stage2 = _evaluate_stage2(y_true_aami, y_stage2_pred)
+    
+        print("\n[QG5' v2.2] Pipeline two-stage end-to-end")
+        print(
+            f"  Estágio 1 | Recall(Anormal)={stage1.recall:.4f} "
+            f"Precision(Anormal)={stage1.precision:.4f} "
+            f"F1-macro={stage1.f1_macro:.4f} Acc={stage1.accuracy:.4f} MCC={stage1.mcc:.4f}"
+        )
+        print(
+            f"  Estágio 2 | F1-macro={stage2.f1_macro:.4f} "
+            f"Acc={stage2.accuracy:.4f} MCC={stage2.mcc:.4f} "
+            f"per-class F1={stage2.per_class_f1}"
+        )
+    
+        tolerance = 1e-6
+>       assert stage1.recall + tolerance >= STAGE1_MIN_RECALL_ANORMAL, (
+            f"QG5' v2.2: Recall(Anormal) do Estágio 1 ({stage1.recall:.4f}) "
+            f"abaixo do threshold ({STAGE1_MIN_RECALL_ANORMAL})"
+        )
+E       AssertionError: QG5' v2.2: Recall(Anormal) do Estágio 1 (0.0661) abaixo do threshold (0.3)
+E       assert (0.06614583333333333 + 1e-06) >= 0.3
+E        +  where 0.06614583333333333 = StageMetrics(recall=0.06614583333333333, precision=1.0, f1_macro=0.1245115100172782, accuracy=0.12451171875, mcc=0.06638845296803621, per_class_f1={'N': 0.12493899463152758, 'Anormal': 0.12408402540302882}).recall
+
+tests/test_two_stage_qg5.py:271: AssertionError
+=========================== short test summary info ============================
+FAILED tests/test_two_stage_qg5.py::test_two_stage_qg5_end_to_end - AssertionError: QG5' v2.2: Recall(Anormal) do Estágio 1 (0.0661) abaixo do threshold (0.3)
+assert (0.06614583333333333 + 1e-06) >= 0.3
+ +  where 0.06614583333333333 = StageMetrics(recall=0.06614583333333333, precision=1.0, f1_macro=0.1245115100172782, accuracy=0.12451171875, mcc=0.06638845296803621, per_class_f1={'N': 0.12493899463152758, 'Anormal': 0.12408402540302882}).recall
+============================== 1 failed in 11.27s ==============================
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783910495.722171 1728121 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783910495.723098 1728121 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1783910495.794208 1728121 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783910497.418601 1728121 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783910497.419421 1728121 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+E0000 00:00:1783910498.490321 1728121 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+
+[exit_code=1]

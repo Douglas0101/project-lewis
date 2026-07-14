@@ -1,0 +1,56 @@
+$ make lint
+uv run flake8 src tests --max-line-length=100
+uv run mypy src --ignore-missing-imports
+Success: no issues found in 117 source files
+uv run bandit -c pyproject.toml -r src
+Working... ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:02
+Run started:2026-07-13 02:42:25.258805+00:00
+
+Test results:
+	No issues identified.
+
+Code scanned:
+	Total lines of code: 17229
+	Total lines skipped (#nosec): 0
+	Total potential issues skipped due to specifically being disabled (e.g., #nosec BXXX): 14
+
+Run metrics:
+	Total issues (by severity):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+	Total issues (by confidence):
+		Undefined: 0
+		Low: 0
+		Medium: 0
+		High: 0
+Files skipped (0):
+[main]	INFO	profile include tests: None
+[main]	INFO	profile exclude tests: B404,B603,B311,B101
+[main]	INFO	cli include tests: None
+[main]	INFO	cli exclude tests: None
+[main]	INFO	using config: pyproject.toml
+[main]	INFO	running on Python 3.12.3
+[tester]	WARNING	nosec encountered (B110), but no failed test on file src/callbacks/metric_tracker.py:105
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:518
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:519
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:520
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:521
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:522
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:523
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:524
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:525
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:526
+[tester]	WARNING	nosec encountered (B105), but no failed test on file src/data/preprocessor.py:520
+[tester]	WARNING	nosec encountered (B608), but no failed test on file src/knowledge/structured_query.py:331
+[tester]	WARNING	nosec encountered (B110), but no failed test on file src/tracking/_git.py:21
+[tester]	WARNING	nosec encountered (B608), but no failed test on file src/tracking/timeline.py:201
+[tester]	WARNING	nosec encountered (B608), but no failed test on file src/tracking/timeline.py:202
+[tester]	WARNING	nosec encountered (B608), but no failed test on file src/tracking/timeline.py:202
+
+[exit_code=0]
+
+$ uv run flake8 scripts/stage1_loader_lane.py scripts/build_stage1_loader_fixture.py scripts/audit_stage1_loader_equivalence.py --max-line-length=100
+
+[exit_code=0]

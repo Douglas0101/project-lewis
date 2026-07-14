@@ -1,0 +1,127 @@
+{
+  "schema_version": "1.0",
+  "shape": [
+    11,
+    500,
+    1
+  ],
+  "dtype": "float32",
+  "sha256": "59d08ed5ae4a15e55e45f2c09afd3cebcdf4921782c71e8febd649df81d48794",
+  "array_sha256": "f35880b59c6221398b2b02fe57b26dc3271b6dfa22fe93e95281f89bf228c8ae",
+  "scaler_sha256": "80f5fabf5aeb790f9bf6c0bd8dfc993133d6d53f5f9787cc53011fb1c2b3acb3",
+  "model_sha256": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347",
+  "threshold": 0.5800000000000001,
+  "selection_policy": "Deterministic union of first true Normal, first true Anormal, highest positive score, lowest negative score, nearest score below/above 0.58, and nearest scores to global p01/p25/p50/p75/p99; duplicate indices are merged and roles retained.",
+  "samples": [
+    {
+      "fixture_index": 0,
+      "qg5_subset_index": 0,
+      "sample_id": "stage2_multiclass:V:166",
+      "true_label_stage1": 1,
+      "reference_score": 0.17563413083553314,
+      "roles": [
+        "true_abnormal"
+      ]
+    },
+    {
+      "fixture_index": 1,
+      "qg5_subset_index": 34,
+      "sample_id": "stage1_binary:N:49",
+      "true_label_stage1": 0,
+      "reference_score": 0.4425305128097534,
+      "roles": [
+        "true_normal"
+      ]
+    },
+    {
+      "fixture_index": 2,
+      "qg5_subset_index": 82,
+      "sample_id": "stage2_multiclass:F:4378",
+      "true_label_stage1": 1,
+      "reference_score": 0.058460552245378494,
+      "roles": [
+        "score_quantile_p01"
+      ]
+    },
+    {
+      "fixture_index": 3,
+      "qg5_subset_index": 709,
+      "sample_id": "stage2_multiclass:S:1472",
+      "true_label_stage1": 1,
+      "reference_score": 0.15015357732772827,
+      "roles": [
+        "score_quantile_p25"
+      ]
+    },
+    {
+      "fixture_index": 4,
+      "qg5_subset_index": 929,
+      "sample_id": "stage2_multiclass:S:2590",
+      "true_label_stage1": 1,
+      "reference_score": 0.21620412170886993,
+      "roles": [
+        "score_quantile_p50"
+      ]
+    },
+    {
+      "fixture_index": 5,
+      "qg5_subset_index": 945,
+      "sample_id": "stage2_multiclass:F:5943",
+      "true_label_stage1": 1,
+      "reference_score": 0.6220294237136841,
+      "roles": [
+        "score_quantile_p99"
+      ]
+    },
+    {
+      "fixture_index": 6,
+      "qg5_subset_index": 980,
+      "sample_id": "stage2_multiclass:V:129",
+      "true_label_stage1": 1,
+      "reference_score": 0.6506867408752441,
+      "roles": [
+        "predicted_positive_highest_score"
+      ]
+    },
+    {
+      "fixture_index": 7,
+      "qg5_subset_index": 1051,
+      "sample_id": "stage2_multiclass:F:4204",
+      "true_label_stage1": 1,
+      "reference_score": 0.5800524950027466,
+      "roles": [
+        "immediately_above_threshold"
+      ]
+    },
+    {
+      "fixture_index": 8,
+      "qg5_subset_index": 1198,
+      "sample_id": "stage2_multiclass:F:5013",
+      "true_label_stage1": 1,
+      "reference_score": 0.5794573426246643,
+      "roles": [
+        "immediately_below_threshold"
+      ]
+    },
+    {
+      "fixture_index": 9,
+      "qg5_subset_index": 1285,
+      "sample_id": "stage2_multiclass:S:41",
+      "true_label_stage1": 1,
+      "reference_score": 0.012770771980285645,
+      "roles": [
+        "predicted_negative_lowest_score"
+      ]
+    },
+    {
+      "fixture_index": 10,
+      "qg5_subset_index": 2024,
+      "sample_id": "stage1_binary:N:103",
+      "true_label_stage1": 0,
+      "reference_score": 0.4227834641933441,
+      "roles": [
+        "score_quantile_p75"
+      ]
+    }
+  ]
+}

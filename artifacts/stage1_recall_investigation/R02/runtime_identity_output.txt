@@ -1,0 +1,21 @@
+{
+  "sys_executable": "/usr/bin/python3.12",
+  "python_version": "3.12.3 (main, Jun 19 2026, 12:46:00) [GCC 13.3.0]",
+  "conda_prefix": "/home/douglas-souza/anaconda3/envs/ai_env",
+  "virtual_env": "/home/douglas-souza/PycharmProjects/Project-Lewis/.venv",
+  "keras_version": "3.14.1",
+  "tensorflow_version": "2.21.0",
+  "canonical_executable": "/usr/bin/python3.12",
+  "executable_matches": true,
+  "python_version_matches": true
+}
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783907771.318795 1718445 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783907771.320133 1718445 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1783907771.489215 1718445 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783907774.704654 1718445 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783907774.705126 1718445 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+
+[exit_code=0]

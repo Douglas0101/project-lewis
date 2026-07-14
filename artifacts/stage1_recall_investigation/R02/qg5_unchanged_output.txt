@@ -1,0 +1,35 @@
+$ uv run pytest tests/test_two_stage_qg5.py::test_two_stage_qg5_end_to_end -q -s
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.0, pluggy-1.6.0
+rootdir: /home/douglas-souza/PycharmProjects/Project-Lewis
+configfile: pyproject.toml
+plugins: xdist-3.8.0, hydra-core-1.3.3, cov-7.1.0, anyio-4.14.1, timeout-2.4.0
+collected 1 item
+
+tests/test_two_stage_qg5.py 
+[QG5' v2.2] Pipeline two-stage end-to-end
+  Estágio 1 | Recall(Anormal)=0.0661 Precision(Anormal)=1.0000 F1-macro=0.1245 Acc=0.1245 MCC=0.0664
+  Estágio 2 | F1-macro=0.6420 Acc=0.6578 MCC=0.5088 per-class F1={'S': 0.7168784029038112, 'V': 0.4626728110599078, 'F': 0.7465214761040533}
+F
+
+=================================== FAILURES ===================================
+________________________ test_two_stage_qg5_end_to_end _________________________
+tests/test_two_stage_qg5.py:271: in test_two_stage_qg5_end_to_end
+    assert stage1.recall + tolerance >= STAGE1_MIN_RECALL_ANORMAL, (
+E   AssertionError: QG5' v2.2: Recall(Anormal) do Estágio 1 (0.0661) abaixo do threshold (0.3)
+E   assert (0.06614583333333333 + 1e-06) >= 0.3
+E    +  where 0.06614583333333333 = StageMetrics(recall=0.06614583333333333, precision=1.0, f1_macro=0.1245115100172782, accuracy=0.12451171875, mcc=0.06638845296803621, per_class_f1={'N': 0.12493899463152758, 'Anormal': 0.12408402540302882}).recall
+=========================== short test summary info ============================
+FAILED tests/test_two_stage_qg5.py::test_two_stage_qg5_end_to_end - Assertion...
+============================== 1 failed in 13.25s ==============================
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783907991.004336 1719315 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783907991.005275 1719315 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1783907991.135893 1719315 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783907993.815619 1719315 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783907993.816178 1719315 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+E0000 00:00:1783907994.956155 1719315 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+
+[exit_code=1]

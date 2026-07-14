@@ -1,0 +1,167 @@
+$ uv run pytest tests/test_stage1_predict_training_false_equivalence.py tests/test_stage1_dropout_inference_mode.py tests/test_stage1_inference_state_immutability.py tests/test_stage1_dropout_rng_state.py tests/test_stage1_no_training_true_in_production.py -vv --tb=long
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.0, pluggy-1.6.0 -- /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/douglas-souza/PycharmProjects/Project-Lewis
+configfile: pyproject.toml
+plugins: xdist-3.8.0, hydra-core-1.3.3, cov-7.1.0, anyio-4.14.1, timeout-2.4.0
+collecting ... collected 21 items
+
+tests/test_stage1_predict_training_false_equivalence.py::test_r03_fixture_is_immutable_and_untouched PASSED [  4%]
+tests/test_stage1_predict_training_false_equivalence.py::test_predict_is_reproducible PASSED [  9%]
+tests/test_stage1_predict_training_false_equivalence.py::test_training_false_is_reproducible PASSED [ 14%]
+tests/test_stage1_predict_training_false_equivalence.py::test_predict_equals_training_false PASSED [ 19%]
+tests/test_stage1_dropout_inference_mode.py::test_dropout_exists_and_has_rate_between_zero_and_one PASSED [ 23%]
+tests/test_stage1_dropout_inference_mode.py::test_dropout_has_seed_generator PASSED [ 28%]
+tests/test_stage1_dropout_inference_mode.py::test_dropout_layer_is_trainable_but_non_trainable_count_is_one PASSED [ 33%]
+tests/test_stage1_dropout_inference_mode.py::test_training_false_does_not_activate_dropout FAILED [ 38%]
+tests/test_stage1_dropout_inference_mode.py::test_predict_does_not_activate_dropout FAILED [ 42%]
+tests/test_stage1_dropout_inference_mode.py::test_training_true_changes_output PASSED [ 47%]
+tests/test_stage1_inference_state_immutability.py::test_predict_does_not_change_trainable_weights PASSED [ 52%]
+tests/test_stage1_inference_state_immutability.py::test_training_false_does_not_change_trainable_weights PASSED [ 57%]
+tests/test_stage1_inference_state_immutability.py::test_training_true_does_not_change_trainable_weights PASSED [ 61%]
+tests/test_stage1_dropout_rng_state.py::test_rng_state_does_not_advance_during_predict PASSED [ 66%]
+tests/test_stage1_dropout_rng_state.py::test_rng_state_does_not_advance_during_training_false PASSED [ 71%]
+tests/test_stage1_dropout_rng_state.py::test_rng_state_may_advance_during_training_true PASSED [ 76%]
+tests/test_stage1_dropout_rng_state.py::test_training_true_outputs_are_not_all_identical PASSED [ 80%]
+tests/test_stage1_dropout_rng_state.py::test_cross_process_deterministic_reload_with_same_seed PASSED [ 85%]
+tests/test_stage1_no_training_true_in_production.py::test_no_training_true_in_production ERROR [ 90%]
+tests/test_stage1_no_training_true_in_production.py::test_training_true_allowed_in_diagnostics ERROR [ 95%]
+tests/test_stage1_no_training_true_in_production.py::test_training_false_in_production_is_safe PASSED [100%]
+
+==================================== ERRORS ====================================
+____________ ERROR at setup of test_no_training_true_in_production _____________
+
+    @pytest.fixture(scope="module")
+    def all_training_true_hits() -> list[tuple[str, int]]:
+>       return _find_training_true_calls(PROJECT_ROOT)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_stage1_no_training_true_in_production.py:72: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/home/douglas-souza/PycharmProjects/Project-Lewis')
+
+    def _find_training_true_calls(path: Path) -> list[tuple[str, int]]:
+        """Return (file, line) for model(..., training=True) in Python files."""
+        hits: list[tuple[str, int]] = []
+        for source in path.rglob("*.py"):
+            if ".venv" in source.parts or "node_modules" in source.parts:
+                continue
+            try:
+>               tree = ast.parse(source.read_text(encoding="utf-8"))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_stage1_no_training_true_in_production.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/tools/xpack-arm-none-eabi-gcc-13.3.1-1.1/lib/python3.11/test/badsyntax_pep3120.py')
+encoding = 'utf-8', errors = None
+
+    def read_text(self, encoding=None, errors=None):
+        """
+        Open the file in text mode, read it, and close the file.
+        """
+        encoding = io.text_encoding(encoding)
+        with self.open(mode='r', encoding=encoding, errors=errors) as f:
+>           return f.read()
+                   ^^^^^^^^
+
+/usr/lib/python3.12/pathlib.py:1030: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <encodings.utf_8.IncrementalDecoder object at 0x77df8acebc20>
+input = b'print("b\xf6se")\n', final = True
+
+>   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf6 in position 8: invalid start byte
+
+<frozen codecs>:322: UnicodeDecodeError
+_________ ERROR at setup of test_training_true_allowed_in_diagnostics __________
+
+    @pytest.fixture(scope="module")
+    def all_training_true_hits() -> list[tuple[str, int]]:
+>       return _find_training_true_calls(PROJECT_ROOT)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_stage1_no_training_true_in_production.py:72: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+path = PosixPath('/home/douglas-souza/PycharmProjects/Project-Lewis')
+
+    def _find_training_true_calls(path: Path) -> list[tuple[str, int]]:
+        """Return (file, line) for model(..., training=True) in Python files."""
+        hits: list[tuple[str, int]] = []
+        for source in path.rglob("*.py"):
+            if ".venv" in source.parts or "node_modules" in source.parts:
+                continue
+            try:
+>               tree = ast.parse(source.read_text(encoding="utf-8"))
+                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+tests/test_stage1_no_training_true_in_production.py:35: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = PosixPath('/home/douglas-souza/PycharmProjects/Project-Lewis/firmware/tools/xpack-arm-none-eabi-gcc-13.3.1-1.1/lib/python3.11/test/badsyntax_pep3120.py')
+encoding = 'utf-8', errors = None
+
+    def read_text(self, encoding=None, errors=None):
+        """
+        Open the file in text mode, read it, and close the file.
+        """
+        encoding = io.text_encoding(encoding)
+        with self.open(mode='r', encoding=encoding, errors=errors) as f:
+>           return f.read()
+                   ^^^^^^^^
+
+/usr/lib/python3.12/pathlib.py:1030: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ 
+
+self = <encodings.utf_8.IncrementalDecoder object at 0x77df8acebc20>
+input = b'print("b\xf6se")\n', final = True
+
+>   ???
+E   UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf6 in position 8: invalid start byte
+
+<frozen codecs>:322: UnicodeDecodeError
+=================================== FAILURES ===================================
+________________ test_training_false_does_not_activate_dropout _________________
+
+    def test_training_false_does_not_activate_dropout() -> None:
+        """Three training=False calls are identical, proving Dropout is inactive."""
+        import numpy as np
+    
+        model = load_keras_model(MODEL_PATH, compile=False)
+        with np.load(FIXTURE_PATH, allow_pickle=False) as data:
+            x_values = data["X_scaled"].astype(np.float32, copy=False)
+    
+        outputs = [np.asarray(model(x_values, training=False)) for _ in range(3)]
+>       for left, right in zip(outputs, outputs[1:], strict=True):
+E       ValueError: zip() argument 2 is shorter than argument 1
+
+tests/test_stage1_dropout_inference_mode.py:66: ValueError
+----------------------------- Captured stderr call -----------------------------
+E0000 00:00:1783913346.756571 1738852 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+____________________ test_predict_does_not_activate_dropout ____________________
+
+    def test_predict_does_not_activate_dropout() -> None:
+        """Three predict() calls are identical, proving Dropout is inactive."""
+        import numpy as np
+    
+        model = load_keras_model(MODEL_PATH, compile=False)
+        with np.load(FIXTURE_PATH, allow_pickle=False) as data:
+            x_values = data["X_scaled"].astype(np.float32, copy=False)
+    
+        outputs = [np.asarray(model.predict(x_values, verbose=0)) for _ in range(3)]  # type: ignore[reportArgumentType]
+>       for left, right in zip(outputs, outputs[1:], strict=True):
+E       ValueError: zip() argument 2 is shorter than argument 1
+
+tests/test_stage1_dropout_inference_mode.py:80: ValueError
+=========================== short test summary info ============================
+FAILED tests/test_stage1_dropout_inference_mode.py::test_training_false_does_not_activate_dropout - ValueError: zip() argument 2 is shorter than argument 1
+FAILED tests/test_stage1_dropout_inference_mode.py::test_predict_does_not_activate_dropout - ValueError: zip() argument 2 is shorter than argument 1
+ERROR tests/test_stage1_no_training_true_in_production.py::test_no_training_true_in_production - UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf6 in position 8: invalid start byte
+ERROR tests/test_stage1_no_training_true_in_production.py::test_training_true_allowed_in_diagnostics - UnicodeDecodeError: 'utf-8' codec can't decode byte 0xf6 in position 8: invalid start byte
+============== 2 failed, 17 passed, 2 errors in 65.05s (0:01:05) ===============
+
+[exit_code=1]

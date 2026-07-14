@@ -1,0 +1,80 @@
+{
+  "mode": "deterministic_reload",
+  "model_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "fixture_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/artifacts/stage1_recall_investigation/R03/loader_fixture.npz",
+  "fixture_shape": [
+    11,
+    500,
+    1
+  ],
+  "fixture_dtype": "float32",
+  "trainable_weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_before": "5d685423b6061658af8cb589ba730104db46d98e3dbfbed2a0215af4a9aa365a",
+  "initial_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "5d685423b6061658af8cb589ba730104db46d98e3dbfbed2a0215af4a9aa365a",
+      "values": [
+        754786658,
+        0
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "run": {
+    "mode": "deterministic_reload",
+    "seed": 42,
+    "environment_seed": 42,
+    "first_training_true": {
+      "shape": [
+        11,
+        2
+      ],
+      "dtype": "float32",
+      "sha256": "bd89740b3bd40d72b081393ec27e358a354092ca6ae96115d227b1a03f521f98"
+    },
+    "initial_rng_state": {
+      "state": {
+        "shape": [
+          2
+        ],
+        "dtype": "int64",
+        "sha256": "0b4440d7f0726f3afaa8effbbace8f0e42239947ab4b29d4b1d3c857d772b163",
+        "values": [
+          295310486,
+          1
+        ]
+      },
+      "_state": null,
+      "seed": null,
+      "_seed": null,
+      "counter": null
+    }
+  },
+  "trainable_weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_after": "5d685423b6061658af8cb589ba730104db46d98e3dbfbed2a0215af4a9aa365a",
+  "final_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "5d685423b6061658af8cb589ba730104db46d98e3dbfbed2a0215af4a9aa365a",
+      "values": [
+        754786658,
+        0
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "trainable_weights_immutable": true
+}

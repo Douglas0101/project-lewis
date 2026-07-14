@@ -1,0 +1,137 @@
+{
+  "layer_name": "dropout",
+  "layer_index": 9,
+  "rate": 0.3,
+  "seed": null,
+  "noise_shape": null,
+  "trainable": true,
+  "dtype": "float32",
+  "module": "keras.src.layers.regularization.dropout",
+  "class_name": "Dropout",
+  "config": {
+    "name": "dropout",
+    "trainable": true,
+    "dtype": {
+      "module": "keras",
+      "class_name": "DTypePolicy",
+      "config": {
+        "name": "float32"
+      },
+      "registered_name": null
+    },
+    "rate": 0.3,
+    "seed": null,
+    "noise_shape": null
+  },
+  "has_seed_generator": true,
+  "seed_generator_type": "keras.src.random.seed_generator.SeedGenerator",
+  "seed_generator_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "values": [
+        160886684,
+        0
+      ],
+      "sha256": "b06316433dae2628643ef80ec975f6618535dd43dda8cf0311ddb084102afbd5"
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "non_trainable_variable_count": 1,
+  "non_trainable_variables": [
+    {
+      "name": "seed_generator_state",
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "b06316433dae2628643ef80ec975f6618535dd43dda8cf0311ddb084102afbd5"
+    }
+  ],
+  "trainable_variable_count": 10,
+  "trainable_variables": [
+    {
+      "name": "kernel",
+      "shape": [
+        7,
+        1,
+        16
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "bias",
+      "shape": [
+        16
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "kernel",
+      "shape": [
+        5,
+        16,
+        32
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "bias",
+      "shape": [
+        32
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "kernel",
+      "shape": [
+        3,
+        32,
+        64
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "bias",
+      "shape": [
+        64
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "kernel",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "bias",
+      "shape": [
+        64
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "kernel",
+      "shape": [
+        64,
+        2
+      ],
+      "dtype": "float32"
+    },
+    {
+      "name": "bias",
+      "shape": [
+        2
+      ],
+      "dtype": "float32"
+    }
+  ]
+}

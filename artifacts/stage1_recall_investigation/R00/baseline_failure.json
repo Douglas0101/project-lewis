@@ -1,0 +1,31 @@
+{
+  "model_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "model_sha256": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347",
+  "scaler_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/input_scaler_stage1_v2.0.pkl",
+  "scaler_sha256": "80f5fabf5aeb790f9bf6c0bd8dfc993133d6d53f5f9787cc53011fb1c2b3acb3",
+  "threshold_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_threshold_v2.0.json",
+  "threshold_sha256": "b75e14ab95136d544664a166eaa15fcdcfe38fda821462a781b26265b6966746",
+  "n_samples": 2048,
+  "n_normal": 128,
+  "n_abnormal": 1920,
+  "true_positive": 127,
+  "false_positive": 0,
+  "true_negative": 128,
+  "false_negative": 1793,
+  "recall_abnormal": 0.06614583333333333,
+  "precision_abnormal": 1.0,
+  "f1_abnormal": 0.12408402540302882,
+  "threshold_used": 0.5800000000000001,
+  "average_precision": 0.9136421076851974,
+  "predicted_abnormal_rate": 0.06201171875,
+  "input_shape": [
+    2048,
+    500,
+    1
+  ],
+  "input_dtype": "float32",
+  "target_shape": [
+    2048
+  ],
+  "target_dtype": "int64"
+}

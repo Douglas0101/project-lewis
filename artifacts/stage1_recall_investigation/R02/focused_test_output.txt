@@ -1,0 +1,16 @@
+$ uv run pytest tests/test_stage1_keras_artifact_contract.py tests/test_stage1_positive_class_contract.py tests/test_stage1_ap_reports_prevalence.py tests/test_runtime_identity.py -q
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.0, pluggy-1.6.0
+rootdir: /home/douglas-souza/PycharmProjects/Project-Lewis
+configfile: pyproject.toml
+plugins: xdist-3.8.0, hydra-core-1.3.3, cov-7.1.0, anyio-4.14.1, timeout-2.4.0
+collected 9 items
+
+tests/test_stage1_keras_artifact_contract.py ...                         [ 33%]
+tests/test_stage1_positive_class_contract.py ..                          [ 55%]
+tests/test_stage1_ap_reports_prevalence.py ..                            [ 77%]
+tests/test_runtime_identity.py ..                                        [100%]
+
+============================== 9 passed in 5.19s ===============================
+
+[exit_code=0]
