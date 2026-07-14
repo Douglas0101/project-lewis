@@ -8,11 +8,11 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Union
 
 import joblib
 import numpy as np
-import tensorflow as tf
+
+from src.models.keras_loader import load_keras_model
 
 
 class MLPStage1Runner:
@@ -30,20 +30,26 @@ class MLPStage1Runner:
 
     def __init__(
         self,
-        model_path: Union[Path, str],
-        scaler_path: Union[Path, str],
-        config_path: Union[Path, str],
-    ):
-        self.model = tf.keras.models.load_model(str(model_path), compile=False)
+        model_path: Path | str,
+        scaler_path: Path | str,
+        config_path: Path | str,
+    ) -> None:
+        self.model = load_keras_model(str(model_path), compile=False)
         self.scaler = joblib.load(scaler_path)
-        self.config = json.loads(Path(config_path).read_text(encoding="utf-8"))
-        self.feature_names: List[str] = self.config["feature_names"]
+        try:
+            config = json.loads(Path(config_path).read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as error:
+            raise ValueError(f"Invalid Stage 1 config: {config_path}") from error
+        if not isinstance(config, dict) or not isinstance(config.get("feature_names"), list):
+            raise ValueError("Stage 1 config must contain a feature_names list")
+        self.config = config
+        self.feature_names: list[str] = [str(name) for name in config["feature_names"]]
 
     def predict(
         self,
-        features: Dict[str, np.ndarray],
-        threshold: Optional[float] = None,
-    ) -> Dict[str, np.ndarray]:
+        features: dict[str, np.ndarray],
+        threshold: float | None = None,
+    ) -> dict[str, np.ndarray]:
         """Retorna classes e probabilidades para um batch de batimentos.
 
         Parameters
@@ -66,7 +72,11 @@ class MLPStage1Runner:
         X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
         X = self.scaler.transform(X)
 
-        y_proba = self.model.predict(X, batch_size=1024, verbose=0)
+        # Keras 3 accepts integer verbosity modes at runtime; its unannotated
+        # signature makes Pyright infer ``str`` from the default ``"auto"``.
+        y_proba = self.model.predict(
+            X, batch_size=1024, verbose=0  # pyright: ignore[reportArgumentType]
+        )
 
         if threshold is None:
             y_pred = np.argmax(y_proba, axis=1)
