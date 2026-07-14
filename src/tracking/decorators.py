@@ -151,6 +151,8 @@ def log_run(
             session = get_session()
             try:
                 experiment_id = kwargs.get(experiment_id_arg)
+                if experiment_id is None:
+                    raise ValueError(f"{experiment_id_arg} é obrigatório para log_run")
                 fold_idx = kwargs.get(fold_idx_arg) if fold_idx_arg else None
                 run = start_run(
                     session=session,

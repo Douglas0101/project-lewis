@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -88,7 +88,7 @@ class F1MacroCheckpoint(tf.keras.callbacks.Callback):
             return float(result["per_class"][cls][metric_name])
         raise ValueError(f"Unsupported selection metric: {self.metric}")
 
-    def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Mapping[str, Any] | None = None) -> None:
         """Avalia validação e salva pesos se a métrica melhorou."""
         from src.models.evaluate import (
             evaluate_aami,
@@ -131,7 +131,7 @@ class F1MacroCheckpoint(tf.keras.callbacks.Callback):
             thresholds_dict = None
 
         score = self._extract_score(result)
-        logs = logs or {}
+        logs = dict(logs) if logs else {}
         logs[f"val_{self.metric}"] = score
         threshold_str = (
             f"{threshold:.2f}"
@@ -174,7 +174,7 @@ class F1MacroCheckpoint(tf.keras.callbacks.Callback):
                     self.best_score,
                 )
 
-    def on_train_end(self, logs: Optional[dict] = None) -> None:
+    def on_train_end(self, logs: Mapping[str, Any] | None = None) -> None:
         """Restaura os melhores pesos salvos, se existirem."""
         if self.filepath.exists():
             LOGGER.info("Restoring best weights (best %s=%.4f)", self.metric, self.best_score)

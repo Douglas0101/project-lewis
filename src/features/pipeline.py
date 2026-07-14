@@ -134,7 +134,7 @@ def _load_raw_annotations(record_id: str, dataset: str) -> Optional[Tuple[np.nda
 # ---------------------------------------------------------------------------
 
 
-def _build_beat_records(
+def build_beat_records(
     sig: np.ndarray,
     r_peaks: np.ndarray,
     aami_labels: np.ndarray,
@@ -162,18 +162,16 @@ def _build_beat_records(
         r_in_seg = int(np.argmax(np.abs(X[seg_i])))
         morph_raw = morph_feats[seg_i]
 
-        def _none_if_nan(value: float) -> Optional[float]:
-            return None if isinstance(value, float) and np.isnan(value) else float(value)
+        def _sentinel_if_nan(value: float, sentinel: float = -1.0) -> float:
+            return sentinel if isinstance(value, float) and np.isnan(value) else float(value)
 
         morph_clean = {
             **morph_raw,
-            "qrs_width_ms": (
-                0.0 if np.isnan(morph_raw["qrs_width_ms"]) else float(morph_raw["qrs_width_ms"])
-            ),
-            "qrs_area": 0.0 if np.isnan(morph_raw["qrs_area"]) else float(morph_raw["qrs_area"]),
-            "qrs_asymmetry_index": _none_if_nan(morph_raw["qrs_asymmetry_index"]),
-            "t_r_ratio": _none_if_nan(morph_raw["t_r_ratio"]),
-            "qrs_raggedness": _none_if_nan(morph_raw["qrs_raggedness"]),
+            "qrs_width_ms": _sentinel_if_nan(morph_raw["qrs_width_ms"], 0.0),
+            "qrs_area": _sentinel_if_nan(morph_raw["qrs_area"], 0.0),
+            "qrs_asymmetry_index": _sentinel_if_nan(morph_raw["qrs_asymmetry_index"]),
+            "t_r_ratio": _sentinel_if_nan(morph_raw["t_r_ratio"]),
+            "qrs_raggedness": _sentinel_if_nan(morph_raw["qrs_raggedness"]),
         }
         records.append(
             BeatRecord(
@@ -193,6 +191,10 @@ def _build_beat_records(
             )
         )
     return records, X, y
+
+
+# Alias retrocompatível para uso interno
+_build_beat_records = build_beat_records
 
 
 # ---------------------------------------------------------------------------

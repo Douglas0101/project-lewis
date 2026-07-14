@@ -46,6 +46,10 @@ FEATURE_COLUMNS = [
     "qrs_raggedness",
 ]
 
+assert len(FEATURE_COLUMNS) == 16, (
+    f"FEATURE_COLUMNS deve ter 16 features, tem {len(FEATURE_COLUMNS)}"
+)
+
 
 def main() -> int:
     parquet_path = Path("data/features/stage2_multiclass.parquet")
@@ -74,7 +78,12 @@ def main() -> int:
         )
         return 1
 
-    # Verifica NaN/Inf nas features
+    # Verifica existência das 16 features e NaN/Inf.
+    missing = [c for c in FEATURE_COLUMNS if c not in df.columns]
+    if missing:
+        LOGGER.error("Features ausentes no parquet: %s", missing)
+        return 1
+
     features_df = df[FEATURE_COLUMNS].copy()
     x_features = features_df.values.astype(np.float32)
 
@@ -85,11 +94,16 @@ def main() -> int:
     from src.features.scaler_utils import fit_feature_scaler_on_train
 
     scaler, train_idx, _ = fit_feature_scaler_on_train(x_features, groups, n_splits=5)
+    if scaler.n_features_in_ != 16:
+        LOGGER.error("Scaler foi ajustado com %d features, esperado 16", scaler.n_features_in_)
+        return 1
 
     # Imputa NaNs usando medianas por classe (quando disponível) ou globais do treino.
     n_nan = features_df.isna().sum().sum()
     if n_nan > 0:
-        LOGGER.warning("%d valores NaN encontrados; preenchendo com mediana por classe do treino", n_nan)
+        LOGGER.warning(
+            "%d valores NaN encontrados; preenchendo com mediana por classe do treino", n_nan
+        )
         y_train_arr = y[train_idx]
         for col in FEATURE_COLUMNS:
             col_median = features_df[col].iloc[train_idx].median()

@@ -19,7 +19,6 @@ import tempfile
 import time
 from pathlib import Path
 
-
 UART_LOG = Path("/tmp/renode_lewis_uart.log")
 
 
@@ -70,7 +69,7 @@ start
 """
 
 
-def _compile_beat_re() -> re.Pattern:
+def _compile_beat_re() -> re.Pattern[str]:
     """Regex tolerante para linhas de beat da UART (two-stage v2.0).
 
     Aceita tanto ``output=[...]`` (formato atual) quanto ``output [...]``
@@ -84,7 +83,15 @@ def _compile_beat_re() -> re.Pattern:
     )
 
 
-def parse_uart_log(log_text):
+def _compile_skip_re() -> re.Pattern[str]:
+    """Regex para linhas de skip geradas pelo adaptive skipping."""
+    return re.compile(
+        r"\[SKIP\]\s+beat\s+(?P<idx>\d+)\s+class=(?P<class>\w+)",
+        re.IGNORECASE,
+    )
+
+
+def parse_uart_log(log_text: str) -> dict:
     """Extrai metricas do log de texto plano da UART."""
     lines = [ln.strip() for ln in log_text.splitlines() if ln.strip()]
     result = {
@@ -93,6 +100,7 @@ def parse_uart_log(log_text):
         "inference_init": False,
         "arena_used_bytes": None,
         "beats": [],
+        "skips": [],
         "end": False,
         "raw_lines": lines,
     }
@@ -102,7 +110,14 @@ def parse_uart_log(log_text):
     init_ok_re = re.compile(r"Stage1\s+inference\s+init\s+OK", re.IGNORECASE)
     arena_re = re.compile(r"Arena\s+used\s*:\s*(?P<arena>\d+)\s*bytes")
     beat_re = _compile_beat_re()
+    skip_re = _compile_skip_re()
     end_re = re.compile(r"===\s*Fim\s*===")
+
+    def _safe_int(value: str) -> int:
+        try:
+            return int(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid integer in UART log: {value!r}") from exc
 
     for line in lines:
         m = header_re.search(line)
@@ -112,23 +127,34 @@ def parse_uart_log(log_text):
             continue
         m = model_re.search(line)
         if m:
-            result["model_size_bytes"] = int(m.group("size"))
+            result["model_size_bytes"] = _safe_int(m.group("size"))
             continue
         if init_ok_re.search(line):
             result["inference_init"] = True
             continue
         m = arena_re.search(line)
         if m:
-            result["arena_used_bytes"] = int(m.group("arena"))
+            result["arena_used_bytes"] = _safe_int(m.group("arena"))
             continue
         m = beat_re.search(line)
         if m:
-            values = [int(v.strip()) for v in m.group("values").split(",") if v.strip()]
+            values = [
+                _safe_int(value.strip()) for value in m.group("values").split(",") if value.strip()
+            ]
             result["beats"].append(
                 {
-                    "index": int(m.group("idx")),
-                    "time_ms": int(m.group("time")),
+                    "index": _safe_int(m.group("idx")),
+                    "time_ms": _safe_int(m.group("time")),
                     "output": values,
+                }
+            )
+            continue
+        m = skip_re.search(line)
+        if m:
+            result["skips"].append(
+                {
+                    "index": _safe_int(m.group("idx")),
+                    "class": m.group("class"),
                 }
             )
             continue
@@ -138,15 +164,21 @@ def parse_uart_log(log_text):
     return result
 
 
-def check_report(parsed, expected_beats=3):
-    """Avalia checks estruturais."""
+def check_report(parsed: dict, expected_beats: int = 3) -> dict:
+    """Avalia checks estruturais.
+
+    Beats processados + beats pulados por adaptive skipping devem atender
+    ao numero esperado de beats do demo, ja que ambos indicam que o ciclo
+    de inferencia foi avaliado.
+    """
     model_size = parsed["model_size_bytes"]
+    total_beats = len(parsed["beats"]) + len(parsed["skips"])
     checks = {
         "header": parsed["header"],
         # Two-stage v2.0: soma dos FlatBuffers (stage1+stage2) deve caber na Flash.
         "model_size": model_size is not None and model_size < 512 * 1024,
         "inference_init": parsed["inference_init"],
-        "beats": len(parsed["beats"]) >= expected_beats,
+        "beats": total_beats >= expected_beats,
         "end": parsed["end"],
     }
     checks["all_passed"] = all(checks.values())
@@ -171,7 +203,9 @@ def _find_venv_python(project_root: Path) -> Path | None:
 def _python_has_robot(python: Path) -> bool:
     """Verifica se o interpretador possui robotframework."""
     try:
-        rc, _ = run_command([str(python), "-c", "import robot; print(robot.__version__)"], timeout_sec=10)
+        rc, _ = run_command(
+            [str(python), "-c", "import robot; print(robot.__version__)"], timeout_sec=10
+        )
         return rc == 0
     except Exception:
         return False
@@ -188,7 +222,9 @@ def _choose_python_runner(project_root: Path) -> str:
     return "python3"
 
 
-def run_renode_test(renode_bin: Path, robot_path: Path, resc_path: Path, project_root: Path, timeout_sec=120):
+def run_renode_test(
+    renode_bin: Path, robot_path: Path, resc_path: Path, project_root: Path, timeout_sec=120
+):
     """Executa Renode via renode-test usando o cenario Robot fornecido."""
     renode_dir = renode_bin.parent
     renode_test = renode_dir / "renode-test"

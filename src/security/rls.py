@@ -37,7 +37,7 @@ class RowLevelSecurity:
         if where_match is not None:
             where_idx, keyword = where_match
             before = normalized[:where_idx]
-            after = normalized[where_idx + len(keyword):]
+            after = normalized[where_idx + len(keyword) :]
             return f"{before}{keyword} {placeholder} AND{after}", params
 
         for keyword in ("GROUP BY", "ORDER BY", "HAVING", "LIMIT"):

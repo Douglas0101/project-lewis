@@ -18,9 +18,8 @@ import numpy as np
 import tensorflow as tf
 from sklearn.utils.class_weight import compute_class_weight
 
-from src.data.augmentation import oversample_class, oversample_per_class
-
 from src.callbacks.f1_macro_checkpoint import F1MacroCheckpoint
+from src.data.augmentation import oversample_class, oversample_per_class
 
 from .backbone_1d import freeze_conv_layers, save_model_config
 
@@ -91,9 +90,8 @@ class SparseCategoricalFocalLoss(tf.keras.losses.Loss):
         self.alpha = alpha
         # Detecta se alpha é escalar em tempo de construção para evitar
         # operações simbólicas no call (modo grafo).
-        self._alpha_is_scalar = (
-            alpha is not None
-            and (isinstance(alpha, (int, float)) or np.ndim(alpha) == 0)
+        self._alpha_is_scalar = alpha is not None and (
+            isinstance(alpha, (int, float)) or np.ndim(alpha) == 0
         )
 
     def call(self, y_true: tf.Tensor, y_pred: tf.Tensor) -> tf.Tensor:
@@ -450,7 +448,7 @@ def finetune_mitbih(
         json.dump(metrics, fh, indent=2, ensure_ascii=False)
 
     # Salvar modelo completo (já com os melhores pesos restaurados pelo callback)
-    model.save(str(experiment_dir / "model.keras"), save_format="keras")
+    model.save(str(experiment_dir / "model.keras"), save_format="keras")  # type: ignore[call-arg]
     LOGGER.info("Full model saved to %s", experiment_dir / "model.keras")
 
     LOGGER.info(

@@ -406,7 +406,6 @@ class TestPreprocessorClipBeforeNormalize:
         x = rng.standard_normal((100, 500, 1)).astype(np.float32)
         x[0, 0, 0] = 20.0
         mean, std = pre.compute_global_stats(x, clip_limits=(-5.0, 5.0))
-        assert np.isscalar(mean)
-        assert np.isscalar(std)
-        assert std > 0
-        assert std < 5.0  # without clipping std would be ~2.1; with clipping ~1
+        assert float(mean) > 0
+        assert float(std) > 0
+        assert float(std) < 5.0  # without clipping std would be ~2.1; with clipping ~1

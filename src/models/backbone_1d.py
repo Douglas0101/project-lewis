@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Optional
 
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
 LOGGER = logging.getLogger("lewis.camada04.backbone")
 
@@ -266,7 +267,7 @@ def build_backbone_1d_multilabel(
         name=name,
     )
     # Substituir softmax por sigmoid na última camada
-    model.layers[-1].activation = tf.keras.activations.sigmoid
+    model.layers[-1].activation = tf.keras.activations.sigmoid  # type: ignore[assignment]
     return model
 
 
@@ -398,7 +399,7 @@ def load_backbone_weights_from_pretrained(
     if not source_path.exists():
         raise FileNotFoundError(f"Modelo pré-treinado não encontrado: {source_path}")
 
-    source_model = tf.keras.models.load_model(str(source_path), compile=False)
+    source_model = load_keras_model(str(source_path), compile=False)
     source_layers = {layer.name: layer for layer in source_model.layers}
 
     for layer in target_model.layers:

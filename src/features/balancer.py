@@ -10,7 +10,7 @@ Regras mandatórias (ecg-preprocessing-pipeline + Camada-03 spec §3.8):
 from __future__ import annotations
 
 import logging
-from typing import Tuple
+from typing import Tuple, cast
 
 import numpy as np
 
@@ -82,7 +82,7 @@ class ECGBalancer:
         else:
             raise ValueError(f"Estratégia desconhecida: {self.strategy}")
 
-        X_bal, y_bal = sampler.fit_resample(X, y)
+        X_bal, y_bal = cast(Tuple[np.ndarray, np.ndarray], sampler.fit_resample(X, y))
 
         # Log class distribution
         from collections import Counter

@@ -15,6 +15,8 @@ services:
     environment:
       - PYTHONUNBUFFERED=1
       - LEWIS_REQUIRE_DATA=0
+      - TF_USE_LEGACY_KERAS=0
+      - KERAS_BACKEND=tensorflow
     # Sincroniza dependências de desenvolvimento no volume persistente e abre shell.
     command: ["bash", "-c", "uv sync && exec bash"]
     stdin_open: true
@@ -33,6 +35,8 @@ services:
       - lewis-data:/app/data
     environment:
       - PYTHONUNBUFFERED=1
+      - TF_USE_LEGACY_KERAS=0
+      - KERAS_BACKEND=tensorflow
 
   prometheus:
     image: prom/prometheus:v2.53.0

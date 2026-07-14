@@ -280,6 +280,7 @@ def evaluate_multiclass_at_thresholds(
     class_names: Optional[List[str]] = None,
     thresholds_cfg: Optional[Dict[str, Any]] = None,
     fallback_class: int = 1,
+    fallback_to_argmax: bool = False,
 ) -> Dict[str, Any]:
     """Avalia classificação multiclasse com thresholds one-vs-rest.
 
@@ -296,7 +297,12 @@ def evaluate_multiclass_at_thresholds(
     thresholds_cfg : dict, optional
         Thresholds para ``evaluate_aami``.
     fallback_class : int
-        Classe atribuída quando nenhuma classe supera o limiar.
+        Classe atribuída quando nenhuma classe supera o limiar (apenas se
+        ``fallback_to_argmax`` for False).
+    fallback_to_argmax : bool
+        Se True, quando nenhuma classe supera seu limiar o fallback é a classe
+        de maior probabilidade (argmax), evitando viés em direção a uma classe
+        fixa (ex.: V majoritário).
 
     Returns
     -------
@@ -309,7 +315,11 @@ def evaluate_multiclass_at_thresholds(
 
     n_samples = len(y_true)
     n_classes = len(class_names)
-    y_pred = np.full(n_samples, fallback_class, dtype=np.int64)
+
+    if fallback_to_argmax:
+        y_pred = np.argmax(y_score, axis=1).astype(np.int64)
+    else:
+        y_pred = np.full(n_samples, fallback_class, dtype=np.int64)
 
     above_threshold = np.zeros((n_samples, n_classes), dtype=bool)
     for i, cls in enumerate(class_names):
@@ -327,7 +337,7 @@ def evaluate_multiclass_at_thresholds(
         scores_masked[~above_threshold] = -1.0
         y_pred[multi_class] = np.argmax(scores_masked[multi_class], axis=1)
 
-    # Caso nenhuma supere, mantém fallback_class.
+    # Caso nenhuma supere, mantém o fallback escolhido.
     result = evaluate_aami(
         y_true,
         y_pred,
@@ -418,6 +428,86 @@ def find_best_thresholds_multiclass(
     return best_result
 
 
+def find_best_thresholds_youden(
+    y_true: np.ndarray,
+    y_score: np.ndarray,
+    class_names: Optional[List[str]] = None,
+    search_step: float = 0.01,
+    fallback_class: int = 1,
+) -> Dict[str, Any]:
+    """Busca thresholds one-vs-rest maximizando a estatística J de Youden.
+
+    Para cada classe k, define um problema binário one-vs-rest e encontra o
+    threshold t_k que maximiza:
+
+        J_k(t) = TPR_k(t) + TNR_k(t) - 1
+
+    onde TPR_k = TP/(TP+FN) e TNR_k = TN/(TN+FP) no problema classe k vs resto.
+    A escolha de Youden é invariante sob prevalência e equaliza sensibilidade
+    e especificidade, evitando thresholds fixos que favoreçam a classe
+    majoritária (V) em detrimento de S/F.
+
+    Parameters
+    ----------
+    y_true : np.ndarray
+        Labels verdadeiros inteiros.
+    y_score : np.ndarray
+        Probabilidades softmax (shape: (n_samples, n_classes)).
+    class_names : list[str], optional
+        Nomes das classes.
+    search_step : float
+        Passo da busca em [0.01, 0.99].
+    fallback_class : int
+        Classe de fallback quando nenhum threshold é atingido.
+
+    Returns
+    -------
+    dict
+        Resultado de ``evaluate_multiclass_at_thresholds`` com thresholds de
+        Youden, incluindo ``best_j_per_class``.
+    """
+    if class_names is None:
+        class_names = ["S", "V", "F"]
+
+    candidate_thresholds = np.arange(0.01, 1.0, search_step)
+
+    best_thresholds: Dict[str, float] = {}
+    best_j_per_class: Dict[str, float] = {}
+
+    for i, cls in enumerate(class_names):
+        y_true_bin = (y_true == i).astype(np.int64)
+        best_j = -1.0
+        best_thr = 0.5
+        for thr in candidate_thresholds:
+            y_pred_bin = (y_score[:, i] >= thr).astype(np.int64)
+            tp = int(((y_pred_bin == 1) & (y_true_bin == 1)).sum())
+            fp = int(((y_pred_bin == 1) & (y_true_bin == 0)).sum())
+            fn = int(((y_pred_bin == 0) & (y_true_bin == 1)).sum())
+            tn = int(((y_pred_bin == 0) & (y_true_bin == 0)).sum())
+
+            tpr = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+            tnr = tn / (tn + fp) if (tn + fp) > 0 else 0.0
+            j = tpr + tnr - 1.0
+            if j > best_j:
+                best_j = j
+                best_thr = float(thr)
+        best_thresholds[cls] = best_thr
+        best_j_per_class[cls] = best_j
+
+    result = evaluate_multiclass_at_thresholds(
+        y_true,
+        y_score,
+        best_thresholds,
+        class_names=class_names,
+        thresholds_cfg=None,
+        fallback_class=fallback_class,
+        fallback_to_argmax=True,
+    )
+    result["thresholds"] = best_thresholds
+    result["best_j_per_class"] = best_j_per_class
+    return result
+
+
 def evaluate_fold(
     model,
     X_test: np.ndarray,
@@ -425,6 +515,7 @@ def evaluate_fold(
     class_names: Optional[List[str]] = None,
     thresholds: Optional[Dict[str, Any]] = None,
     optimize_thresholds: bool = False,
+    optimize_youden: bool = False,
 ) -> Dict[str, Any]:
     """Avalia um fold de GroupKFold.
 
@@ -440,6 +531,11 @@ def evaluate_fold(
         Nomes das classes.
     thresholds : dict, optional
         Thresholds configuráveis para ``evaluate_aami``.
+    optimize_thresholds : bool
+        Se True, usa busca gulosa maximizando F1-macro multiclasse.
+    optimize_youden : bool
+        Se True, usa otimização por Youden's J one-vs-rest (sobrepõe
+        ``optimize_thresholds``).
 
     Returns
     -------
@@ -459,6 +555,12 @@ def evaluate_fold(
             target_class_idx=target_class_idx,
         )
         result["y_pred"] = (y_score >= result["threshold"]).astype(np.int64).tolist()
+    elif optimize_youden and class_names is not None:
+        result = find_best_thresholds_youden(
+            y_test,
+            y_pred_proba,
+            class_names=class_names,
+        )
     elif optimize_thresholds and class_names is not None:
         result = find_best_thresholds_multiclass(
             y_test,

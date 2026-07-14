@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -22,7 +24,7 @@ from src.tracking.schemas import (
 
 
 @pytest.fixture
-def session() -> Session:
+def session() -> Generator[Session, None, None]:
     """Sessão em banco SQLite in-memory."""
     engine = create_engine("sqlite:///:memory:", future=True)
     init_schema(engine)
@@ -33,7 +35,11 @@ def session() -> Session:
 
 def test_create_experiment(session: Session) -> None:
     repo = ExperimentRepository(session)
-    exp = repo.create(ExperimentCreate(name="exp_test", stage="stage1", config_path="config.yaml"))
+    exp = repo.create(
+        ExperimentCreate(
+            name="exp_test", stage="stage1", config_path="config.yaml", git_commit=None
+        )
+    )
     assert exp.id is not None
     assert exp.name == "exp_test"
     assert exp.stage == "stage1"
@@ -41,8 +47,8 @@ def test_create_experiment(session: Session) -> None:
 
 def test_list_experiments_filter_stage(session: Session) -> None:
     repo = ExperimentRepository(session)
-    repo.create(ExperimentCreate(name="e1", stage="stage1"))
-    repo.create(ExperimentCreate(name="e2", stage="stage2"))
+    repo.create(ExperimentCreate(name="e1", stage="stage1", config_path=None, git_commit=None))
+    repo.create(ExperimentCreate(name="e2", stage="stage2", config_path=None, git_commit=None))
     stage1 = repo.list(stage="stage1")
     assert len(stage1) == 1
     assert stage1[0].stage == "stage1"
@@ -50,7 +56,9 @@ def test_list_experiments_filter_stage(session: Session) -> None:
 
 def test_create_run_and_metrics(session: Session) -> None:
     exp_repo = ExperimentRepository(session)
-    exp = exp_repo.create(ExperimentCreate(name="exp", stage="finetune"))
+    exp = exp_repo.create(
+        ExperimentCreate(name="exp", stage="finetune", config_path=None, git_commit=None)
+    )
 
     run_repo = RunRepository(session)
     run = run_repo.create(RunCreate(experiment_id=exp.id, run_type="test", fold_idx=2))
@@ -70,7 +78,9 @@ def test_create_run_and_metrics(session: Session) -> None:
 
 def test_get_best_metric(session: Session) -> None:
     exp_repo = ExperimentRepository(session)
-    exp = exp_repo.create(ExperimentCreate(name="exp", stage="stage1"))
+    exp = exp_repo.create(
+        ExperimentCreate(name="exp", stage="stage1", config_path=None, git_commit=None)
+    )
     run_repo = RunRepository(session)
     run = run_repo.create(RunCreate(experiment_id=exp.id, run_type="test"))
 
@@ -88,7 +98,9 @@ def test_get_best_metric(session: Session) -> None:
 
 def test_run_complete(session: Session) -> None:
     exp_repo = ExperimentRepository(session)
-    exp = exp_repo.create(ExperimentCreate(name="exp", stage="stage1"))
+    exp = exp_repo.create(
+        ExperimentCreate(name="exp", stage="stage1", config_path=None, git_commit=None)
+    )
     run_repo = RunRepository(session)
     run = run_repo.create(RunCreate(experiment_id=exp.id, run_type="test"))
 
@@ -100,7 +112,9 @@ def test_run_complete(session: Session) -> None:
 
 def test_alert_create_and_resolve(session: Session) -> None:
     exp_repo = ExperimentRepository(session)
-    exp = exp_repo.create(ExperimentCreate(name="exp", stage="stage1"))
+    exp = exp_repo.create(
+        ExperimentCreate(name="exp", stage="stage1", config_path=None, git_commit=None)
+    )
 
     alert_repo = AlertRepository(session)
     alert = alert_repo.create(
@@ -125,7 +139,9 @@ def test_alert_create_and_resolve(session: Session) -> None:
 
 def test_cascade_delete_experiment_removes_runs(session: Session) -> None:
     exp_repo = ExperimentRepository(session)
-    exp = exp_repo.create(ExperimentCreate(name="exp", stage="stage1"))
+    exp = exp_repo.create(
+        ExperimentCreate(name="exp", stage="stage1", config_path=None, git_commit=None)
+    )
     run_repo = RunRepository(session)
     run = run_repo.create(RunCreate(experiment_id=exp.id, run_type="test"))
 

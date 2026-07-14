@@ -58,6 +58,7 @@ def _seed_timeline_db(db_path: Path, n_runs: int) -> None:
             runs,
         )
         last_run_id = conn.execute(text("SELECT last_insert_rowid()")).scalar()
+        assert last_run_id is not None
         first_run_id = last_run_id - n_runs + 1
 
         metrics = [

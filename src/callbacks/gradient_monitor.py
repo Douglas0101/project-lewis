@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import numpy as np
 import tensorflow as tf
@@ -71,7 +71,7 @@ class GradientMonitor(keras.callbacks.Callback):
 
         os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
 
-    def on_train_begin(self, logs: Optional[dict] = None) -> None:
+    def on_train_begin(self, logs: Mapping[str, Any] | None = None) -> None:
         """Identifica camadas Dense e amostra dados de validação se necessário."""
         if self.layer_names is None:
             self.layer_names = [
@@ -91,7 +91,7 @@ class GradientMonitor(keras.callbacks.Callback):
 
         print(f"[GradientMonitor] Monitorando camadas: {self.layer_names}")
 
-    def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Mapping[str, Any] | None = None) -> None:
         """Computa estatísticas de gradiente ao final de cada época."""
         stats = self._compute_gradient_stats(epoch)
         self.history.append(stats)
@@ -128,10 +128,11 @@ class GradientMonitor(keras.callbacks.Callback):
             grad_norm = float(tf.norm(grads).numpy())
             weight_norm = float(tf.norm(weights).numpy())
             norm_ratio = grad_norm / (weight_norm + 1e-10)
-            grads_np = grads.numpy()
+            grads_t = tf.convert_to_tensor(grads)
+            grads_np = grads_t.numpy()
             p95_gradient = float(np.percentile(np.abs(grads_np), 95))
-            grad_mean = float(tf.reduce_mean(grads).numpy())
-            grad_std = float(tf.math.reduce_std(grads).numpy())
+            grad_mean = float(tf.reduce_mean(grads_t).numpy())
+            grad_std = float(tf.math.reduce_std(grads_t).numpy())
 
             grad_per_class = self._gradient_mean_per_class(tape, weights, predictions, biases)
 
@@ -180,7 +181,7 @@ class GradientMonitor(keras.callbacks.Callback):
             provided_names = list(self.class_names)
         else:
             provided_names = ["N", "S", "V", "F"]
-        class_names = provided_names + default_class_names[len(provided_names):]
+        class_names = provided_names + default_class_names[len(provided_names) :]
 
         grad_per_class: Dict[str, float] = {}
         for cls in range(n_classes):
@@ -191,7 +192,9 @@ class GradientMonitor(keras.callbacks.Callback):
             grad_cls = tape.gradient(weighted_loss, weights)
             name = class_names[cls] if cls < len(class_names) else f"cls_{cls}"
             if grad_cls is not None:
-                grad_per_class[name] = float(tf.reduce_mean(tf.abs(grad_cls)).numpy())
+                grad_per_class[name] = float(
+                    tf.reduce_mean(tf.abs(tf.convert_to_tensor(grad_cls))).numpy()
+                )
             else:
                 grad_per_class[name] = 0.0
 

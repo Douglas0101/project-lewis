@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+
 from src.features.scaler_utils import fit_feature_scaler_on_train, scale_features
 
 
@@ -12,9 +13,19 @@ def _make_synthetic_feature_data(
     rng = np.random.default_rng(seed)
     if feature_cols is None:
         feature_cols = [
-            "rr_prev", "rr_next", "rr_ratio", "rr_local_mean", "rr_local_std",
-            "rmssd", "heart_rate", "r_amplitude", "q_depth", "t_amplitude",
-            "qrs_width_ms", "qrs_area", "st_slope_mV_s",
+            "rr_prev",
+            "rr_next",
+            "rr_ratio",
+            "rr_local_mean",
+            "rr_local_std",
+            "rmssd",
+            "heart_rate",
+            "r_amplitude",
+            "q_depth",
+            "t_amplitude",
+            "qrs_width_ms",
+            "qrs_area",
+            "st_slope_mV_s",
         ]
     records = [f"r{i % 10}" for i in range(n)]
     df = pd.DataFrame(rng.random((n, len(feature_cols))).astype(np.float32), columns=feature_cols)

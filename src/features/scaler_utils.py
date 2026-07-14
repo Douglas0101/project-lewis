@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Tuple
+from typing import Tuple, cast
 
 import numpy as np
 from sklearn.model_selection import GroupKFold
@@ -31,4 +31,4 @@ def scale_features(
     X: np.ndarray,
     scaler: StandardScaler,
 ) -> np.ndarray:
-    return scaler.transform(X).astype(np.float32, copy=False)
+    return cast(np.ndarray, scaler.transform(X)).astype(np.float32, copy=False)

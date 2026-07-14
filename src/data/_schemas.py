@@ -160,9 +160,15 @@ try:
     import jsonschema as _jsonschema  # type: ignore
 
     _HAS_JSONSCHEMA = True
+    _CATALOG_VALIDATOR = _jsonschema.Draft202012Validator(CATALOG_SCHEMA)
+    _CHECKSUMS_VALIDATOR = _jsonschema.Draft202012Validator(CHECKSUMS_SCHEMA)
+    _DLQ_VALIDATOR = _jsonschema.Draft202012Validator(DLQ_LINE_SCHEMA)
 except ImportError:
     _jsonschema = None  # type: ignore[assignment]
     _HAS_JSONSCHEMA = False
+    _CATALOG_VALIDATOR = None
+    _CHECKSUMS_VALIDATOR = None
+    _DLQ_VALIDATOR = None
 
 
 def _get_jsonschema():
@@ -180,11 +186,11 @@ def validate_catalog_line(line: str) -> bool:
         obj: dict[str, Any] = json.loads(line)
     except json.JSONDecodeError:
         return False
-    if _HAS_JSONSCHEMA and _jsonschema is not None:
+    if _HAS_JSONSCHEMA and _CATALOG_VALIDATOR is not None:
         try:
-            _jsonschema.validate(obj, CATALOG_SCHEMA)
+            _CATALOG_VALIDATOR.validate(obj)
             return True
-        except _jsonschema.ValidationError as exc:
+        except _jsonschema.ValidationError as exc:  # type: ignore[union-attr]
             LOGGER.debug("catalog line schema fail: %s", exc)
             return False
     required = {
@@ -208,11 +214,11 @@ def validate_dlq_line(line: str) -> bool:
         obj: dict[str, Any] = json.loads(line)
     except json.JSONDecodeError:
         return False
-    if _HAS_JSONSCHEMA and _jsonschema is not None:
+    if _HAS_JSONSCHEMA and _DLQ_VALIDATOR is not None:
         try:
-            _jsonschema.validate(obj, DLQ_LINE_SCHEMA)
+            _DLQ_VALIDATOR.validate(obj)
             return True
-        except _jsonschema.ValidationError as exc:
+        except _jsonschema.ValidationError as exc:  # type: ignore[union-attr]
             LOGGER.debug("dlq line schema fail: %s", exc)
             return False
     return _fallback_required(obj, {"event", "ts", "url", "attempts"})
@@ -220,11 +226,11 @@ def validate_dlq_line(line: str) -> bool:
 
 def validate_checksums_manifest(payload: dict[str, Any]) -> bool:
     """Validate an in-memory ``checksums.json`` document."""
-    if _HAS_JSONSCHEMA and _jsonschema is not None:
+    if _HAS_JSONSCHEMA and _CHECKSUMS_VALIDATOR is not None:
         try:
-            _jsonschema.validate(payload, CHECKSUMS_SCHEMA)
+            _CHECKSUMS_VALIDATOR.validate(payload)
             return True
-        except _jsonschema.ValidationError as exc:
+        except _jsonschema.ValidationError as exc:  # type: ignore[union-attr]
             LOGGER.debug("checksums manifest schema fail: %s", exc)
             return False
     if not {"version", "generated_at", "datasets"}.issubset(payload.keys()):

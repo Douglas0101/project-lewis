@@ -14,7 +14,7 @@ Regras mandatórias (ecg-preprocessing-pipeline + Camada-03 spec §3.6):
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, cast
 
 import numpy as np
 from scipy import signal
@@ -38,10 +38,13 @@ class MorphologicalFeatures:
         """Compute signal envelope using Hilbert transform (bandpass 5-30 Hz)."""
         # Bandpass 5-30 Hz for envelope
         nyq = fs / 2.0
-        b, a = signal.butter(2, [5.0 / nyq, 30.0 / nyq], btype="band")
+        b, a = cast(
+            Tuple[np.ndarray, np.ndarray],
+            signal.butter(2, [5.0 / nyq, 30.0 / nyq], btype="band"),
+        )
         filtered = signal.filtfilt(b, a, seg)
         # Analytic signal envelope
-        analytic = signal.hilbert(filtered)
+        analytic = cast(np.ndarray, signal.hilbert(filtered))
         return np.abs(analytic)
 
     def _find_qrs_onset_offset(

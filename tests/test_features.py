@@ -48,9 +48,9 @@ def _synthetic_ecg_segment(
     qrs_onset = r_idx - half
     qrs_offset = r_idx + half
     if qrs_onset >= 0 and qrs_offset <= n_samples:
-        seg[qrs_onset:qrs_offset] = np.sin(
-            np.linspace(0, np.pi, qrs_offset - qrs_onset)
-        ).astype(np.float32)
+        seg[qrs_onset:qrs_offset] = np.sin(np.linspace(0, np.pi, qrs_offset - qrs_onset)).astype(
+            np.float32
+        )
 
     # T-wave: ~300ms after R
     tw_start = r_idx + int(round(0.25 * fs))

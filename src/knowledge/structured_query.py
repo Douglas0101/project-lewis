@@ -387,6 +387,7 @@ def validate_sql(sql: str, allowed_tables: Optional[set[str]] = None) -> Tuple[b
     if not parsed:
         return False, "Não foi possível fazer parse do SQL"
 
+    flat_lower = ""
     for statement in parsed:
         tokens = [str(t) for t in statement.tokens if not t.is_whitespace]
         first_keyword = tokens[0].lower() if tokens else ""

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Generator
+
 import numpy as np
 import pytest
 from sqlalchemy import create_engine
@@ -20,7 +22,7 @@ from src.tracking.schemas import RunCreate
 
 
 @pytest.fixture
-def session() -> Session:
+def session() -> Generator[Session, None, None]:
     engine = create_engine("sqlite:///:memory:", future=True)
     init_schema(engine)
     with Session(engine) as s:

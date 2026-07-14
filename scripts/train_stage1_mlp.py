@@ -9,7 +9,6 @@ from __future__ import annotations
 import argparse
 import json
 import logging
-import os
 import sys
 from pathlib import Path
 
@@ -138,6 +137,16 @@ def train_fold(
 
 
 def main() -> int:
+    # Limpa scalers v2.3 antigos para garantir que nenhum scaler de 13 features
+    # seja carregado por engano durante a publicação de artefatos.
+    for stale_scaler in (
+        PROJECT_ROOT / "models" / "input_scaler_stage1_v2.3.pkl",
+        PROJECT_ROOT / "models" / "input_scaler_stage2_v2.3.pkl",
+    ):
+        if stale_scaler.exists():
+            stale_scaler.unlink()
+            LOGGER.info("Removido scaler antigo: %s", stale_scaler)
+
     parser = argparse.ArgumentParser(description="Treina Estágio 1 MLP sobre features.")
     parser.add_argument(
         "--hidden-units",

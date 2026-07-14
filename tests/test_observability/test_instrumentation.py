@@ -10,6 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any, List, Tuple
 from unittest.mock import patch
@@ -80,7 +81,7 @@ def _isolated_knowledge_log_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
 
 
 @pytest.fixture
-def knowledge_db(tmp_path: Path) -> Tuple[Any, Path]:
+def knowledge_db(tmp_path: Path) -> Generator[Tuple[Any, Path], None, None]:
     """Banco SQLite-vec temporário com schema inicializado."""
     db_path = tmp_path / "knowledge.db"
     conn = db_module.get_connection(db_path)
@@ -94,7 +95,7 @@ def populated_knowledge_db(
     knowledge_db: Tuple[Any, Path],
     _fake_model: _FakeSentenceTransformer,
     monkeypatch: pytest.MonkeyPatch,
-) -> Path:
+) -> Generator[Path, None, None]:
     """Banco knowledge populado com um chunk e retriever monkeypatched."""
     conn, db_path = knowledge_db
     source = "docs/Camada-04-Modelagem-v1.1.md"
@@ -181,7 +182,11 @@ def test_retriever_instrumented(populated_knowledge_db: Path) -> None:
 
     with patch("src.observability.metrics.REQUEST_LATENCY") as mock_hist:
         with patch("src.observability.metrics.REQUEST_COUNT") as mock_cnt:
-            retriever_module.search(QueryRequest(query="F1-macro QG5", k=1, fetch_k=5))
+            retriever_module.search(
+                QueryRequest(
+                    query="F1-macro QG5", k=1, fetch_k=5, layer=None, version=None, tags=None
+                )
+            )
 
     mock_hist.labels.return_value.observe.assert_called()
     mock_cnt.labels.return_value.inc.assert_called()

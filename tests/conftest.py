@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
-import json
+# Garante que tf.keras use Keras 3 standalone antes de qualquer import
+# de TensorFlow/Keras pelos testes. Isso evita que bibliotecas como
+# sentence-transformers ou tensorflow_model_optimization redirecionem
+# tf.keras para tf_keras durante a suite.
 import os
-import sys
-from pathlib import Path
 
-import pytest
+os.environ.setdefault("TF_USE_LEGACY_KERAS", "0")
+os.environ.setdefault("KERAS_BACKEND", "tensorflow")
+
+import json  # noqa: E402
+import sys  # noqa: E402
+from pathlib import Path  # noqa: E402
+
+import pytest  # noqa: E402
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SRC = PROJECT_ROOT / "src"

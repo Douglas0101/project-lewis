@@ -13,7 +13,7 @@ import os
 import random
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 import numpy as np
 import tensorflow as tf
@@ -72,14 +72,18 @@ def _normalize_fold(
     # Transform treino e teste. Forçamos float32 internamente e convertemos
     # diretamente para float16, evitando o pico de float64 do sklearn e o
     # pico de manter float32 + float16 simultaneamente.
-    mean = scaler.mean_.astype(np.float32, copy=False)
-    scale = scaler.scale_.astype(np.float32, copy=False)
+    mean = cast(np.ndarray, scaler.mean_).astype(np.float32, copy=False)
+    scale = cast(np.ndarray, scaler.scale_).astype(np.float32, copy=False)
     x_train_norm = (
-        (X_train_2d.astype(np.float32, copy=False) - mean) / scale
-    ).astype(np.float16, copy=False).reshape(n_train, seq_len, channels)
+        ((X_train_2d.astype(np.float32, copy=False) - mean) / scale)
+        .astype(np.float16, copy=False)
+        .reshape(n_train, seq_len, channels)
+    )
     x_test_norm = (
-        (X_test.reshape(-1, channels).astype(np.float32, copy=False) - mean) / scale
-    ).astype(np.float16, copy=False).reshape(n_test, seq_len, channels)
+        ((X_test.reshape(-1, channels).astype(np.float32, copy=False) - mean) / scale)
+        .astype(np.float16, copy=False)
+        .reshape(n_test, seq_len, channels)
+    )
 
     return x_train_norm, x_test_norm, scaler
 

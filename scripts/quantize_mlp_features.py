@@ -26,6 +26,39 @@ from src.quantization.ptq import representative_dataset_factory
 LOGGER = logging.getLogger("lewis.camada05.quantize_mlp_features")
 
 
+def _balanced_calibration_dataset(
+    X: np.ndarray,
+    y: np.ndarray,
+    n_cal: int = 500,
+    seed: int = 42,
+):
+    """Gera dataset de calibração INT8 estratificado 50/50 (Stage 1 binário).
+
+    Garante que a calibração não seja enviesada para a classe majoritária,
+    preservando a sensibilidade da classe minoritária no modelo quantizado.
+    """
+    rng = np.random.default_rng(seed)
+    classes = np.unique(y)
+    if len(classes) != 2:
+        raise ValueError(f"_balanced_calibration_dataset espera 2 classes, tem {len(classes)}")
+
+    n_per_class = n_cal // 2
+    selected: list[int] = []
+    for cls in classes:
+        idx = np.where(y == cls)[0]
+        n = min(n_per_class, len(idx))
+        selected.extend(rng.choice(idx, size=n, replace=False).tolist())
+
+    rng.shuffle(selected)
+    samples = X[selected].astype(np.float32)
+
+    def _generator():
+        for sample in samples:
+            yield [np.expand_dims(sample, axis=0)]
+
+    return _generator
+
+
 def _quantize_model(
     keras_path: Path,
     scaler_path: Path,
@@ -42,14 +75,25 @@ def _quantize_model(
 
     data = np.load(feature_npz)
     X = data["X"].astype(np.float32)
+    y = data["y"].astype(np.int64)
     # Preserva shape 2D (n_samples, n_features) — sem adicionar canal.
     if X.ndim != 2:
         raise ValueError(f"Expected 2D feature array, got shape {X.shape}")
+    if scaler.n_features_in_ != X.shape[1]:
+        raise ValueError(
+            f"Scaler espera {scaler.n_features_in_} features, mas os dados têm {X.shape[1]}."
+        )
 
     # O modelo MLP foi treinado sobre features escalonadas; a calibração
     # precisa receber dados na mesma escala.
     X_scaled = scaler.transform(X)
-    representative_data = representative_dataset_factory(X_scaled, y=None, n_samples=n_cal)
+
+    # Para Stage 1 (binário), força calibração balanceada 50/50 para evitar
+    # viés contra a classe minoritária. Stage 2 usa estratificação proporcional.
+    if len(np.unique(y)) == 2 and "stage1" in output_name:
+        representative_data = _balanced_calibration_dataset(X_scaled, y, n_cal=n_cal)
+    else:
+        representative_data = representative_dataset_factory(X_scaled, y=y, n_samples=n_cal)
 
     tflite_path = export_tflite(
         model=model,

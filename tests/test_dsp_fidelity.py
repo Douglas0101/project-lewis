@@ -11,7 +11,6 @@ saida int8 final com a referencia Python usando similaridade de cosseno e MAE.
 
 from __future__ import annotations
 
-import json
 import subprocess
 import tempfile
 from pathlib import Path
@@ -19,13 +18,17 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from src.quantization.firmware_params import (
+    TensorQuantizationParams,
+    load_firmware_quantization_params,
+)
 from tests.fixtures.adc_stub import adc_stub_get_beat
 from tests.fixtures.dsp_filters import filter_chain
 from tests.fixtures.normalizer import zscore_normalize
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_SRC = PROJECT_ROOT / "firmware" / "src"
-QUANT_PARAMS_PATH = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
+QUANT_PARAMS_PATH = PROJECT_ROOT / "firmware" / "src" / "ml" / "quantization_params.h"
 
 C_DSP_PIPELINE_SOURCE = r"""
 #include "dsp/adc_stub.h"
@@ -95,11 +98,10 @@ int main(int argc, char** argv)
 """
 
 
-def _load_quant_params():
+def _load_quant_params() -> TensorQuantizationParams:
     if not QUANT_PARAMS_PATH.exists():
         pytest.skip(f"Parametros de quantizacao nao encontrados: {QUANT_PARAMS_PATH}")
-    data = json.loads(QUANT_PARAMS_PATH.read_text(encoding="utf-8"))
-    return data["input"]
+    return load_firmware_quantization_params(QUANT_PARAMS_PATH).input
 
 
 def _quantize(values: np.ndarray, scale: float, zero_point: int) -> np.ndarray:
@@ -156,8 +158,8 @@ def _run_c_dsp_pipeline(bin_path: Path, idx: int) -> np.ndarray:
 def _python_filtered_beat(idx: int) -> np.ndarray:
     """Replica o pipeline DSP Python: adc_stub -> dequant -> filter -> quant."""
     q = _load_quant_params()
-    scale = q["scale"]
-    zero_point = q["zero_point"]
+    scale = q.scale
+    zero_point = q.zero_point
 
     raw = adc_stub_get_beat(idx)
     frame = (raw.astype(np.float32) - zero_point) * scale
@@ -170,7 +172,10 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     norm = np.linalg.norm(a.astype(np.float64)) * np.linalg.norm(b.astype(np.float64))
     if norm == 0.0:
         return 0.0
-    return float(np.dot(a.astype(np.float64), b.astype(np.float64)) / norm)
+    try:
+        return float(np.dot(a.astype(np.float64), b.astype(np.float64)) / norm)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid arrays for cosine similarity") from exc
 
 
 @pytest.mark.qg17
@@ -186,10 +191,14 @@ class TestDSPPipelineFidelity:
         c_out = _run_c_dsp_pipeline(dsp_pipeline_bin, idx)
         py_out = _python_filtered_beat(idx)
 
-        assert c_out.shape == py_out.shape == (500,), f"Shape inesperado: {c_out.shape}"
+        assert c_out.shape == py_out.shape, f"Shapes divergentes: {c_out.shape} vs {py_out.shape}"
+        assert c_out.size == 500, f"Tamanho inesperado: {c_out.size}"
 
         cosine = _cosine_similarity(c_out, py_out)
-        mae = float(np.mean(np.abs(c_out.astype(np.float64) - py_out.astype(np.float64))))
+        try:
+            mae = float(np.mean(np.abs(c_out.astype(np.float64) - py_out.astype(np.float64))))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid DSP outputs for MAE") from exc
 
         assert (
             cosine > self.MIN_COSINE_SIMILARITY

@@ -7,6 +7,8 @@ biquad transposed direct-form II equivalente.
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 from scipy import signal
 
@@ -144,4 +146,7 @@ def design_coefficients() -> tuple[np.ndarray, np.ndarray]:
     q = NOTCH_FREQ / NOTCH_BW
     b, a = signal.iirnotch(w0=NOTCH_FREQ, Q=q, fs=FS)
     notch_sos = signal.tf2sos(b, a)
-    return bp_sos.astype(np.float32), notch_sos.astype(np.float32)
+    assert bp_sos is not None and notch_sos is not None
+    return cast(np.ndarray, bp_sos).astype(np.float32), cast(np.ndarray, notch_sos).astype(
+        np.float32
+    )

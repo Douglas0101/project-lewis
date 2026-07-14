@@ -137,7 +137,7 @@ class ECGAugmenter:
             np.arange(old_len),
             x,
             kind="cubic",
-            fill_value="extrapolate",
+            fill_value="extrapolate",  # type: ignore[arg-type]
         )
         x_warped = f(np.linspace(0, old_len - 1, new_len))
 
@@ -146,7 +146,7 @@ class ECGAugmenter:
             np.arange(new_len),
             x_warped,
             kind="cubic",
-            fill_value="extrapolate",
+            fill_value="extrapolate",  # type: ignore[arg-type]
         )
         return f2(np.linspace(0, new_len - 1, old_len))
 

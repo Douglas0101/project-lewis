@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional
+from typing import Any, Mapping, Optional
 
 import psutil
 import tensorflow as tf
@@ -29,7 +29,7 @@ class ResourceMonitor(tf.keras.callbacks.Callback):
         self.alert_ram_threshold = alert_ram_threshold
         self._process = psutil.Process()
 
-    def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Mapping[str, Any] | None = None) -> None:
         try:
             entry = self._build_log(epoch)
             LOGGER.info(

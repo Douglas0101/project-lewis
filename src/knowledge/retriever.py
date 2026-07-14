@@ -135,9 +135,9 @@ class _VectorIndexerAdapter:
     def semantic_search(
         self, query: str, filters: Optional[Dict[str, Any]] = None, top_k: int = 10
     ) -> List[Dict[str, Any]]:
-        query_emb = self.model.encode(
-            [query], normalize_embeddings=True, show_progress_bar=False
-        )[0]
+        query_emb = self.model.encode([query], normalize_embeddings=True, show_progress_bar=False)[
+            0
+        ]
         conn = get_connection()
         try:
             rows = conn.execute(

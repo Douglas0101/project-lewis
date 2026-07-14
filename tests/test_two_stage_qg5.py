@@ -10,6 +10,8 @@ Thresholds verificados (QG5' v2.2):
 O teste usa no máximo 2048 amostras por estágio e não realiza treinamento.
 """
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -112,7 +112,7 @@ class TestBackboneArchitecture:
         model = build_backbone_1d(
             input_len=500,
             num_classes=5,
-            conv_filters=[32, 64, 96],
+            conv_filters=(32, 64, 96),
             dense_units=96,
         )
         info = TFLMConstraints.validate_model(model)
@@ -129,7 +129,7 @@ class TestBackboneArchitecture:
             input_len=500,
             num_classes=2,
             num_features=2,
-            conv_filters=[32, 64, 96],
+            conv_filters=(32, 64, 96),
             dense_units=96,
         )
         info = TFLMConstraints.validate_model(model)

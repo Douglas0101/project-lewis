@@ -140,6 +140,7 @@ class MITBIHLoader:
             physical=(units == "physical"),
         )
         sig = rec.p_signal if units == "physical" else rec.d_signal
+        assert sig is not None
         sig = sig.squeeze().astype(np.float64)
 
         if units == "physical":

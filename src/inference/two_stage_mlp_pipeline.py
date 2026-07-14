@@ -16,13 +16,18 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import joblib
 import numpy as np
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
-from src.inference.feature_extractor import FeatureExtractor, FEATURE_NAMES
+from src.inference.feature_extractor import FEATURE_NAMES, FeatureExtractor
+from src.inference.manifest_validator import (
+    ManifestValidationError,
+    load_and_validate_manifest,
+)
 from src.inference.quantized_runner import QuantizedModelRunner
 
 LOGGER = logging.getLogger("lewis.inference.two_stage_mlp_pipeline")
@@ -42,8 +47,12 @@ class TwoStageMLPPipeline:
         stage2_model_path: Path | str,
         stage2_scaler_path: Path | str,
         stage1_threshold_path: Path | str | None = None,
+        stage2_threshold_path: Path | str | None = None,
         use_quantized: bool = False,
         fs: float = 500.0,
+        strict_manifest: bool = False,
+        expected_feature_schema_hash: str | None = None,
+        expected_dataset_hash: str | None = None,
     ) -> None:
         self.stage1_model_path = Path(stage1_model_path)
         self.stage1_scaler_path = Path(stage1_scaler_path)
@@ -52,14 +61,23 @@ class TwoStageMLPPipeline:
         self.stage1_threshold_path = (
             Path(stage1_threshold_path) if stage1_threshold_path is not None else None
         )
+        self.stage2_threshold_path = (
+            Path(stage2_threshold_path) if stage2_threshold_path is not None else None
+        )
         self.use_quantized = use_quantized
         self.fs = fs
+        self.strict_manifest = strict_manifest
+        self.expected_feature_schema_hash = expected_feature_schema_hash
+        self.expected_dataset_hash = expected_dataset_hash
 
         self.stage1_threshold = 0.5
+        self.stage2_thresholds = {"S": 0.5, "V": 0.5, "F": 0.5}
         self.stage1_model: tf.keras.Model | QuantizedModelRunner | None = None
         self.stage2_model: tf.keras.Model | QuantizedModelRunner | None = None
         self.stage1_scaler: Any = None
         self.stage2_scaler: Any = None
+        self.stage1_manifest: dict[str, Any] | None = None
+        self.stage2_manifest: dict[str, Any] | None = None
         self.feature_extractor = FeatureExtractor(fs=fs)
 
     @classmethod
@@ -67,6 +85,9 @@ class TwoStageMLPPipeline:
         cls,
         model_dir: Path | str,
         use_quantized: bool = False,
+        strict_manifest: bool = False,
+        expected_feature_schema_hash: str | None = None,
+        expected_dataset_hash: str | None = None,
     ) -> TwoStageMLPPipeline:
         """Cria pipeline a partir dos artefatos v2.3 padrão em ``model_dir``."""
         model_dir = Path(model_dir)
@@ -84,39 +105,75 @@ class TwoStageMLPPipeline:
             stage2_model_path=stage2_model,
             stage2_scaler_path=model_dir / "input_scaler_stage2_v2.3.pkl",
             stage1_threshold_path=model_dir / "stage1_threshold_v2.3.json",
+            stage2_threshold_path=model_dir / "stage2_thresholds_v2.3.json",
             use_quantized=use_quantized,
+            strict_manifest=strict_manifest,
+            expected_feature_schema_hash=expected_feature_schema_hash,
+            expected_dataset_hash=expected_dataset_hash,
         )
 
     def load(self) -> TwoStageMLPPipeline:
-        """Carrega scalers, modelos e threshold."""
-        LOGGER.info("Carregando pipeline MLP v2.3 (quantizado=%s)", self.use_quantized)
+        """Carrega scalers, modelos, threshold e valida manifests."""
+        LOGGER.info("Carregando pipeline MLP (quantizado=%s)", self.use_quantized)
 
         self.stage1_scaler = joblib.load(self.stage1_scaler_path)
         self.stage2_scaler = joblib.load(self.stage2_scaler_path)
+
+        self.stage1_manifest = self._load_manifest(self.stage1_model_path, "stage1_model")
+        self.stage2_manifest = self._load_manifest(self.stage2_model_path, "stage2_model")
 
         if self.use_quantized:
             self.stage1_model = QuantizedModelRunner(self.stage1_model_path).allocate()
             self.stage2_model = QuantizedModelRunner(self.stage2_model_path).allocate()
         else:
-            self.stage1_model = tf.keras.models.load_model(
-                str(self.stage1_model_path), compile=False
-            )
-            self.stage2_model = tf.keras.models.load_model(
-                str(self.stage2_model_path), compile=False
-            )
+            self.stage1_model = load_keras_model(str(self.stage1_model_path), compile=False)
+            self.stage2_model = load_keras_model(str(self.stage2_model_path), compile=False)
 
         if self.stage1_threshold_path is not None:
-            data = json.loads(Path(self.stage1_threshold_path).read_text(encoding="utf-8"))
-            self.stage1_threshold = float(data.get("threshold", 0.5))
+            try:
+                data = json.loads(Path(self.stage1_threshold_path).read_text(encoding="utf-8"))
+                self.stage1_threshold = float(data.get("threshold", 0.5))
+            except Exception as exc:
+                raise RuntimeError(f"Falha ao carregar threshold Stage 1: {exc}") from exc
+
+        if self.stage2_threshold_path is not None and self.stage2_threshold_path.exists():
+            try:
+                data = json.loads(Path(self.stage2_threshold_path).read_text(encoding="utf-8"))
+                self.stage2_thresholds = data.get("thresholds", {"S": 0.5, "V": 0.5, "F": 0.5})
+            except Exception as exc:
+                raise RuntimeError(f"Falha ao carregar threshold Stage 2: {exc}") from exc
 
         LOGGER.info("Threshold Estágio 1: %.4f", self.stage1_threshold)
+        LOGGER.info("Thresholds Estágio 2: %s", self.stage2_thresholds)
         return self
+
+    def _load_manifest(self, model_path: Path, artifact_name: str) -> dict[str, Any] | None:
+        """Carrega e valida manifest alongside do modelo, se existir."""
+        manifest_path = model_path.with_suffix(".manifest.json")
+        if not manifest_path.exists():
+            if self.strict_manifest:
+                raise ManifestValidationError(
+                    f"{artifact_name}: manifest {manifest_path} ausente e "
+                    "strict_manifest=True. Regenere o artefato v2.4 com manifest."
+                )
+            LOGGER.warning(
+                "%s: manifest nao encontrado em %s; continuando sem validacao de schema.",
+                artifact_name,
+                manifest_path,
+            )
+            return None
+        return load_and_validate_manifest(
+            manifest_path,
+            expected_feature_schema_hash=self.expected_feature_schema_hash,
+            expected_dataset_hash=self.expected_dataset_hash,
+            artifact_name=artifact_name,
+        )
 
     def _extract_features(
         self,
         X: np.ndarray,
         r_peaks: np.ndarray | None = None,
-        temporal_features: List[Dict[str, float]] | None = None,
+        temporal_features: list[dict[str, float]] | None = None,
     ) -> np.ndarray:
         """Extrai e empilha features dos segmentos ECG."""
         feats = self.feature_extractor.extract_from_segments(
@@ -126,8 +183,22 @@ class TwoStageMLPPipeline:
         )
         return FeatureExtractor.features_to_array(feats, feature_names=FEATURE_NAMES)
 
+    def _validate_feature_count(self, X_features: np.ndarray, stage: str) -> None:
+        """Garante que o número de features bate com o scaler do estágio."""
+        scaler = self.stage1_scaler if stage == "stage1" else self.stage2_scaler
+        expected = scaler.n_features_in_
+        got = X_features.shape[1]
+        if got != expected:
+            raise ValueError(
+                f"{stage}: scaler espera {expected} features, mas recebeu {got}. "
+                "Regenere o scaler com as 16 features atuais."
+            )
+
     def _run_stage1(self, X_features: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Executa o Estágio 1 e retorna predições + probabilidade Anormal."""
+        if self.stage1_model is None:
+            raise RuntimeError("stage1_model nao foi carregado")
+        self._validate_feature_count(X_features, "stage1")
         X_scaled = self.stage1_scaler.transform(X_features)
         logits = self._forward(self.stage1_model, X_scaled)
         score_anormal = logits[:, 1]
@@ -135,13 +206,49 @@ class TwoStageMLPPipeline:
         return y_pred, score_anormal
 
     def _run_stage2(self, X_features: np.ndarray) -> np.ndarray:
-        """Executa o Estágio 2 e retorna labels S/V/F."""
-        X_scaled = self.stage2_scaler.transform(X_features)
-        logits = self._forward(self.stage2_model, X_scaled)
-        return np.argmax(logits, axis=1).astype(np.int64)
+        """Executa o Estágio 2 e retorna labels S/V/F com thresholds otimizados."""
+        scores = self._stage2_scores(X_features)
+        return self._apply_stage2_thresholds(scores, self.stage2_thresholds)
+
+    @staticmethod
+    def _apply_stage2_thresholds(
+        scores: np.ndarray,
+        thresholds: dict[str, float],
+    ) -> np.ndarray:
+        """Aplica thresholds one-vs-rest otimizados por Youden.
+
+        A lógica replica ``evaluate_multiclass_at_thresholds`` sem computar
+        métricas. Quando nenhuma classe supera seu limiar, fallback para a
+        classe de maior probabilidade (equivale a threshold 0.5 uniforme).
+        """
+        n_samples = scores.shape[0]
+        class_names = ["S", "V", "F"]
+        thr = {cls: thresholds.get(cls, 0.5) for cls in class_names}
+
+        above = np.zeros((n_samples, 3), dtype=bool)
+        for i, cls in enumerate(class_names):
+            above[:, i] = scores[:, i] >= thr[cls]
+
+        # Fallback default: maior probabilidade (argmax)
+        y_pred = np.argmax(scores, axis=1).astype(np.int64)
+
+        single = above.sum(axis=1) == 1
+        if single.any():
+            y_pred[single] = np.argmax(above[single], axis=1)
+
+        multi = above.sum(axis=1) > 1
+        if multi.any():
+            masked = scores.copy()
+            masked[~above] = -1.0
+            y_pred[multi] = np.argmax(masked[multi], axis=1)
+
+        return y_pred
 
     def _stage2_scores(self, X_features: np.ndarray) -> np.ndarray:
         """Retorna scores do Estágio 2 para as amostras."""
+        if self.stage2_model is None:
+            raise RuntimeError("stage2_model nao foi carregado")
+        self._validate_feature_count(X_features, "stage2")
         X_scaled = self.stage2_scaler.transform(X_features)
         return self._forward(self.stage2_model, X_scaled)
 
@@ -164,7 +271,10 @@ class TwoStageMLPPipeline:
         """Combina predições: N=0, S=1, V=2, F=3."""
         integrated = np.zeros_like(stage1_pred)
         abnormal_mask = stage1_pred == 1
-        n_abnormal = int(abnormal_mask.sum())
+        try:
+            n_abnormal = int(abnormal_mask.sum())
+        except Exception as exc:
+            raise RuntimeError(f"Falha ao contar amostras Anormal: {exc}") from exc
 
         if n_abnormal > 0:
             if len(stage2_pred) != n_abnormal:
@@ -197,7 +307,10 @@ class TwoStageMLPPipeline:
 
         y_stage1, score_anormal = self._run_stage1(X_features)
         abnormal_mask = y_stage1 == 1
-        n_abnormal = int(abnormal_mask.sum())
+        try:
+            n_abnormal = int(abnormal_mask.sum())
+        except Exception as exc:
+            raise RuntimeError(f"Falha ao contar amostras Anormal: {exc}") from exc
 
         stage2_scores = np.zeros((X_features.shape[0], 3), dtype=np.float32)
         if n_abnormal > 0:
@@ -222,7 +335,7 @@ class TwoStageMLPPipeline:
         self,
         X: np.ndarray,
         r_peaks: np.ndarray | None = None,
-        temporal_features: List[Dict[str, float]] | None = None,
+        temporal_features: list[dict[str, float]] | None = None,
     ) -> dict[str, Any]:
         """Executa o pipeline completo sobre segmentos ECG.
 

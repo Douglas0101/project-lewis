@@ -257,7 +257,7 @@ class ECGAggregator:
 
                 # Read header explicitly for gain/baseline metadata
                 header = wfdb.rdheader(str(record_path))
-                channel = lead_selector.get_lead_index(header.sig_name, ls_name)
+                channel = lead_selector.get_lead_index(list(header.sig_name or []), ls_name)
                 gain = header.adc_gain[channel] if header.adc_gain else None
                 baseline = header.adc_zero[channel] if header.adc_zero else None
 

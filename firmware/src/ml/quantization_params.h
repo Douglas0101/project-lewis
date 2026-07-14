@@ -17,14 +17,14 @@ typedef struct {
     int32_t zero_point;
 } lewis_quantization_params_t;
 
-#define LEWIS_QUANTIZATION_PARAMS_INPUT_SCALE 0.0680587143f
-#define LEWIS_QUANTIZATION_PARAMS_INPUT_ZERO_POINT -20
+#define LEWIS_QUANTIZATION_PARAMS_INPUT_SCALE 0.0749904141f
+#define LEWIS_QUANTIZATION_PARAMS_INPUT_ZERO_POINT -6
 #define LEWIS_QUANTIZATION_PARAMS_OUTPUT_SCALE 0.0039062500f
 #define LEWIS_QUANTIZATION_PARAMS_OUTPUT_ZERO_POINT -128
 
 static const lewis_quantization_params_t lewis_quantization_params = {
-    .scale = 0.0680587143f,
-    .zero_point = -20,
+    .scale = 0.0749904141f,
+    .zero_point = -6,
 };
 
 static const lewis_quantization_params_t lewis_quantization_params_output = {

@@ -1,3 +1,4 @@
+# pyright: reportArgumentType=false
 from __future__ import annotations
 
 import json
@@ -176,7 +177,9 @@ def test_hybrid_search_returns_query_results(
     ]
     _populate_hybrid_db(db_path, test_embedding, monkeypatch, chunks)
 
-    req = QueryRequest(query="QG5 threshold F1 macro", k=3)
+    req = QueryRequest(
+        query="QG5 threshold F1 macro", k=3, fetch_k=10, layer=None, version=None, tags=None
+    )
     results = hybrid_search(req)
 
     assert results

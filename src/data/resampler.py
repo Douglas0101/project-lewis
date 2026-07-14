@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import logging
 from fractions import Fraction
+from typing import cast
 
 import numpy as np
 from scipy import signal
@@ -89,14 +90,16 @@ def _design_fir_for_resample_poly(up: int, down: int) -> np.ndarray:
     max_rate = max(up, down)
     # Para max_rate pequeno não deveríamos estar aqui, mas mantemos proteção.
     half_len = min(10 * max_rate, _MAX_HALF_LEN_CUSTOM)
-    h = signal.firwin(2 * half_len + 1, 1.0 / max_rate, window=("kaiser", 5.0))
+    h = signal.firwin(
+        2 * half_len + 1, 1.0 / max_rate, window=("kaiser", 5.0)  # type: ignore[arg-type]
+    )
     LOGGER.debug(
         "FIR customizado para resample_poly: max_rate=%d, taps=%d, half_len=%d",
         max_rate,
         len(h),
         half_len,
     )
-    return h.astype(np.float64)
+    return cast(np.ndarray, h).astype(np.float64)
 
 
 def resample_to_500hz(

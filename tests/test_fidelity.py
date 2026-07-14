@@ -13,7 +13,6 @@ O teste exige que o firmware tenha sido compilado com:
 
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import tempfile
@@ -21,6 +20,11 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+
+from src.quantization.firmware_params import (
+    TensorQuantizationParams,
+    load_firmware_quantization_params,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 FIRMWARE_ROOT = PROJECT_ROOT / "firmware"
@@ -31,13 +35,13 @@ GROUND_TRUTH_DIR = PROJECT_ROOT / "tests" / "ground_truth"
 UART_LOG = Path("/tmp/renode_lewis_uart.log")
 
 
-def _load_quant_params():
-    """Carrega parametros de quantizacao do modelo a partir do JSON exportado."""
-    path = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
+def _load_quant_params() -> tuple[TensorQuantizationParams, TensorQuantizationParams]:
+    """Carrega os parâmetros compilados no firmware."""
+    path = FIRMWARE_ROOT / "src" / "ml" / "quantization_params.h"
     if not path.exists():
         pytest.skip(f"Parametros de quantizacao nao encontrados: {path}")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data["input"], data["output"]
+    params = load_firmware_quantization_params(path)
+    return params.input, params.output
 
 
 # Limiares QG10.
@@ -182,7 +186,10 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     norm = np.linalg.norm(a) * np.linalg.norm(b)
     if norm == 0.0:
         return 0.0
-    return float(np.dot(a, b) / norm)
+    try:
+        return float(np.dot(a, b) / norm)
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid arrays for cosine similarity") from exc
 
 
 @pytest.mark.qg10
@@ -207,16 +214,22 @@ class TestFidelity:
         )
 
     @pytest.fixture(scope="class")
-    def quant_params(self) -> tuple[dict, dict]:
+    def quant_params(
+        self,
+    ) -> tuple[TensorQuantizationParams, TensorQuantizationParams]:
         """Fornece escalas e zero-points de quantizacao (lazy load)."""
         return _load_quant_params()
 
     @pytest.mark.parametrize("idx", [0, 1, 2, 3, 4])
-    def test_beat_fidelity(self, idx: int, quant_params: tuple[dict, dict]) -> None:
+    def test_beat_fidelity(
+        self,
+        idx: int,
+        quant_params: tuple[TensorQuantizationParams, TensorQuantizationParams],
+    ) -> None:
         """QG10: saida do firmware deve ser proxima a ground-truth Python."""
-        input_quant, output_quant = quant_params
-        output_scale = output_quant["scale"]
-        output_zero_point = output_quant["zero_point"]
+        _, output_quant = quant_params
+        output_scale = output_quant.scale
+        output_zero_point = output_quant.zero_point
 
         expected_path = GROUND_TRUTH_DIR / f"expected_output_{idx:02d}.bin"
         if not expected_path.exists():
@@ -226,17 +239,24 @@ class TestFidelity:
             )
 
         expected_int8 = np.fromfile(expected_path, dtype=np.int8)
-        assert expected_int8.shape == (RESPONSE_LEN,), f"Formato inesperado: {expected_int8.shape}"
+        assert (
+            expected_int8.ndim == 1 and expected_int8.size == RESPONSE_LEN
+        ), f"Formato inesperado: {expected_int8.shape}"
 
         log_bytes = _run_robot_for_beat(idx)
         firmware_int8 = _extract_response_frame(log_bytes)
-        assert firmware_int8.shape == (RESPONSE_LEN,), f"Resposta inesperada: {firmware_int8.shape}"
+        assert (
+            firmware_int8.ndim == 1 and firmware_int8.size == RESPONSE_LEN
+        ), f"Resposta inesperada: {firmware_int8.shape}"
 
         expected_f32 = _dequantize(expected_int8, output_scale, output_zero_point)
         firmware_f32 = _dequantize(firmware_int8, output_scale, output_zero_point)
 
         cosine = _cosine_similarity(expected_f32, firmware_f32)
-        mae = float(np.mean(np.abs(expected_f32 - firmware_f32)))
+        try:
+            mae = float(np.mean(np.abs(expected_f32 - firmware_f32)))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid fidelity outputs for MAE") from exc
 
         assert cosine > MIN_COSINE_SIMILARITY, (
             f"Beat {idx}: cosine similarity {cosine:.6f} <= "

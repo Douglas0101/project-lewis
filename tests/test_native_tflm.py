@@ -9,15 +9,19 @@ as classes S/V/F do Estagio 2 (zeros quando o Estagio 1 classifica como N).
 
 from __future__ import annotations
 
-import json
 import re
 import subprocess
 from pathlib import Path
+from subprocess import TimeoutExpired
 
 import numpy as np
 import pytest
 import tensorflow as tf
 
+from src.quantization.firmware_params import (
+    FirmwareQuantizationParams,
+    load_firmware_quantization_params,
+)
 from tests.fixtures.adc_stub import adc_stub_get_beat
 from tests.fixtures.dsp_filters import filter_chain
 from tests.fixtures.normalizer import zscore_normalize
@@ -27,7 +31,7 @@ FIRMWARE_DIR = PROJECT_ROOT / "firmware"
 NATIVE_BIN = FIRMWARE_DIR / "build" / "native" / "lewis"
 STAGE1_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage1_int8_v2.0.tflite"
 STAGE2_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage2_int8_v2.0.tflite"
-QPARAMS_PATH = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
+QPARAMS_PATH = FIRMWARE_DIR / "src" / "ml" / "quantization_params.h"
 
 
 NUM_BEATS = 3
@@ -35,8 +39,8 @@ DEQUANT_ATOL = 1e-5
 STUB_MARKER = "[inference] STUB"
 
 
-def _read_quantization_params() -> dict:
-    return json.loads(QPARAMS_PATH.read_text())
+def _read_quantization_params() -> FirmwareQuantizationParams:
+    return load_firmware_quantization_params(QPARAMS_PATH)
 
 
 def _build_native_tflm() -> None:
@@ -56,7 +60,9 @@ def _run_native(timeout: float = 3.0) -> str:
             timeout=timeout,
         )
         return result.stdout
-    except subprocess.TimeoutExpired as exc:
+    except Exception as exc:
+        if not isinstance(exc, TimeoutExpired):
+            raise
         # O firmware entra em loop infinito apos os beats; usamos o timeout
         # para encerrar a execucao e analisar a saida produzida.
         stdout = exc.stdout or ""
@@ -72,7 +78,10 @@ def _parse_native_outputs(stdout: str) -> list[np.ndarray]:
     )
     outputs = []
     for match in pattern.finditer(stdout):
-        values = [int(v.strip()) for v in match.group("values").split(",")]
+        try:
+            values = [int(value.strip()) for value in match.group("values").split(",")]
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid native inference output") from exc
         outputs.append(np.array(values, dtype=np.int8))
     return outputs
 
@@ -110,10 +119,10 @@ def _run_python_reference(num_beats: int) -> list[np.ndarray]:
     stage2_output = stage2.get_output_details()[0]
 
     qparams = _read_quantization_params()
-    in_scale = qparams["input"]["scale"]
-    in_zero_point = qparams["input"]["zero_point"]
-    out_scale = qparams["output"]["scale"]
-    out_zero_point = qparams["output"]["zero_point"]
+    in_scale = qparams.input.scale
+    in_zero_point = qparams.input.zero_point
+    out_scale = qparams.output.scale
+    out_zero_point = qparams.output.zero_point
 
     outputs = []
     for idx in range(num_beats):
@@ -129,7 +138,11 @@ def _run_python_reference(num_beats: int) -> list[np.ndarray]:
         stage1.invoke()
         stage1_out = stage1.get_tensor(stage1_output["index"])[0].copy()
 
-        if int(np.argmax(stage1_out)) == 1:
+        try:
+            stage1_class = int(np.argmax(stage1_out))
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Invalid Stage 1 logits") from exc
+        if stage1_class == 1:
             stage2.set_tensor(stage2_input["index"], tensor)
             stage2.invoke()
             final_out = stage2.get_tensor(stage2_output["index"])[0].copy()
@@ -165,11 +178,11 @@ class TestNativeTflm:
         assert len(fw_outputs) == NUM_BEATS, f"esperava {NUM_BEATS} beats, obteve {len(fw_outputs)}"
 
         qparams = _read_quantization_params()
-        out_scale = qparams["output"]["scale"]
-        out_zero_point = qparams["output"]["zero_point"]
+        out_scale = qparams.output.scale
+        out_zero_point = qparams.output.zero_point
 
         py_outputs = _run_python_reference(len(fw_outputs))
-        for idx, (fw_out, py_out) in enumerate(zip(fw_outputs, py_outputs)):
+        for idx, (fw_out, py_out) in enumerate(zip(fw_outputs, py_outputs, strict=True)):
             fw_float = _dequantize(fw_out, out_scale, out_zero_point)
             assert np.allclose(fw_float, py_out, atol=DEQUANT_ATOL), (
                 f"saida do beat {idx} diverge do Python de referencia: "

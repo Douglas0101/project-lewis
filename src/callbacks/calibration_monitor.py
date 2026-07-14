@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Mapping, Optional
 
 import numpy as np
 from tensorflow import keras
@@ -72,7 +72,7 @@ class CalibrationMonitor(keras.callbacks.Callback):
 
         os.makedirs(os.path.dirname(log_path) or ".", exist_ok=True)
 
-    def on_train_begin(self, logs: Optional[dict] = None) -> None:
+    def on_train_begin(self, logs: Mapping[str, Any] | None = None) -> None:
         """Amostra dados de validação se max_samples for menor que o dataset."""
         n_samples = self.val_data.shape[0]
         if self.max_samples is not None and 0 < self.max_samples < n_samples:
@@ -85,7 +85,7 @@ class CalibrationMonitor(keras.callbacks.Callback):
                 f"amostras de validação."
             )
 
-    def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Mapping[str, Any] | None = None) -> None:
         """Computa métricas de calibração ao final de cada época."""
         stats = self._compute_calibration_stats(epoch)
         self.history.append(stats)

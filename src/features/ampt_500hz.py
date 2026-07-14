@@ -18,7 +18,7 @@ NÃO usar biosppy, heartpy, neurokit2 — implementar do zero para auditabilidad
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, cast
 
 import numpy as np
 from scipy import signal
@@ -43,7 +43,10 @@ class AMPTDetector:
         self.tol_samples = int(round(TOL_MS_DEFAULT * fs / 1000.0))
 
         # 1. Bandpass: 5–15 Hz, 2nd order Butterworth, zero-phase filtfilt
-        self.b_band, self.a_band = signal.butter(2, [5.0 / (fs / 2), 15.0 / (fs / 2)], btype="band")
+        self.b_band, self.a_band = cast(
+            Tuple[np.ndarray, np.ndarray],
+            signal.butter(2, [5.0 / (fs / 2), 15.0 / (fs / 2)], btype="band"),
+        )
 
         # 4. MWI window: 150 ms
         self.mwi_window = int(round(0.150 * fs))

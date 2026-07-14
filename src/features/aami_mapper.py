@@ -56,7 +56,7 @@ _EXCLUDED_SYMBOLS: set[str] = {"~", "+", "x"}
 
 def map_annotations(
     symbols: List[str],
-) -> Tuple[List[str], Dict[str, int]]:
+) -> Tuple[List[str], Dict[str, Any]]:
     """Map WFDB beat symbols to AAMI EC57 classes.
 
     Parameters

@@ -28,6 +28,10 @@ UV      := uv
 DATA    := data
 FIRMWARE_DIR := firmware
 
+# Garante que tf.keras use Keras 3 standalone, evitando redirecionamento
+# para tf_keras causado por sentence-transformers / tensorflow_model_optimization.
+export TF_USE_LEGACY_KERAS := 0
+
 # ---------------------------------------------------------------------------
 # MLP v2.3 — variáveis configuráveis
 # ---------------------------------------------------------------------------

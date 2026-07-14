@@ -1,7 +1,7 @@
 """Feature extractor for inference-time MLP inputs.
 
-Extracts the same 13 morphological + time-domain features used during training
-of ``stage1_mlp_features_v2.1.keras``.  The extractor is intentionally light so
+Extracts the same 16 morphological + time-domain features used during training
+of ``stage1_mlp_features_v2.3.keras``.  The extractor is intentionally light so
 that it can be ported to C for the firmware (QG8/QG9).
 """
 
@@ -84,9 +84,7 @@ class FeatureExtractor:
         if segments.ndim == 3:
             segments = segments[..., 0]
         if segments.ndim != 2:
-            raise ValueError(
-                f"segments must be (n, 500) or (n, 500, 1); got {segments.shape}"
-            )
+            raise ValueError(f"segments must be (n, 500) or (n, 500, 1); got {segments.shape}")
 
         n = segments.shape[0]
 
@@ -109,8 +107,7 @@ class FeatureExtractor:
         else:
             if r_peaks is not None and len(r_peaks) != n:
                 LOGGER.warning(
-                    "r_peaks length (%d) differs from segments (%d); "
-                    "zero-filling RR features",
+                    "r_peaks length (%d) differs from segments (%d); " "zero-filling RR features",
                     len(r_peaks),
                     n,
                 )

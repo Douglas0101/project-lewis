@@ -287,7 +287,8 @@ def enrich_metadata(chunks: List[Chunk]) -> List[tuple[DocumentMeta, str]]:
             exp_meta = _parse_experiment_metadata(source, content)
             layer = "SIMULATION"
             version = resolve_version(file_path)
-            tags = list({*(exp_meta.get("tags") or []), "experimento", exp_meta.get("stage", "")})
+            raw_tags: list[str] = list(exp_meta.get("tags") or [])
+            tags = list({*raw_tags, "experimento", str(exp_meta.get("stage", ""))})
             tags = [t for t in tags if t]
             chunk_id = deterministic_chunk_id(source, content)
             meta = DocumentMeta(
