@@ -9,17 +9,38 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RESEARCH_DIR = PROJECT_ROOT / "experiments" / "stage2_v2.4_research"
 MODELS_DIR = PROJECT_ROOT / "models"
+CANONICAL_STAGE_DIRS = {
+    "E00": "E00_baseline_snapshot",
+    "E01": "E01_patient_distribution",
+    "E02": "E02_manifest_immutable",
+    "E03": "E03_split_protocol",
+    "E04": "E04_qg5_gates",
+    "E05": "E05_feature_separability",
+    "E06": "E06_feature_engineering",
+    "E07": "E07_label_audit",
+    "E08": "E08_resampled_focal_mlp",
+}
+E06_NON_COMPLETION_DIRS = ("E06_reopened", "E06_5")
 
 
 def test_research_report_exists():
     assert (PROJECT_ROOT / "docs" / "stage2_v2.4_research_report.md").exists()
 
 
-def test_all_manifests_exist():
-    for e in range(9):
-        dirs = list(RESEARCH_DIR.glob(f"E{e:02d}_*"))
-        assert dirs, f"E{e:02d} nao encontrado"
-        assert (dirs[0] / f"E{e:02d}_manifest.json").exists(), f"Manifesto E{e:02d} ausente"
+def test_all_canonical_manifests_exist():
+    for stage, directory_name in CANONICAL_STAGE_DIRS.items():
+        stage_dir = RESEARCH_DIR / directory_name
+        assert stage_dir.is_dir(), f"Diretorio canonico {stage} ausente: {directory_name}"
+        assert (stage_dir / f"{stage}_manifest.json").is_file(), f"Manifesto {stage} ausente"
+
+
+@pytest.mark.parametrize("directory_name", E06_NON_COMPLETION_DIRS)
+def test_reopened_e06_paths_are_not_historical_completion(directory_name: str):
+    stage_dir = RESEARCH_DIR / directory_name
+    assert stage_dir.is_dir(), f"Diretorio E06 esperado ausente: {directory_name}"
+    assert not (
+        stage_dir / "E06_manifest.json"
+    ).exists(), f"{directory_name} nao pode declarar conclusao historica E06"
 
 
 def test_no_v2_4_artifacts_in_models():
