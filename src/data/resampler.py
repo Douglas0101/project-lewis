@@ -4,7 +4,8 @@ Regras mandatórias (ecg-preprocessing-pipeline):
 - Método: scipy.signal.resample_poly APENAS
 - padtype="line" para ECG não-periódico
 - NUNCA usar scipy.signal.resample (FFT-based) — introduz artefatos de borda
-- SVDB fs = 250 Hz (não 128 Hz)
+- SVDB fs = 128 Hz (confirmado nos headers .hea; a nota anterior que dizia
+  250 Hz estava errada — corrigida na v3)
 """
 
 from __future__ import annotations

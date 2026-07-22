@@ -38,7 +38,9 @@ class TimeDomainFeatures:
         Parameters
         ----------
         r_peaks : np.ndarray
-            Sample indices of R-peaks.
+            Sample indices of R-peaks **no mesmo relógio de ``fs``**
+            (rebuild_spec/02). DQ-02: passar índices em fs nativo com
+            ``fs=500`` produz RR errado por fator fs_nativo/fs.
         fs : float, optional
             Override sampling frequency.
 

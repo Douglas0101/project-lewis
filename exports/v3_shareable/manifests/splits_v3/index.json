@@ -1,0 +1,53 @@
+{
+  "split_version": "3.0.0",
+  "created_utc": "2026-07-21T03:49:51.821909+00:00",
+  "n_splits": 5,
+  "protocol_seeds": [
+    17,
+    29,
+    43,
+    71,
+    101
+  ],
+  "data_hash": "dc4069b94a5ff44743f47970e1542a9bce6521caafc2e2e568403fd8d39f8111",
+  "ontology_hash": "051f4d8b476e4dde2e32b125b302b18b091e4d582d97fc217a50b1d5ab0f78a1",
+  "preprocessing_hash": "0b8792fd9d080b76f33cc31cf1cca2e47da2278b9a3e2934ce3d04bec0220c58",
+  "n_patients": 201,
+  "folds": [
+    {
+      "fold": 0,
+      "path": "data/splits/groupkfold_5_stratified/v3/fold_0.json",
+      "sha256": "7789e1369d9c3b82f5024a257bba20f4dd53c393cd41b39b145f0dcfb4ce0744",
+      "n_val_records": 40,
+      "n_val_beats": 93668
+    },
+    {
+      "fold": 1,
+      "path": "data/splits/groupkfold_5_stratified/v3/fold_1.json",
+      "sha256": "a53d29b232c78ba5e473ec3a3eca9e1cf6cbf6fa2d01a500d4ff3fa82a6a8a75",
+      "n_val_records": 41,
+      "n_val_beats": 95075
+    },
+    {
+      "fold": 2,
+      "path": "data/splits/groupkfold_5_stratified/v3/fold_2.json",
+      "sha256": "aa223d5b134d0ae809a8b5bf8baecf1ee2d56667c2b66483fd94cc13836efaa9",
+      "n_val_records": 40,
+      "n_val_beats": 93669
+    },
+    {
+      "fold": 3,
+      "path": "data/splits/groupkfold_5_stratified/v3/fold_3.json",
+      "sha256": "2d78a1bad076fa7efc53180ae40c3fba166cae5aae760f6312e62c5fefdf97e4",
+      "n_val_records": 40,
+      "n_val_beats": 93645
+    },
+    {
+      "fold": 4,
+      "path": "data/splits/groupkfold_5_stratified/v3/fold_4.json",
+      "sha256": "5af407fffca9ff8075320ceb27517c74633f71b3cb299807d2e341e7bb83e1c3",
+      "n_val_records": 40,
+      "n_val_beats": 93666
+    }
+  ]
+}

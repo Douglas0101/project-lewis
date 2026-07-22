@@ -253,14 +253,17 @@ class TestAAMIMapper:
     """Validate WFDB → AAMI EC57 mapping."""
 
     def test_map_all_beat_symbols(self):
+        # v3: '|' (QRS-like artifact) é excluído pela ontologia única — ver
+        # docs/rebuild_spec/01 e tests/test_ontology_v3.py.
         symbols = ["N", "L", "R", "e", "j", "V", "E", "A", "a", "J", "S", "F", "/", "f", "Q", "|"]
         labels, stats = map_annotations(symbols)
 
-        assert len(labels) == len(symbols)
+        assert len(labels) == len(symbols) - 1  # '|' excluído
         assert set(labels).issubset(set(AAMI_CLASSES))
-        assert stats["n_total"] == len(symbols)
-        assert stats["n_mapped"] == len(symbols)
+        assert stats["n_total"] == len(symbols) - 1
+        assert stats["n_mapped"] == len(symbols) - 1
         assert stats["n_unmapped"] == 0
+        assert stats["n_excluded"] == 1
 
     def test_normal_beats_map_to_n(self):
         symbols = ["N", "L", "R", "e", "j"]
@@ -286,12 +289,14 @@ class TestAAMIMapper:
         assert "N" in labels
         assert "V" in labels
 
-    def test_unknown_symbols_map_to_q(self):
+    def test_unknown_symbols_excluded_never_q(self):
+        """v3: símbolo desconhecido é excluído, nunca mapeado para Q (D2/D4)."""
         symbols = ["N", "UNKNOWN", "V"]
         labels, stats = map_annotations(symbols)
 
-        assert labels[1] == "Q"
-        assert stats["n_unmapped"] == 1
+        assert labels == ["N", "V"]
+        assert stats["n_excluded"] == 1
+        assert stats["n_unmapped"] == 0
 
     def test_stats_counts(self):
         symbols = ["N", "N", "V", "V", "V", "S", "F", "Q"]

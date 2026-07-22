@@ -1,0 +1,50 @@
+{
+  "cell_id": "a_f3_s43",
+  "family": "a",
+  "fold": 3,
+  "seed": 43,
+  "created_utc": "2026-07-18T23:25:08.659923+00:00",
+  "data_hash": "dc4069b94a5ff44743f47970e1542a9bce6521caafc2e2e568403fd8d39f8111",
+  "ontology_hash": "af4278e85ffd21cf18d5303b9f507eda65bb4ac7791802096990b3ad44601280",
+  "preprocessing_hash": "0b8792fd9d080b76f33cc31cf1cca2e47da2278b9a3e2934ce3d04bec0220c58",
+  "fold_manifest_sha256": "bef8583e1ee900c2034e7b6bd1d67aa59b9e85ad6e24a519f929b15fa6c6dc22",
+  "n_train_inner": 276941,
+  "n_val_inner": 93095,
+  "n_val_outer": 91564,
+  "n_val_patients": 40,
+  "threshold_from_inner_val": 0.7000000000000004,
+  "metrics_outer": {
+    "roc_auc": 0.9370026412741193,
+    "pr_auc": 0.8349207390996182,
+    "threshold": 0.7000000000000004,
+    "recall_anormal": 0.8221335107562653,
+    "precision_anormal": 0.5421175782392512,
+    "specificity": 0.9241392678021951,
+    "f1_macro": 0.8021795266960385,
+    "mcc": 0.623858232191174,
+    "brier": 0.09503477066755295,
+    "ece15": 0.13267068176308447,
+    "confusion_matrix": [
+      [
+        76284,
+        6262
+      ],
+      [
+        1604,
+        7414
+      ]
+    ],
+    "support": {
+      "n": 91564,
+      "pos": 9018,
+      "neg": 82546
+    }
+  },
+  "metrics_inner_val_auc": 0.935084272816167,
+  "class_weight": {
+    "0": 0.5689547492162366,
+    "1": 4.125566082707663
+  },
+  "runtime_sec": 1535.6,
+  "sha256": "df41a39fa9726d74b2fe9ef740cd596c4bf746bf8694b1ae57f7b4ab283c9e08"
+}

@@ -1,0 +1,67 @@
+{
+  "cell_id": "d_f4_s43",
+  "family": "d",
+  "fold": 4,
+  "seed": 43,
+  "created_utc": "2026-07-20T02:22:07.426392+00:00",
+  "data_hash": "dc4069b94a5ff44743f47970e1542a9bce6521caafc2e2e568403fd8d39f8111",
+  "ontology_hash": "af4278e85ffd21cf18d5303b9f507eda65bb4ac7791802096990b3ad44601280",
+  "preprocessing_hash": "0b8792fd9d080b76f33cc31cf1cca2e47da2278b9a3e2934ce3d04bec0220c58",
+  "fold_manifest_sha256": "8113f6415721d948787ae6fef44f218448f0c9571636506646e6e8289897b7cb",
+  "n_train_inner": 276346,
+  "n_val_inner": 91627,
+  "n_val_outer": 93627,
+  "n_val_patients": 40,
+  "threshold_from_inner_val": 0.7000000000000004,
+  "metrics_outer": {
+    "roc_auc": 0.9229970127683162,
+    "pr_auc": 0.7128295072147846,
+    "threshold": 0.7000000000000004,
+    "recall_anormal": 0.8414485411389436,
+    "precision_anormal": 0.4510888698888498,
+    "specificity": 0.8684553080705815,
+    "f1_macro": 0.7534472923188109,
+    "mcc": 0.5513263772987358,
+    "brier": 0.14914008975028992,
+    "ece15": 0.2119018003633481,
+    "confusion_matrix": [
+      [
+        72054,
+        10914
+      ],
+      [
+        1690,
+        8969
+      ]
+    ],
+    "support": {
+      "n": 93627,
+      "pos": 10659,
+      "neg": 82968
+    }
+  },
+  "metrics_inner_val_auc": 0.9400385920176557,
+  "class_weight": {
+    "0": 0.5647690207394933,
+    "1": 4.359869998737852
+  },
+  "runtime_sec": 3093.0,
+  "rhythm_outer": {
+    "f1_macro": 0.10392728057398716,
+    "per_class_f1": {
+      "SINUS": 0.0,
+      "AFIB": 0.41570912229594864,
+      "AFL": 0.0,
+      "JUNCTIONAL": 0.0
+    },
+    "support": {
+      "SINUS": 10758,
+      "AFIB": 3853,
+      "AFL": 73,
+      "JUNCTIONAL": 0
+    },
+    "n_val_episodes": 14684,
+    "n_val_records": 4
+  },
+  "sha256": "cc1f8f020f193bfbf30f3649ccafb11cb651d2891ab0f9854e59a6d03614ec93"
+}

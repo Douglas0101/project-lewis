@@ -1,0 +1,41 @@
+{
+  "split_version": "3.0.0",
+  "task": "afdb_rhythm",
+  "created_utc": "2026-07-21T03:51:09.910624+00:00",
+  "fold": 1,
+  "n_splits": 5,
+  "protocol_seeds": [
+    17,
+    29,
+    43,
+    71,
+    101
+  ],
+  "data_hash": "8ac7718957463b97668231b5e3b54c24d2a6f8a934b81c7c92597a4b812c04a9",
+  "ontology_hash": "051f4d8b476e4dde2e32b125b302b18b091e4d582d97fc217a50b1d5ab0f78a1",
+  "preprocessing_hash": "279c32a00e603e4dfc8ee6d471ef85a87a36cea332c51e11b9cab0f52527bb5b",
+  "episodes_parquet": "data/features/afdb_rhythm_episodes.parquet",
+  "n_val_records": 4,
+  "n_val_episodes": 14682,
+  "val_patient_ids": [
+    "04126",
+    "05261",
+    "07162",
+    "07910"
+  ],
+  "val_record_ids": [
+    "04126",
+    "05261",
+    "07162",
+    "07910"
+  ],
+  "val_dataset_ids": [
+    "afdb"
+  ],
+  "val_rhythm_distribution": {
+    "SINUS": 10203,
+    "AFIB": 4432,
+    "AFL": 47
+  },
+  "sha256": "4e82fd9243e742ba71d5a555e8b6adb8ed84bad35aa9b1d383001fd2869b2e9b"
+}

@@ -1,0 +1,12 @@
+{
+  "artifact_sha256": {
+    "data/features/v3.1.0-r4/stage2_multiclass.npz": "078417222c030f74d829d9726e2ad51d14fa3ba7644cd403dba3fb47b3b171b6",
+    "data/features/v3.1.0-r4/stage2_multiclass.parquet": "5c02b16bfd2d89e02c0242070240debbea4514f4760319b47f914bf1c494f458"
+  },
+  "generation_id": "advanced-training-v3.1.0-r4",
+  "reason": "Stage 2 was emitted by the two-stage preparation utility but is outside the r4 config and lacks NPZ ordered sample_id/waveform_sha256 binding.",
+  "recorded_at_utc": "2026-07-22T03:57:57.431263+00:00",
+  "required_action": "Add an explicit Stage 2 custody contract and regenerate into a new generation before any Stage 2 training.",
+  "schema_version": "dataset-scope-exclusion-v1",
+  "status": "NOT_AUTHORIZED_FOR_TRAINING"
+}

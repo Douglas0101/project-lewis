@@ -1,0 +1,8 @@
+{
+  "evidence_bundle_hash": "7e3b2a8fd1d5a294cc5ac1eb0492033ffa04b9f6e3bc04d4a9f4306c441c49cc",
+  "generation_id": "advanced-training-v3.1.0-r4-bootstrap",
+  "report_json_sha256": "c0e9d272d0d66ca5ddb59a1e5e5cff939f727483eae6761c9f45aeafd42824f9",
+  "report_markdown_sha256": "6d3daf3486bde071f27025c4072d010d1657574c696d306d0e06e2f8095da2bf",
+  "schema_version": "preflight-report-publication-v3.1.0",
+  "status": "REPORT_BUNDLE_COMPLETE"
+}

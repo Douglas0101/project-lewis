@@ -58,9 +58,12 @@ def test_each_beat_has_single_stage2_class():
 
 def test_aami_mapping_traceability():
     trace = pd.read_csv(E01_DIR / "aami_traceability.csv")
+    # v3.0.0 (relógio corrigido, DQ-01/02): V perdeu exatamente 1 beat — anotação
+    # de borda fora do alcance do sinal, descartada pelo contrato de relógio
+    # (build_beat_records). S e F inalterados. Valores anteriores: V=37183.
     expected = {
         ("S", "S", "Anormal", 0): 16934,
-        ("V", "V", "Anormal", 1): 37183,
+        ("V", "V", "Anormal", 1): 37182,
         ("F", "F", "Anormal", 2): 1044,
     }
     for (orig, mapped, stage1, stage2), count in expected.items():

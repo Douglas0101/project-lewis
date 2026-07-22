@@ -144,6 +144,13 @@ class BeatRecord(BaseModel):
     label_aami: AAMIClass
     r_peak_sample: int = Field(..., ge=0, description="R-peak index within the full record")
     r_peak_in_segment: int = Field(..., ge=0, description="R-peak index within the segment")
+    source_sampling_rate: Optional[float] = Field(None, gt=0)
+    target_sampling_rate: Optional[float] = Field(None, gt=0)
+    annotation_index_native: Optional[int] = Field(None, ge=0)
+    annotation_time_seconds: Optional[float] = Field(None, ge=0)
+    annotation_index_target: Optional[int] = Field(None, ge=0)
+    class_original: Optional[str] = Field(None, min_length=1)
+    class_canonical: Optional[str] = Field(None, min_length=1)
     temporal: TemporalFeatures
     morph: MorphologicalFeatures
     augmentation_applied: bool = False

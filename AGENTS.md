@@ -92,7 +92,15 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 13. Senhas hasheadas (Argon2id/bcrypt) — se houver camada de auth
 14. LGPD: nenhum PII em logs
 15. Revisão humana para código crítico
-16. Classe Q (paced/unclassifiable) excluída da classificação final a partir de v2.0 — tratada como "Anormal" no Estágio 1
+16. Classe Q — **v3.0.0**: renomeada `Q_OR_UNKNOWN` (classe de rejeição/abstenção, decisão D4); excluída dos alvos clínicos (Stage 1 e Stage 2) e roteada para `ABSTAIN_*`; em v2.x era tratada como "Anormal" no Estágio 1 (encerrado — DQ-05)
+17. **v3.0.0** — Ontologia clínica única versionada em `src/features/ontology_v3.py` (fonte única símbolo→classe); `F` = `FUSION` (somente fusão V+N, **nunca** fibrilação atrial); símbolos desconhecidos são excluídos, nunca mapeados para Q
+18. **v3.0.0** — Índices de anotação WFDB são reescalonados do fs nativo para o relógio canônico de 500 Hz **antes** da segmentação e das features (`round(s × 500/fs_nativo)`); índice nativo sobre sinal reamostrado é defeito fatal (DQ-01/DQ-02)
+
+> **Nota v3.0.0 (2026-07-18):** após a auditoria forense (`reports/forensic_data_quality_report_v1.0.md`),
+> o projeto está em reconstrução conforme `docs/rebuild_spec/`. Artefatos legados (modelos, scalers,
+> thresholds v2.x) são **inválidos para novo treinamento** (`LEGACY_ARTIFACTS_INVALID_FOR_NEW_TRAINING`).
+> AFDB contribui como tarefa de ritmo (AFIB/AFL) em escopo de episódio, fora do classificador de
+> batimentos (decisão D3). Splits são congelados em `data/splits/groupkfold_5_stratified/v3/`.
 
 > **Nota:** A arquitetura atual não inclui autenticação. Esta regra é condicional e só se aplica se uma camada de auth for introduzida no futuro.
 

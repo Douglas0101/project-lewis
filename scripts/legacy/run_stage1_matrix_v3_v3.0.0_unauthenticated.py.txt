@@ -1,0 +1,645 @@
+"""Matriz de treinamento v3 — 4 famílias × 5 folds × 5 seeds = 100 células.
+
+Protocolo (docs/rebuild_spec/05): folds e seeds idênticos para todas as
+famílias; scalers/imputers ajustados SOMENTE no treino interno do fold; early
+stopping e threshold SOMENTE na validação interna; outer val avaliado uma vez;
+nenhum artefato legado. Cada célula grava JSON próprio; o ledger permite
+resume seguro (pular células DONE com o mesmo data_hash).
+
+Famílias:
+  a — CNN-1D waveform (baseline)
+  b — MLP sobre 17 features clínicas (parquet v3)
+  c — fusão CNN waveform + features (build_backbone_1d_with_features)
+  d — multitarefa beat+quality (multitask_v3) + ritmo AFDB (mesma célula)
+
+Uso:
+  python scripts/run_stage1_matrix_v3.py --family a --fold 1 --seed 17   # 1 célula
+  python scripts/run_stage1_matrix_v3.py --campaign                      # 100 células c/ resume
+  python scripts/run_stage1_matrix_v3.py --smoke --family b              # validação rápida
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import logging
+import sys
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+
+LEGACY_V3_BLOCK_MESSAGE = (
+    "LEGACY_V3_TRAINING_BLOCKED: the record-grouped v3 runner is not eligible for new "
+    "training. Run `uv run --locked python -m src.cli.advanced_training_v3 preflight` "
+    "and wait for task #3 to provide a generation-bound runner."
+)
+
+if __name__ == "__main__":
+    print(LEGACY_V3_BLOCK_MESSAGE, file=sys.stderr)
+    raise SystemExit(10)
+
+import numpy as np
+import pandas as pd
+import tensorflow as tf
+from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    average_precision_score,
+    brier_score_loss,
+    confusion_matrix,
+    f1_score,
+    matthews_corrcoef,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+)
+from sklearn.model_selection import GroupKFold
+from sklearn.preprocessing import StandardScaler
+from sklearn.utils.class_weight import compute_class_weight
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.models.backbone_1d import build_backbone_1d, build_backbone_1d_with_features  # noqa: E402
+from src.models.multitask_v3 import (  # noqa: E402
+    QUALITY_HEAD_NAMES,
+    RHYTHM_CLASSES,
+    build_multitask_beat_model,
+    build_rhythm_model,
+    weighted_sparse_ce,
+)
+from src.models.train import _set_seeds  # noqa: E402
+
+LOGGER = logging.getLogger("lewis.camada04.matrix_v3")
+
+FEATURE_DIR = PROJECT_ROOT / "data" / "features"
+SPLIT_DIR = PROJECT_ROOT / "data" / "splits" / "groupkfold_5_stratified" / "v3"
+OUT_DIR = PROJECT_ROOT / "artifacts" / "stage1_matrix_v3"
+CELLS_DIR = OUT_DIR / "cells"
+LEDGER_PATH = OUT_DIR / "ledger.json"
+
+FAMILIES = ["a", "b", "c", "d"]
+FOLDS = [0, 1, 2, 3, 4]
+SEEDS = [17, 29, 43, 71, 101]
+
+EPOCHS = 50
+BATCH_SIZE = 128
+LEARNING_RATE = 1e-3
+ES_PATIENCE = 10
+
+FEATURE_COLS = [
+    "rr_prev", "rr_next", "rr_ratio", "rr_local_mean", "rr_local_std", "rmssd",
+    "heart_rate", "r_amplitude", "q_depth", "t_amplitude", "qrs_width_ms", "qrs_area",
+    "st_slope_mV_s", "j_point", "qrs_asymmetry_index", "t_r_ratio", "qrs_raggedness",
+]
+# Sentinelas do pipeline v3 (morph_clean): -1.0 (asymmetry/ratio/raggedness), 0.0 (width/area)
+SENTINEL_NEG1 = ["qrs_asymmetry_index", "t_r_ratio", "qrs_raggedness"]
+SENTINEL_ZERO = ["qrs_width_ms", "qrs_area"]
+
+
+# ---------------------------------------------------------------------------
+# dados
+# ---------------------------------------------------------------------------
+
+def _sha256_text(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _load_stage1() -> tuple[np.ndarray, np.ndarray, pd.DataFrame]:
+    z = np.load(FEATURE_DIR / "stage1_binary.npz")
+    X = z["X"].astype(np.float32)
+    y = z["y"].astype(np.int64)
+    df = pd.read_parquet(FEATURE_DIR / "stage1_binary.parquet")
+    if len(df) != len(X):
+        raise ValueError(f"stage1 parquet/npz mismatch: {len(df)} vs {len(X)}")
+    return X, y, df
+
+
+def _features_from_parquet(df: pd.DataFrame) -> np.ndarray:
+    feats = df[FEATURE_COLS].to_numpy(dtype=np.float32, copy=True)
+    for j, col in enumerate(FEATURE_COLS):
+        if col in SENTINEL_NEG1:
+            feats[feats[:, j] <= -0.999999, j] = np.nan
+        if col in SENTINEL_ZERO:
+            feats[(feats[:, j] == 0.0), j] = np.nan
+    return feats
+
+
+def _fold_manifest(fold: int, task: str = "beat") -> dict:
+    path = (SPLIT_DIR / "afdb" / f"fold_{fold}.json") if task == "rhythm" else (
+        SPLIT_DIR / f"fold_{fold}.json"
+    )
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _inner_split(records_train: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
+    """Inner GroupKFold(4) por paciente — usa a 1ª partição como inner-val."""
+    uniq = np.unique(records_train)
+    r2g = {r: i for i, r in enumerate(uniq)}
+    groups = np.array([r2g[r] for r in records_train])
+    gkf = GroupKFold(n_splits=4)
+    inner_train_idx, inner_val_idx = next(gkf.split(np.zeros(len(records_train)), None, groups))
+    return inner_train_idx, inner_val_idx
+
+
+class _ValAucCallback(tf.keras.callbacks.Callback):
+    """AUC sklearn por época exposta ao EarlyStopping (bug AUC Keras 3 evitado).
+
+    Compatível com modelos multi-saída (usa a cabeça 'beat').
+    """
+
+    def __init__(self, x_val, y_val, multi_output: bool = False) -> None:
+        super().__init__()
+        self.x_val = x_val
+        self.y_val = y_val
+        self.multi_output = multi_output
+
+    def on_epoch_end(self, epoch: int, logs: dict | None = None) -> None:
+        logs = logs if logs is not None else {}
+        pred = self.model.predict(self.x_val, batch_size=1024, verbose=0)
+        beat = pred[0] if self.multi_output else pred
+        logs["val_auc"] = float(roc_auc_score(self.y_val, beat[:, 1]))
+
+
+def _scale_waveform(X_tr, X_iv, X_ov):
+    n, seq, ch = X_tr.shape
+    scaler = StandardScaler()
+    scaler.fit(X_tr.reshape(-1, ch))
+    out = []
+    for arr in (X_tr, X_iv, X_ov):
+        out.append(scaler.transform(arr.reshape(-1, ch)).reshape(len(arr), seq, ch))
+    return out, scaler
+
+
+def _scale_features(F_tr, F_iv, F_ov):
+    imputer = SimpleImputer(strategy="median")
+    imputer.fit(F_tr)
+    scaler = StandardScaler()
+    scaler.fit(imputer.transform(F_tr))
+    out = []
+    for arr in (F_tr, F_iv, F_ov):
+        out.append(scaler.transform(imputer.transform(arr)))
+    return out, (imputer, scaler)
+
+
+def _class_weight(y_train: np.ndarray) -> dict[int, float]:
+    classes = np.unique(y_train)
+    weights = compute_class_weight("balanced", classes=classes, y=y_train)
+    return {int(c): float(w) for c, w in zip(classes, weights)}
+
+
+def _tune_threshold(y_true: np.ndarray, scores: np.ndarray) -> float:
+    """Threshold por F1-macro na validação INTERNA (nunca no outer)."""
+    best_t, best_f1 = 0.5, -1.0
+    for t in np.arange(0.30, 0.7001, 0.01):
+        f1 = f1_score(y_true, (scores >= t).astype(int), labels=[0, 1], average="macro",
+                      zero_division=0.0)
+        if f1 > best_f1:
+            best_f1, best_t = f1, float(t)
+    return best_t
+
+
+def _ece(y_true: np.ndarray, scores: np.ndarray, n_bins: int = 15) -> float:
+    edges = np.linspace(0.0, 1.0, n_bins + 1)
+    ece = 0.0
+    for i in range(n_bins):
+        lo, hi = edges[i], edges[i + 1]
+        sel = (scores >= lo) & (scores < hi) if i < n_bins - 1 else (scores >= lo) & (scores <= hi)
+        if sel.any():
+            ece += (sel.sum() / len(scores)) * abs(y_true[sel].mean() - scores[sel].mean())
+    return float(ece)
+
+
+def _beat_metrics(y_true: np.ndarray, scores: np.ndarray, threshold: float) -> dict:
+    y_pred = (scores >= threshold).astype(int)
+    cm = confusion_matrix(y_true, y_pred, labels=[0, 1])
+    return {
+        "roc_auc": float(roc_auc_score(y_true, scores)),
+        "pr_auc": float(average_precision_score(y_true, scores)),
+        "threshold": float(threshold),
+        "recall_anormal": float(recall_score(y_true, y_pred, pos_label=1, zero_division=0.0)),
+        "precision_anormal": float(precision_score(y_true, y_pred, pos_label=1, zero_division=0.0)),
+        "specificity": float(recall_score(y_true, y_pred, pos_label=0, zero_division=0.0)),
+        "f1_macro": float(
+            f1_score(y_true, y_pred, labels=[0, 1], average="macro", zero_division=0.0)
+        ),
+        "mcc": float(matthews_corrcoef(y_true, y_pred)),
+        "brier": float(brier_score_loss(y_true, scores)),
+        "ece15": _ece(y_true, scores),
+        "confusion_matrix": cm.tolist(),
+        "support": {
+            "n": int(len(y_true)),
+            "pos": int(y_true.sum()),
+            "neg": int((1 - y_true).sum()),
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# treino por família
+# ---------------------------------------------------------------------------
+
+def _fit_keras(model, fit_args, x_val_auc, y_val_auc, multi_output=False):
+    cb = [
+        _ValAucCallback(x_val_auc, y_val_auc, multi_output=multi_output),
+        tf.keras.callbacks.EarlyStopping(
+            monitor="val_auc", mode="max", patience=ES_PATIENCE, restore_best_weights=True
+        ),
+    ]
+    return model.fit(callbacks=cb, verbose=2, **fit_args)
+
+
+def _train_family_a(ctx: dict) -> tf.keras.Model:
+    model = build_backbone_1d(
+        input_len=ctx["seq_len"], num_classes=2, embedding_dim=64,
+        conv_filters=(16, 32, 64), conv_kernels=(7, 5, 3), dense_units=64, channels=1,
+    )
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss="sparse_categorical_crossentropy", metrics=["accuracy"],
+    )
+    _fit_keras(
+        model,
+        dict(
+            x=ctx["Xw_it"], y=ctx["y_it"], validation_data=(ctx["Xw_iv"], ctx["y_iv"]),
+            epochs=ctx["epochs"], batch_size=BATCH_SIZE, class_weight=ctx["class_weight"],
+        ),
+        ctx["Xw_iv"], ctx["y_iv"],
+    )
+    return model
+
+
+def _build_mlp(n_features: int) -> tf.keras.Model:
+    inp = tf.keras.Input(shape=(n_features,), name="features")
+    x = tf.keras.layers.Dense(128, activation="relu", name="dense_1")(inp)
+    x = tf.keras.layers.Dropout(0.3, name="dropout_1")(x)
+    x = tf.keras.layers.Dense(64, activation="relu", name="dense_2")(x)
+    out = tf.keras.layers.Dense(2, activation="softmax", name="output")(x)
+    model = tf.keras.Model(inp, out, name="lewis_mlp_v3")
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss="sparse_categorical_crossentropy", metrics=["accuracy"],
+    )
+    return model
+
+
+def _train_family_b(ctx: dict) -> tf.keras.Model:
+    model = _build_mlp(ctx["n_features"])
+    _fit_keras(
+        model,
+        dict(
+            x=ctx["F_it"], y=ctx["y_it"], validation_data=(ctx["F_iv"], ctx["y_iv"]),
+            epochs=ctx["epochs"], batch_size=BATCH_SIZE, class_weight=ctx["class_weight"],
+        ),
+        ctx["F_iv"], ctx["y_iv"],
+    )
+    return model
+
+
+def _train_family_c(ctx: dict) -> tf.keras.Model:
+    model = build_backbone_1d_with_features(
+        input_len=ctx["seq_len"], num_classes=2, num_features=ctx["n_features"],
+        embedding_dim=64, conv_filters=(16, 32, 64), conv_kernels=(7, 5, 3), dense_units=64,
+    )
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss="sparse_categorical_crossentropy", metrics=["accuracy"],
+    )
+    _fit_keras(
+        model,
+        dict(
+            x=[ctx["Xw_it"], ctx["F_it"]], y=ctx["y_it"],
+            validation_data=([ctx["Xw_iv"], ctx["F_iv"]], ctx["y_iv"]),
+            epochs=ctx["epochs"], batch_size=BATCH_SIZE, class_weight=ctx["class_weight"],
+        ),
+        [ctx["Xw_iv"], ctx["F_iv"]], ctx["y_iv"],
+    )
+    return model
+
+
+def _train_family_d_beat(ctx: dict) -> tf.keras.Model:
+    model = build_multitask_beat_model(input_len=ctx["seq_len"], embedding_dim=64)
+    q_it = ctx["q_it"]
+    q_iv = ctx["q_iv"]
+    model.compile(
+        optimizer=tf.keras.optimizers.Adam(learning_rate=LEARNING_RATE),
+        loss={"beat": weighted_sparse_ce(ctx["class_weight"]), "quality": "binary_crossentropy"},
+        loss_weights={"beat": 1.0, "quality": 0.25},
+        metrics={"beat": "accuracy"},
+    )
+    _fit_keras(
+        model,
+        dict(
+            x=ctx["Xw_it"], y={"beat": ctx["y_it"], "quality": q_it},
+            validation_data=(ctx["Xw_iv"], {"beat": ctx["y_iv"], "quality": q_iv}),
+            epochs=ctx["epochs"], batch_size=BATCH_SIZE,
+        ),
+        ctx["Xw_iv"], ctx["y_iv"], multi_output=True,
+    )
+    return model
+
+
+class _EpisodeSequence(tf.keras.utils.Sequence):
+    """Lê episódios do npz via mmap e normaliza por batch (RAM constante)."""
+
+    def __init__(self, X_mmap, y, indices, mean, std, batch_size, shuffle, rng=None):
+        self.X = X_mmap
+        self.y = y
+        self.indices = np.asarray(indices)
+        self.mean = mean
+        self.std = std
+        self.batch_size = batch_size
+        self.shuffle = shuffle
+        self.rng = rng or np.random.default_rng(0)
+        self.on_epoch_end()
+
+    def __len__(self):
+        return int(np.ceil(len(self.indices) / self.batch_size))
+
+    def __getitem__(self, i):
+        batch = self.indices[i * self.batch_size:(i + 1) * self.batch_size]
+        xb = np.asarray(self.X[sorted(batch)], dtype=np.float32)
+        xb = (xb - self.mean) / self.std
+        return xb, self.y[batch]
+
+    def on_epoch_end(self):
+        if self.shuffle:
+            self.rng.shuffle(self.indices)
+
+
+def _train_rhythm(ctx: dict) -> tuple[tf.keras.Model, dict]:
+    """Tarefa de ritmo (D3): episódios AFDB, fold de mesmo índice.
+
+    npz via ``mmap_mode='r'`` + Sequence por batch — sem cópias grandes
+    (OOM observado na campanha com fancy-indexing sobre 1,7 GB).
+    """
+    z = np.load(FEATURE_DIR / "afdb_rhythm_episodes.npz", mmap_mode="r")
+    X = z["X"]  # mmap (n, 5000, 1) float32
+    df = pd.read_parquet(FEATURE_DIR / "afdb_rhythm_episodes.parquet")
+    if len(df) != len(X):
+        raise ValueError(f"afdb episodes parquet/npz mismatch: {len(df)} vs {len(X)}")
+    y_str = df["rhythm"].astype(str).to_numpy()
+    records = df["record_id"].astype(str).to_numpy()
+
+    class_to_int = {c: i for i, c in enumerate(RHYTHM_CLASSES)}
+    keep_idx = np.where(np.isin(y_str, RHYTHM_CLASSES))[0]
+    y_all = np.array([class_to_int[c] for c in y_str], dtype=np.int64)
+
+    manifest = _fold_manifest(ctx["fold"], task="rhythm")
+    val_records = set(manifest["val_patient_ids"])
+    is_val = np.isin(records[keep_idx], list(val_records))
+    idx_pool = keep_idx[~is_val]
+    idx_outer = keep_idx[is_val]
+
+    it_sub, iv_sub = _inner_split(records[idx_pool])
+    idx_it = np.sort(idx_pool[it_sub])
+    idx_iv = np.sort(idx_pool[iv_sub])
+    idx_outer = np.sort(idx_outer)
+    y_it = y_all[idx_it]
+    y_ov = y_all[idx_outer]
+
+    # mean/std do inner-train em streaming (sem materializar cópias)
+    acc_sum = 0.0
+    acc_sq = 0.0
+    acc_n = 0
+    chunk = 4096
+    for start in range(0, len(idx_it), chunk):
+        part = np.asarray(X[idx_it[start:start + chunk]], dtype=np.float32)
+        acc_sum += float(part.sum())
+        acc_sq += float((part.astype(np.float64) ** 2).sum())
+        acc_n += part.size
+    mean = np.float32(acc_sum / acc_n)
+    var = max(acc_sq / acc_n - float(mean) ** 2, 0.0)
+    std = np.float32(np.sqrt(var) + 1e-8)
+
+    model = build_rhythm_model(input_len=int(X.shape[1]))
+    es = tf.keras.callbacks.EarlyStopping(
+        monitor="val_loss", mode="min", patience=8, restore_best_weights=True
+    )
+    rng = np.random.default_rng(ctx.get("seed", 0))
+    model.fit(
+        _EpisodeSequence(X, y_all, idx_it, mean, std, 64, True, rng),
+        validation_data=_EpisodeSequence(X, y_all, idx_iv, mean, std, 64, False),
+        epochs=ctx["epochs"],
+        class_weight=_class_weight(y_it),
+        callbacks=[es],
+        verbose=2,
+    )
+    proba = model.predict(
+        _EpisodeSequence(X, y_all, idx_outer, mean, std, 256, False), verbose=0
+    )
+    y_pred = np.argmax(proba, axis=1)
+    metrics = {
+        "f1_macro": float(f1_score(y_ov, y_pred, labels=list(range(len(RHYTHM_CLASSES))),
+                                   average="macro", zero_division=0.0)),
+        "per_class_f1": {
+            c: float(s) for c, s in zip(
+                RHYTHM_CLASSES,
+                f1_score(y_ov, y_pred, labels=list(range(len(RHYTHM_CLASSES))),
+                         average=None, zero_division=0.0),
+            )
+        },
+        "support": {c: int((y_ov == i).sum()) for i, c in enumerate(RHYTHM_CLASSES)},
+        "n_val_episodes": int(len(y_ov)),
+        "n_val_records": int(len(val_records)),
+    }
+    return model, metrics
+
+
+# ---------------------------------------------------------------------------
+# célula
+# ---------------------------------------------------------------------------
+
+def run_cell(family: str, fold: int, seed: int, epochs: int = EPOCHS) -> dict:
+    _set_seeds(seed)
+    started = time.time()
+    X, y, df = _load_stage1()
+    records = df["record_id"].astype(str).to_numpy()
+    manifest = _fold_manifest(fold)
+    val_records = set(manifest["val_patient_ids"])
+    val_mask = np.isin(records, list(val_records))
+
+    X_tr, y_tr = X[~val_mask], y[~val_mask]
+    X_ov, y_ov = X[val_mask], y[val_mask]
+    rec_tr = records[~val_mask]
+    it_idx, iv_idx = _inner_split(rec_tr)
+
+    F = _features_from_parquet(df)
+    F_tr, F_ov = F[~val_mask], F[val_mask]
+    (Xw_it, Xw_iv, Xw_ov), _ = _scale_waveform(X_tr[it_idx], X_tr[iv_idx], X_ov)
+    (F_it, F_iv, F_ov), _ = _scale_features(F_tr[it_idx], F_tr[iv_idx], F_ov)
+
+    ctx = {
+        "fold": fold, "seed": seed, "epochs": epochs,
+        "seq_len": X.shape[1], "n_features": len(FEATURE_COLS),
+        "Xw_it": Xw_it, "Xw_iv": Xw_iv, "Xw_ov": Xw_ov,
+        "F_it": F_it, "F_iv": F_iv, "F_ov": F_ov,
+        "y_it": y_tr[it_idx], "y_iv": y_tr[iv_idx], "y_ov": y_ov,
+        "class_weight": _class_weight(y_tr[it_idx]),
+        "q_it": df.loc[~val_mask, QUALITY_HEAD_NAMES].to_numpy(dtype=np.float32)[it_idx],
+        "q_iv": df.loc[~val_mask, QUALITY_HEAD_NAMES].to_numpy(dtype=np.float32)[iv_idx],
+    }
+
+    if family == "a":
+        model = _train_family_a(ctx)
+        scores_iv = model.predict(ctx["Xw_iv"], batch_size=1024, verbose=0)[:, 1]
+        scores_ov = model.predict(ctx["Xw_ov"], batch_size=1024, verbose=0)[:, 1]
+    elif family == "b":
+        model = _train_family_b(ctx)
+        scores_iv = model.predict(ctx["F_iv"], batch_size=1024, verbose=0)[:, 1]
+        scores_ov = model.predict(ctx["F_ov"], batch_size=1024, verbose=0)[:, 1]
+    elif family == "c":
+        model = _train_family_c(ctx)
+        scores_iv = model.predict([ctx["Xw_iv"], ctx["F_iv"]], batch_size=1024, verbose=0)[:, 1]
+        scores_ov = model.predict([ctx["Xw_ov"], ctx["F_ov"]], batch_size=1024, verbose=0)[:, 1]
+    elif family == "d":
+        model = _train_family_d_beat(ctx)
+        scores_iv = model.predict(ctx["Xw_iv"], batch_size=1024, verbose=0)[0][:, 1]
+        scores_ov = model.predict(ctx["Xw_ov"], batch_size=1024, verbose=0)[0][:, 1]
+    else:
+        raise ValueError(f"família desconhecida: {family}")
+
+    threshold = _tune_threshold(ctx["y_iv"], scores_iv)
+    result = {
+        "cell_id": f"{family}_f{fold}_s{seed}",
+        "family": family, "fold": fold, "seed": seed,
+        "created_utc": datetime.now(timezone.utc).isoformat(),
+        "data_hash": manifest["data_hash"],
+        "ontology_hash": manifest["ontology_hash"],
+        "preprocessing_hash": manifest["preprocessing_hash"],
+        "fold_manifest_sha256": manifest["sha256"],
+        "n_train_inner": int(len(ctx["y_it"])),
+        "n_val_inner": int(len(ctx["y_iv"])),
+        "n_val_outer": int(len(y_ov)),
+        "n_val_patients": int(len(val_records)),
+        "threshold_from_inner_val": threshold,
+        "metrics_outer": _beat_metrics(y_ov, scores_ov, threshold),
+        "metrics_inner_val_auc": float(roc_auc_score(ctx["y_iv"], scores_iv)),
+        "class_weight": ctx["class_weight"],
+        "runtime_sec": round(time.time() - started, 1),
+    }
+
+    if family == "d":
+        # libera arrays/modelo do beat antes da tarefa de ritmo (RAM: OOM
+        # observado na célula d — episódios 10 s ocupam ~1,7 GB)
+        del model, ctx
+        tf.keras.backend.clear_session()
+        _set_seeds(seed)
+        _, rhythm_metrics = _train_rhythm({"fold": fold, "epochs": epochs})
+        result["rhythm_outer"] = rhythm_metrics
+        result["runtime_sec"] = round(time.time() - started, 1)
+
+    CELLS_DIR.mkdir(parents=True, exist_ok=True)
+    cell_path = CELLS_DIR / f"{result['cell_id']}.json"
+    result["sha256"] = _sha256_text(json.dumps(result, sort_keys=True, default=str))
+    cell_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+    LOGGER.info(
+        "CELL %s | AUC=%.4f F1m=%.4f recall=%.4f thr=%.3f | %.0fs",
+        result["cell_id"], result["metrics_outer"]["roc_auc"],
+        result["metrics_outer"]["f1_macro"], result["metrics_outer"]["recall_anormal"],
+        threshold, result["runtime_sec"],
+    )
+    return result
+
+
+# ---------------------------------------------------------------------------
+# campanha com resume
+# ---------------------------------------------------------------------------
+
+def _load_ledger() -> dict:
+    if LEDGER_PATH.exists():
+        return json.loads(LEDGER_PATH.read_text(encoding="utf-8"))
+    return {}
+
+
+def _save_ledger(ledger: dict) -> None:
+    OUT_DIR.mkdir(parents=True, exist_ok=True)
+    LEDGER_PATH.write_text(json.dumps(ledger, indent=2), encoding="utf-8")
+
+
+def campaign(epochs: int = EPOCHS, only_family: str | None = None) -> None:
+    """Executa as 100 células, cada uma em **processo separado**.
+
+    OOM observado com células em processo único: o TensorFlow retém blocos de
+    memória host entre sessões mesmo após ``clear_session``. Isolar cada
+    célula em um subprocesso devolve toda a RAM ao SO ao fim da célula.
+    """
+    import subprocess
+
+    ledger = _load_ledger()
+    families = [only_family] if only_family else FAMILIES
+    total = len(families) * len(FOLDS) * len(SEEDS)
+    done = 0
+    for family in families:
+        for fold in FOLDS:
+            for seed in SEEDS:
+                cell_id = f"{family}_f{fold}_s{seed}"
+                data_hash = _fold_manifest(fold)["data_hash"]
+                entry = ledger.get(cell_id)
+                if entry and entry.get("status") == "DONE" and entry.get("data_hash") == data_hash:
+                    done += 1
+                    LOGGER.info("SKIP %s (DONE)", cell_id)
+                    continue
+                LOGGER.info("=== CELL %s (%d/%d) ===", cell_id, done + 1, total)
+                cmd = [
+                    sys.executable,
+                    str(Path(__file__).resolve()),
+                    "--family", family,
+                    "--fold", str(fold),
+                    "--seed", str(seed),
+                ]
+                if epochs != EPOCHS:
+                    cmd.append("--smoke")
+                proc = subprocess.run(cmd, check=False)
+                if proc.returncode != 0:
+                    LOGGER.error(
+                        "CELL %s FALHOU (exit=%d) — campanha interrompida; "
+                        "corrija e retome (resume por ledger)",
+                        cell_id, proc.returncode,
+                    )
+                    raise RuntimeError(f"célula {cell_id} falhou com exit={proc.returncode}")
+                result = json.loads((CELLS_DIR / f"{cell_id}.json").read_text(encoding="utf-8"))
+                ledger[cell_id] = {
+                    "status": "DONE",
+                    "data_hash": result["data_hash"],
+                    "sha256": result["sha256"],
+                    "path": str((CELLS_DIR / f"{cell_id}.json").relative_to(PROJECT_ROOT)),
+                    "roc_auc": result["metrics_outer"]["roc_auc"],
+                    "completed_utc": result["created_utc"],
+                }
+                _save_ledger(ledger)
+                done += 1
+                LOGGER.info(
+                    "LEDGER %s | AUC=%.4f (%d/%d)",
+                    cell_id, result["metrics_outer"]["roc_auc"], done, total,
+                )
+    LOGGER.info("Campanha concluída: %d/%d células", done, total)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Matriz v3 — 4 famílias × 5 folds × 5 seeds")
+    parser.add_argument("--family", choices=FAMILIES)
+    parser.add_argument("--fold", type=int, choices=FOLDS)
+    parser.add_argument("--seed", type=int, choices=SEEDS)
+    parser.add_argument("--campaign", action="store_true")
+    parser.add_argument("--smoke", action="store_true", help="2 épocas, validação do runner")
+    args = parser.parse_args()
+
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+    )
+    epochs = 2 if args.smoke else EPOCHS
+
+    if args.campaign:
+        campaign(epochs=epochs, only_family=args.family)
+        return 0
+
+    if args.family is None or args.fold is None or args.seed is None:
+        parser.error("modo célula única exige --family, --fold e --seed")
+    result = run_cell(args.family, args.fold, args.seed, epochs=epochs)
+    print(json.dumps(result["metrics_outer"], indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

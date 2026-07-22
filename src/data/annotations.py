@@ -7,32 +7,15 @@ from typing import Tuple
 import numpy as np
 import wfdb
 
+from src.features.ontology_v3 import BEAT_MAP_V3, CANONICAL_TO_LEGACY
+
 logger = logging.getLogger(__name__)
 
-# AAMI EC57 mapping for the five heartbeat classes.
-# Symbols not listed here are mapped to 'Q' (unknown / unclassifiable)
-# or ignored if they are non-beat markers.
+# AAMI EC57 mapping for the five heartbeat classes (visão legada).
+# Fonte única: src/features/ontology_v3.py (v3.0.0). Símbolos não listados
+# (incluindo '|', '~', '+', 'x' e desconhecidos) são excluídos — nunca → Q.
 AAMI_BEAT_MAP = {
-    # Normal
-    "N": "N",
-    "L": "N",
-    "R": "N",
-    "e": "N",
-    "j": "N",
-    # Supraventricular ectopic
-    "A": "S",
-    "a": "S",
-    "J": "S",
-    "S": "S",
-    # Ventricular ectopic
-    "V": "V",
-    "E": "V",
-    # Fusion
-    "F": "F",
-    # Unknown / unclassifiable (paced, etc.)
-    "/": "Q",
-    "f": "Q",
-    "Q": "Q",
+    sym: CANONICAL_TO_LEGACY[canonical] for sym, (canonical, _, _) in BEAT_MAP_V3.items()
 }
 
 # Symbols that are explicitly beat annotations. Anything else (e.g. rhythm

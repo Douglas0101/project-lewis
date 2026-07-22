@@ -1,0 +1,47 @@
+schema_version: patient-identity-policy-v3.1.0
+datasets:
+  - dataset_id: incart
+    role: CONFIRMATORY_CORE
+    method: INCART_HEADER_PATIENT
+    raw_dir: data/raw_incart
+    expected_records: 75
+    expected_patients: 32
+    same_patient_record_groups: []
+    evidence_ref: >-
+      Local WFDB headers contain exactly one patient number in 1..32;
+      PhysioNet incartdb/1.0.0 states records sharing that number come
+      from the same Holter.
+  - dataset_id: mitdb
+    role: CONFIRMATORY_CORE
+    method: MITDB_DOCUMENTED_SUBJECT
+    raw_dir: data/raw_mitbih
+    expected_records: 48
+    expected_patients: 47
+    same_patient_record_groups:
+      - ["201", "202"]
+    evidence_ref: >-
+      PhysioNet mitdb/1.0.0 records directory states record 202 came
+      from the same analog tape as record 201; the database contains
+      48 records from 47 subjects.
+  - dataset_id: svdb
+    role: DOMAIN_SENSITIVITY
+    method: UNRESOLVED
+    raw_dir: data/raw_svdb
+    expected_records: 78
+    expected_patients: null
+    same_patient_record_groups: []
+    evidence_ref: >-
+      Local headers and the official PhysioNet SVDB overview do not
+      provide a record-to-patient mapping; records remain quarantined
+      from confirmatory patient-wise training.
+  - dataset_id: afdb
+    role: RHYTHM_EXPLORATORY
+    method: UNRESOLVED
+    raw_dir: data/raw_afdb
+    expected_records: 23
+    expected_patients: null
+    same_patient_record_groups: []
+    evidence_ref: >-
+      The 23 complete local AFDB records have no authenticated
+      record-to-patient mapping in the current project manifests;
+      rhythm evaluation remains exploratory.
