@@ -16,8 +16,7 @@ INPUT_BYTES = INPUT_SAMPLES * 4
 START_BYTE = 0x3C  # '<'
 END_BYTE = 0x3E  # '>'
 RESPONSE_LEN = 3
-START_DELAY_S = 0.1   # tempo para o firmware entrar em infer_from_uart
-BYTE_DELAY_S = 0.02   # evita overflow do buffer FIFO da UART emulada
+START_DELAY_S = 0.005  # cede CPU sem consumir o timeout virtual por byte
 
 
 class FidelityKeywords:
@@ -50,9 +49,11 @@ class FidelityKeywords:
         self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {START_BYTE}")
         time.sleep(START_DELAY_S)
 
+        # Execute Command e sincronizado pelo monitor do Renode. Sleeps reais
+        # entre bytes deixam o tempo virtual avancar sem dados e tornam o gate
+        # dependente da carga do runner, podendo disparar UART_BYTE_TIMEOUT_MS.
         for byte in data:
             self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {byte}")
-            time.sleep(BYTE_DELAY_S)
 
         # Fim de frame
         self._builtin.run_keyword("Execute Command", f"sysbus.uart4 WriteChar {END_BYTE}")
@@ -78,6 +79,5 @@ class FidelityKeywords:
                         return
             time.sleep(0.05)
         raise RuntimeError(
-            f"Resposta '<{RESPONSE_LEN}xint8>' nao encontrada em {log_path} "
-            f"apos {timeout}s"
+            f"Resposta '<{RESPONSE_LEN}xint8>' nao encontrada em {log_path} " f"apos {timeout}s"
         )
