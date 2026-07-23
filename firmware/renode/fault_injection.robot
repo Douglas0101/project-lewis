@@ -1,28 +1,14 @@
 *** Settings ***
 Library    OperatingSystem
+Library    ${CURDIR}/FidelityKeywords.py
 
 *** Variables ***
 ${RESC}              ${CURDIR}/stm32f4_discovery.resc
 ${DUMMY_SPI}         ${CURDIR}/dummy_spi_device.py
 ${UART_LOG}          /tmp/renode_lewis_uart.log
 ${TIMEOUT}           30
-${NEWLINE}           10
-${UART_CHAR_DELAY}   0.01
 
 *** Keywords ***
-Send Invalid UART Frame
-    # Envia '<' + 0x00 0xFF + '>'. O firmware espera 500 floats (2000 bytes),
-    # portanto a leitura expira e reporta ERRO de timeout/framing.
-    Execute Command    sysbus.uart4 WriteChar 60
-    Sleep    ${UART_CHAR_DELAY}
-    Execute Command    sysbus.uart4 WriteChar 0
-    Sleep    ${UART_CHAR_DELAY}
-    Execute Command    sysbus.uart4 WriteChar 255
-    Sleep    ${UART_CHAR_DELAY}
-    Execute Command    sysbus.uart4 WriteChar 62
-    Sleep    ${UART_CHAR_DELAY}
-    Execute Command    sysbus.uart4 WriteChar ${NEWLINE}
-
 Try Attach Dummy SPI Peripheral
     # Fallback documentado: Renode 1.15.3 pode nao suportar anexao direta de
     # perifericos SPI a partir de testes Robot. Por isso tentamos varias
@@ -43,5 +29,9 @@ Fault Injection Via Dummy SPI Device
     Create Log Tester    0
     Wait For Log Entry    Modo comando UART ativo    timeout=${TIMEOUT}
     Try Attach Dummy SPI Peripheral
-    Send Invalid UART Frame
-    Wait For Log Entry    ERRO    timeout=${TIMEOUT}
+    # Frame completo (2000 bytes) com terminador invalido: o firmware consome
+    # o payload, rejeita o terminador e reporta '[infer] FRAME ERR' de forma
+    # imediata e deterministica, sem depender de timeout por byte (que seria
+    # sensiveis a stalls do host no runner de CI).
+    Send Corrupted Frame
+    Wait For Log Entry    FRAME ERR    timeout=${TIMEOUT}

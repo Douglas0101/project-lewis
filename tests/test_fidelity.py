@@ -142,12 +142,14 @@ def _run_robot_for_beat(idx: int) -> bytes:
         ]
 
         try:
+            # Margem para absorver stalls do host durante o envio dos 2002
+            # bytes (o firmware tolera ate 30 s virtuais entre bytes).
             result = subprocess.run(
                 cmd,
                 cwd=PROJECT_ROOT,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
-                timeout=300,
+                timeout=600,
                 env=env,
             )
         except subprocess.TimeoutExpired as exc:
