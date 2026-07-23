@@ -30,11 +30,13 @@ def _load_report():
         raise AssertionError(f"Falha ao carregar relatorio QG5: {exc}") from exc
 
 
+@pytest.mark.requires_artifacts
 def test_qg5_report_exists():
     assert (E04_DIR / "qg5_v2.4_report.json").exists()
     assert (E04_DIR / "qg5_v2.4_report.md").exists()
 
 
+@pytest.mark.requires_artifacts
 def test_smoke_balanced_is_diagnostic_only():
     report = _load_report()
     smoke = next(g for g in report["gates"] if g["name"] == "QG5_SMOKE_BALANCED")
@@ -42,6 +44,7 @@ def test_smoke_balanced_is_diagnostic_only():
     assert smoke["passed"]
 
 
+@pytest.mark.requires_artifacts
 def test_patientwise_fails_honestly():
     """QG5_PATIENTWISE deve falhar porque F1(F) inter-paciente < 0.50."""
     report = _load_report()
@@ -53,6 +56,7 @@ def test_patientwise_fails_honestly():
     assert mean_f < 0.50, f"mean F1(F)={mean_f:.4f} nao esta abaixo de 0.50"
 
 
+@pytest.mark.requires_artifacts
 def test_publication_status_is_research_candidate():
     report = _load_report()
     assert report["status"] == "RESEARCH_CANDIDATE_NOT_PUBLICATION_READY"
@@ -114,6 +118,7 @@ def test_smoke_balanced_on_dummy():
     assert result.diagnostic_only
 
 
+@pytest.mark.requires_artifacts
 def test_patientwise_gate_returns_aggregated_metrics():
     npz = np.load(PROJECT_ROOT / "data" / "features" / "stage2_multiclass_features.npz")
     X, y, groups = npz["X"], npz["y"], npz["groups"]

@@ -65,6 +65,7 @@ def _read_json(path: Path) -> dict[str, Any]:
     return value
 
 
+@pytest.mark.requires_artifacts
 def test_helper_selects_standalone_keras_safe_mode() -> None:
     """A keras.src artifact must never route to the tf_keras loader."""
     decision = inspect_loader_selection(MODEL_PATH, compile=False)
@@ -96,6 +97,7 @@ def test_legacy_metadata_remains_recognizable(tmp_path: Path) -> None:
     assert decision.model_sha256 == hashlib.sha256(archive.read_bytes()).hexdigest()
 
 
+@pytest.mark.requires_artifacts
 def test_shared_fixture_is_hashed_and_policy_complete(lane_evidence: Path) -> None:
     """The shared batch must cover every deterministic selection role."""
     manifest = _read_json(lane_evidence / "loader_fixture_manifest.json")
@@ -121,6 +123,7 @@ def test_shared_fixture_is_hashed_and_policy_complete(lane_evidence: Path) -> No
     } <= roles
 
 
+@pytest.mark.requires_artifacts
 def test_lane_structures_weights_and_predictions_are_equivalent(lane_evidence: Path) -> None:
     """Independent loaders must produce identical numerical evidence."""
     reference = _read_json(lane_evidence / "reference_loader_result.json")
@@ -149,6 +152,7 @@ def test_lane_structures_weights_and_predictions_are_equivalent(lane_evidence: P
     assert all(row["array_equal"] == "True" for row in rows)
 
 
+@pytest.mark.requires_artifacts
 def test_compile_true_preserves_reference_predictions(lane_evidence: Path) -> None:
     """Restoring Adam and loss must not change inference outputs."""
     comparison = _read_json(lane_evidence / "prediction_comparison.json")

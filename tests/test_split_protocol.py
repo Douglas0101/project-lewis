@@ -23,6 +23,7 @@ def _load_distribution():
     return pd.read_csv(dist_path / "patient_class_distribution.csv")
 
 
+@pytest.mark.requires_artifacts
 def test_groupkfold_no_overlap():
     npz = np.load(PROJECT_ROOT / "data" / "features" / "stage2_multiclass_features.npz")
     X, y, groups = npz["X"], npz["y"], npz["groups"]
@@ -33,6 +34,7 @@ def test_groupkfold_no_overlap():
         assert train_groups.isdisjoint(test_groups)
 
 
+@pytest.mark.requires_artifacts
 def test_stratified_groupkfold_no_overlap():
     npz = np.load(PROJECT_ROOT / "data" / "features" / "stage2_multiclass_features.npz")
     X, y, groups = npz["X"], npz["y"], npz["groups"]

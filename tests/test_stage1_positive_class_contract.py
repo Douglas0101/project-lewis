@@ -6,6 +6,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+import pytest
 
 from scripts.prepare_two_stage_datasets import _prepare_stage1
 from src.models.keras_artifact_inspector import inspect_keras_archive
@@ -70,6 +71,7 @@ def _identity_and_split() -> tuple[PatientIdentityManifest, PatientSplitManifest
     return identity, split
 
 
+@pytest.mark.requires_artifacts
 def test_stage1_integer_target_and_output_index_contract(tmp_path: Path) -> None:
     """N maps to 0 and every non-N AAMI source class maps to positive index 1."""
     source_labels = np.array([0, 1, 2, 3, 4], dtype=np.int64)

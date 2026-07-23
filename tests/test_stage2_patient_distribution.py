@@ -9,6 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
+pytestmark = pytest.mark.requires_artifacts
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RESEARCH_DIR = PROJECT_ROOT / "experiments" / "stage2_v2.4_research"
 E01_DIR = RESEARCH_DIR / "E01_patient_distribution"

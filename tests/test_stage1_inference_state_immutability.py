@@ -10,6 +10,8 @@ import pytest
 
 from src.models.keras_loader import load_keras_model
 
+pytestmark = pytest.mark.requires_artifacts
+
 PROJECT_ROOT = __import__("pathlib").Path(__file__).resolve().parents[1]
 MODEL_PATH = PROJECT_ROOT / "models" / "stage1_float32_v2.0.keras"
 FIXTURE_PATH = (

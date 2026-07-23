@@ -108,6 +108,7 @@ def test_dataset_hash_mismatch_fails():
         load_and_validate_manifest(tmp / "m.json", expected_hash, "xyz789", "model")
 
 
+@pytest.mark.requires_artifacts
 def test_pipeline_v2_3_loads_without_manifest():
     """Pipeline v2.3 continua carregando sem manifest quando strict=False."""
     from src.inference.two_stage_mlp_pipeline import TwoStageMLPPipeline
@@ -118,6 +119,7 @@ def test_pipeline_v2_3_loads_without_manifest():
     assert pipeline.stage2_model is not None
 
 
+@pytest.mark.requires_artifacts
 def test_pipeline_strict_manifest_rejects_missing_manifest():
     """strict=True rejeita modelos v2.3 sem manifest."""
     from src.inference.manifest_validator import ManifestValidationError
@@ -128,6 +130,7 @@ def test_pipeline_strict_manifest_rejects_missing_manifest():
         pipeline.load()
 
 
+@pytest.mark.requires_artifacts
 def test_pipeline_rejects_incompatible_manifest(tmp_path: Path) -> None:
     """Pipeline rejeita manifest com feature schema incompatível."""
     from src.inference.manifest_validator import ManifestValidationError
@@ -177,6 +180,7 @@ def test_pipeline_rejects_incompatible_manifest(tmp_path: Path) -> None:
         pipeline.load()
 
 
+@pytest.mark.requires_artifacts
 def test_pipeline_accepts_compatible_manifest(tmp_path: Path) -> None:
     """Pipeline carrega modelo quando manifest é compatível."""
     from src.inference.manifest_validator import compute_feature_schema_hash

@@ -161,6 +161,7 @@ markers = [
     "slow: Testes lentos (CI condicional)",
     "mlp: Testes do pipeline two-stage baseado em features MLP",
     "integration: Testes de integracao que dependem de build externo",
+    "requires_artifacts: Testes que exigem datasets, modelos ou evidencias fora do Git",
     "stress: Testes de stress com carga maliciosa ou volume extremo",
     "security: Testes de seguranca (SQLi, XSS, injecao)",
     "eval: Testes que precisam de dependências do grupo eval",

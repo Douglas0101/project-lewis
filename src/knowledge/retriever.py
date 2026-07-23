@@ -138,7 +138,7 @@ class _VectorIndexerAdapter:
         query_emb = self.model.encode([query], normalize_embeddings=True, show_progress_bar=False)[
             0
         ]
-        conn = get_connection()
+        conn = get_connection(KNOWLEDGE_DB)
         try:
             rows = conn.execute(
                 """
@@ -155,7 +155,7 @@ class _VectorIndexerAdapter:
             conn.close()
 
     def get_doc(self, doc_id: str) -> Dict[str, Any]:
-        conn = get_connection()
+        conn = get_connection(KNOWLEDGE_DB)
         try:
             row = conn.execute(
                 "SELECT * FROM knowledge_chunks WHERE chunk_id = ?", (doc_id,)

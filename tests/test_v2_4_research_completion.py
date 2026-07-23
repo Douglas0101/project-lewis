@@ -27,6 +27,7 @@ def test_research_report_exists():
     assert (PROJECT_ROOT / "docs" / "stage2_v2.4_research_report.md").exists()
 
 
+@pytest.mark.requires_artifacts
 def test_all_canonical_manifests_exist():
     for stage, directory_name in CANONICAL_STAGE_DIRS.items():
         stage_dir = RESEARCH_DIR / directory_name
@@ -34,6 +35,7 @@ def test_all_canonical_manifests_exist():
         assert (stage_dir / f"{stage}_manifest.json").is_file(), f"Manifesto {stage} ausente"
 
 
+@pytest.mark.requires_artifacts
 @pytest.mark.parametrize("directory_name", E06_NON_COMPLETION_DIRS)
 def test_reopened_e06_paths_are_not_historical_completion(directory_name: str):
     stage_dir = RESEARCH_DIR / directory_name
@@ -50,6 +52,7 @@ def test_no_v2_4_artifacts_in_models():
             pytest.fail(f"Artefato v2.4 encontrado em models/: {path}")
 
 
+@pytest.mark.requires_artifacts
 def test_v2_3_artifacts_preserved():
     assert (MODELS_DIR / "stage1_float32_v2.3.keras").exists()
     assert (MODELS_DIR / "stage2_float32_v2.3.keras").exists()

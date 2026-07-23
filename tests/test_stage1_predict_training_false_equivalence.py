@@ -12,6 +12,8 @@ from typing import Any
 import numpy as np
 import pytest
 
+pytestmark = pytest.mark.requires_artifacts
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = PROJECT_ROOT / "models" / "stage1_float32_v2.0.keras"
 FIXTURE_PATH = (

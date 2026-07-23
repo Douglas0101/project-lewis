@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.requires_artifacts
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 E07_DIR = PROJECT_ROOT / "experiments" / "stage2_v2.4_research" / "E07_label_audit"
 

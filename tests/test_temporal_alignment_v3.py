@@ -43,6 +43,7 @@ def _corr(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.corrcoef(a, b)[0, 1])
 
 
+@pytest.mark.requires_artifacts
 @pytest.mark.parametrize("rec,ds,raw_path,npy_path,fs_nat", CASES)
 def test_annotation_indices_rescaled_to_target_fs(rec, ds, raw_path, npy_path, fs_nat):
     if not (PROJECT_ROOT / npy_path).exists():
@@ -56,6 +57,7 @@ def test_annotation_indices_rescaled_to_target_fs(rec, ds, raw_path, npy_path, f
     ), f"{ds}/{rec}: índices não correspondem a round(s*500/{fs_nat}) (DQ-01)"
 
 
+@pytest.mark.requires_artifacts
 @pytest.mark.parametrize("rec,ds,raw_path,npy_path,fs_nat", CASES)
 def test_windows_align_with_rescaled_positions(rec, ds, raw_path, npy_path, fs_nat):
     """G-T3: janela do caminho produtivo ≈ sinal na posição reescalonada (≥0,99)."""
@@ -92,6 +94,7 @@ def test_windows_align_with_rescaled_positions(rec, ds, raw_path, npy_path, fs_n
     assert checked >= 20, f"{ds}/{rec}: amostra insuficiente para o gate ({checked})"
 
 
+@pytest.mark.requires_artifacts
 @pytest.mark.parametrize("rec,ds,raw_path,npy_path,fs_nat", CASES)
 def test_rr_dual_clock_matches(rec, ds, raw_path, npy_path, fs_nat):
     """G-T5: RR no relógio nativo (ms) == RR no relógio 500 Hz (ms), ±tol."""
@@ -106,6 +109,7 @@ def test_rr_dual_clock_matches(rec, ds, raw_path, npy_path, fs_nat):
     ), f"{ds}/{rec}: RR dual-clock diverge {delta.max():.3f} ms (tol {tol_ms:.3f})"
 
 
+@pytest.mark.requires_artifacts
 @pytest.mark.parametrize("rec,ds,raw_path,npy_path,fs_nat", CASES)
 def test_roundtrip_sample_time_sample(rec, ds, raw_path, npy_path, fs_nat):
     """G-T7: s → t → s' dentro da tolerância declarada por dataset."""
@@ -116,6 +120,7 @@ def test_roundtrip_sample_time_sample(rec, ds, raw_path, npy_path, fs_nat):
     assert int(np.abs(s_back - native).max()) <= tol
 
 
+@pytest.mark.requires_artifacts
 def test_temporal_error_bound_per_index():
     """G-T2: |t_i/f_t − τ_i| ≤ 0,5/f_t + ε para todo índice."""
     for rec, ds, raw_path, npy_path, fs_nat in CASES:
