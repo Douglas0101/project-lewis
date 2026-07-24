@@ -1,0 +1,12 @@
+$ uv run python scripts/stage1_inference_mode_instance.py --model-path models/stage1_float32_v2.0.keras --fixture artifacts/stage1_recall_investigation/R03/loader_fixture.npz --mode predict --output artifacts/stage1_recall_investigation/R04/predict_reproducibility.json
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783912168.892119 1733612 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783912168.892424 1733612 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1783912169.049597 1733612 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783912171.300634 1733612 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783912171.301124 1733612 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+E0000 00:00:1783912173.388146 1733612 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+
+[exit_code=0]

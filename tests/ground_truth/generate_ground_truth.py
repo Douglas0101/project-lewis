@@ -20,7 +20,6 @@ de referencia gerada pelo interpretador Python.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
@@ -32,25 +31,27 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.quantization.firmware_params import (  # noqa: E402
+    TensorQuantizationParams,
+    load_firmware_quantization_params,
+)
 from tests.fixtures.adc_stub import adc_stub_get_beat  # noqa: E402
 from tests.fixtures.dsp_filters import filter_chain  # noqa: E402
 from tests.fixtures.normalizer import zscore_normalize  # noqa: E402
 
 
-def _load_quant_params():
-    """Carrega parametros de quantizacao do modelo a partir do JSON exportado."""
-    path = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Parametros de quantizacao nao encontrados: {path}")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data["input"], data["output"]
+def _load_quant_params() -> tuple[TensorQuantizationParams, TensorQuantizationParams]:
+    """Carrega os parâmetros compilados no firmware."""
+    path = PROJECT_ROOT / "firmware" / "src" / "ml" / "quantization_params.h"
+    params = load_firmware_quantization_params(path)
+    return params.input, params.output
 
 
 INPUT_QUANT, OUTPUT_QUANT = _load_quant_params()
-INPUT_SCALE = INPUT_QUANT["scale"]
-INPUT_ZERO_POINT = INPUT_QUANT["zero_point"]
-OUTPUT_SCALE = OUTPUT_QUANT["scale"]
-OUTPUT_ZERO_POINT = OUTPUT_QUANT["zero_point"]
+INPUT_SCALE = INPUT_QUANT.scale
+INPUT_ZERO_POINT = INPUT_QUANT.zero_point
+OUTPUT_SCALE = OUTPUT_QUANT.scale
+OUTPUT_ZERO_POINT = OUTPUT_QUANT.zero_point
 
 STAGE1_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage1_int8_v2.0.tflite"
 STAGE2_TFLITE = PROJECT_ROOT / "models" / "quantized" / "stage2_int8_v2.0.tflite"
@@ -98,7 +99,10 @@ def load_python_interpreter(model_path: Path) -> tf.lite.Interpreter:
 
 def argmax_int8(values: np.ndarray) -> int:
     """Argmax compativel com a implementacao C."""
-    return int(np.argmax(values))
+    try:
+        return int(np.argmax(values))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("Invalid INT8 logits for argmax") from exc
 
 
 def generate_ground_truth(num_beats: int = 5) -> None:

@@ -1,0 +1,6 @@
+{
+  "patient_identity_hash": "fbc1ea0d7c7f8b1dc11fb528c86c8d7f6a590db7be5beeaaebaf906ec6644289",
+  "patient_split_hash": "3a15bf1e591f32e29010796d3c3a282795f4ba384da3d29ccce5c5630e9156e3",
+  "schema_version": "patient-split-publication-v3.1.0",
+  "status": "SPLIT_BUNDLE_COMPLETE"
+}

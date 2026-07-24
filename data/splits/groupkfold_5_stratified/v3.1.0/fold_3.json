@@ -1,0 +1,60 @@
+{
+  "class_counts": {
+    "F": 89,
+    "N": 50180,
+    "Q": 2078,
+    "S": 1168,
+    "V": 5096
+  },
+  "dataset_counts": {
+    "incart": 40995,
+    "mitdb": 17616
+  },
+  "fold": 3,
+  "n_samples": 58611,
+  "outer_test_patient_ids": [
+    "incart:patient:1",
+    "incart:patient:11",
+    "incart:patient:13",
+    "incart:patient:15",
+    "incart:patient:2",
+    "incart:patient:4",
+    "incart:patient:5",
+    "incart:patient:9",
+    "mitdb:subject:106",
+    "mitdb:subject:107",
+    "mitdb:subject:109",
+    "mitdb:subject:114",
+    "mitdb:subject:116",
+    "mitdb:subject:219",
+    "mitdb:subject:221",
+    "mitdb:subject:228"
+  ],
+  "outer_test_record_keys": [
+    "incart/I01",
+    "incart/I02",
+    "incart/I03",
+    "incart/I04",
+    "incart/I05",
+    "incart/I08",
+    "incart/I09",
+    "incart/I10",
+    "incart/I11",
+    "incart/I18",
+    "incart/I19",
+    "incart/I23",
+    "incart/I24",
+    "incart/I27",
+    "incart/I28",
+    "incart/I33",
+    "incart/I34",
+    "mitdb/106",
+    "mitdb/107",
+    "mitdb/109",
+    "mitdb/114",
+    "mitdb/116",
+    "mitdb/219",
+    "mitdb/221",
+    "mitdb/228"
+  ]
+}

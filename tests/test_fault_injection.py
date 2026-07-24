@@ -1,14 +1,22 @@
 """Quality Gate QG11 — Injecao de falha via periferico SPI dummy no Renode.
 
-Verifica que o firmware reporta erro quando recebe um frame UART invalido
-apos carregar um periferico SPI dummy.
+Verifica que o firmware reporta erro (mensagem ``FRAME ERR``) quando recebe
+um frame UART completo (2000 bytes) com terminador invalido, apos tentar
+carregar um periferico SPI dummy.
+
+O teste usa frame completo com terminador corrompido em vez de um frame
+curto que depende de timeout por byte: o firmware rejeita o terminador
+imediatamente, tornando o gate deterministico e imune a stalls do host em
+runners compartilhados (o timeout virtual por byte ja causou falhas
+intermitentes desse gate no CI).
 
 Nota sobre fallback:
   Renode 1.15.3 pode nao suportar anexao direta de perifericos SPI a partir
 de testes Robot (os comandos ``machine LoadPeripheralFromFile``,
 ``machine LoadPeripheral`` e injecao via Python costumam falhar nessa
 versao). Quando isso ocorre, o teste prossegue injetando corrupcao de dados
-pela UART e valida o tratamento graceful de erros (mensagem ``ERRO`` no log).
+pela UART e valida o tratamento graceful de erros (mensagem ``FRAME ERR``
+no log).
 """
 
 from __future__ import annotations
@@ -98,13 +106,14 @@ def test_fault_injection_dummy_spi() -> None:
     ]
 
     # Executa a partir de firmware/ para manter a convencao de CWD dos
-    # scripts .resc (os caminhos do binario sao absolutos).
+    # scripts .resc (os caminhos do binario sao absolutos). O timeout cobre
+    # o envio dos 2002 bytes via WriteChar em runners lentos (~20x).
     result = subprocess.run(
         cmd,
         cwd=FIRMWARE_ROOT,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
-        timeout=300,
+        timeout=600,
         env=env,
     )
 

@@ -13,6 +13,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import joblib
 import numpy as np
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
 from .evaluate import evaluate_aami
 
@@ -38,7 +39,7 @@ def load_stage_model(model_path: Path, scaler_path: Path) -> Tuple[tf.keras.Mode
     tuple
         (modelo, scaler)
     """
-    model = tf.keras.models.load_model(str(model_path), compile=False)
+    model = load_keras_model(str(model_path), compile=False)
     scaler = joblib.load(scaler_path)
     return model, scaler
 

@@ -1,0 +1,23 @@
+{
+  "artifact_sha256": {
+    "data/features/v3.1.0-r3/afdb_rhythm_episodes.npz": "2b4d16bbf9fe9e9894703a24b88cf5e48c6309d570c846a93b354b87efa5cf57",
+    "data/features/v3.1.0-r3/afdb_rhythm_episodes.parquet": "c7676252b519aad487a95cc84829b1c8a9c00f2c809d3756944e025d8da8e791",
+    "data/features/v3.1.0-r3/finetuning_mitbih_family.manifest.json": "5b1b40ced387a73b791c8019a0ed3082115c051627f0b109d4855f2d2614e18c",
+    "data/features/v3.1.0-r3/finetuning_mitbih_family.npz": "5113e5a97463ca179bcab8fa7bbb60c813d94bd4924edbefdcb764e121f2b2e1",
+    "data/features/v3.1.0-r3/finetuning_mitbih_family.parquet": "648e87b232e6a2a6a69660b07dcae67404a26df4cc9a49301085ba9ed76f85a3"
+  },
+  "disposition": "Artifacts retained as immutable failed-generation evidence and must never be used for training.",
+  "generation_id": "advanced-training-v3.1.0-r3",
+  "preflight_report_published": false,
+  "pretraining_gate_published": false,
+  "reasons": [
+    {
+      "code": "FAMILY_SOURCE_ANNOTATION_IDENTITY_RENUMBERED",
+      "evidence": "7 records failed source reconstruction because tolerated boundary drops renumbered subsequent beat_idx/sample_id values"
+    }
+  ],
+  "recorded_at_utc": "2026-07-22T03:18:29.305719+00:00",
+  "schema_version": "dataset-generation-rejection-v1",
+  "split_published": false,
+  "status": "GENERATION_REJECTED"
+}

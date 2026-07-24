@@ -17,7 +17,7 @@ import logging
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple, cast
 
 import numpy as np
 from scipy import signal
@@ -150,10 +150,13 @@ class ECGPreprocessor:
 
         # Pré-computar coeficientes Butterworth (evita recálculo por registro)
         nyq = self.fs / 2.0
-        self.b_band, self.a_band = signal.butter(
-            self.order,
-            [self.lowcut / nyq, self.highcut / nyq],
-            btype="band",
+        self.b_band, self.a_band = cast(
+            tuple[np.ndarray, np.ndarray],
+            signal.butter(
+                self.order,
+                [self.lowcut / nyq, self.highcut / nyq],
+                btype="band",
+            ),
         )
 
         # Parâmetros de normalização

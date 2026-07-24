@@ -4,6 +4,8 @@ Preserva a forma (timesteps, channels) ao aplicar SMOTE no espaço
 achatado, reconstruindo os tensores após o oversampling.
 """
 
+from typing import Tuple, cast
+
 import numpy as np
 from imblearn.over_sampling import SMOTE
 
@@ -47,7 +49,10 @@ class SmoteSequence:
             for cls, ratio in self.ratio.items()
         }
 
-        smote = SMOTE(sampling_strategy=counts, random_state=self.random_state)
-        X_res, y_res = smote.fit_resample(X_2d, y)
+        smote = SMOTE(
+            sampling_strategy=counts,  # type: ignore[arg-type]
+            random_state=self.random_state,
+        )
+        X_res, y_res = cast(Tuple[np.ndarray, np.ndarray], smote.fit_resample(X_2d, y))
 
         return X_res.reshape(-1, timesteps, channels), y_res

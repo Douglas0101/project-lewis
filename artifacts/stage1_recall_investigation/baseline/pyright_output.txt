@@ -1,0 +1,9 @@
+/home/douglas-souza/PycharmProjects/Project-Lewis/src/inference/stage1_mlp_runner.py
+  /home/douglas-souza/PycharmProjects/Project-Lewis/src/inference/stage1_mlp_runner.py:69:66 - warning: Argument of type "Literal[0]" cannot be assigned to parameter "verbose" of type "str" in function "predict"
+    "Literal[0]" is not assignable to "str" (reportArgumentType)
+/home/douglas-souza/PycharmProjects/Project-Lewis/tests/test_bit_exact_python_tflm.py
+  /home/douglas-souza/PycharmProjects/Project-Lewis/tests/test_bit_exact_python_tflm.py:251:53 - warning: Argument of type "Literal[0]" cannot be assigned to parameter "verbose" of type "str" in function "predict"
+    "Literal[0]" is not assignable to "str" (reportArgumentType)
+0 errors, 2 warnings, 0 informations
+
+[exit_code=0]

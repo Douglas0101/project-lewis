@@ -1,0 +1,25 @@
+{
+  "hashes": {
+    "model": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347",
+    "scaler": "80f5fabf5aeb790f9bf6c0bd8dfc993133d6d53f5f9787cc53011fb1c2b3acb3",
+    "threshold": "b75e14ab95136d544664a166eaa15fcdcfe38fda821462a781b26265b6966746",
+    "stage1_npz": "23adba2139ac691df639b132f4fd52b06fa1d3095d2d3988b011f1382b6a2b35",
+    "stage2_npz": "68fb0a8e9fa3bc3fd06df7af074222c9837b8a04dc644b9f823d26919ba6b04a"
+  },
+  "hashes_match_precheck": {
+    "model": true,
+    "scaler": true,
+    "threshold": true,
+    "stage1_npz": true,
+    "stage2_npz": true
+  },
+  "qg5_exit": 1,
+  "threshold": 0.5800000000000001,
+  "confusion": {
+    "true_positive": 127,
+    "false_positive": 0,
+    "true_negative": 128,
+    "false_negative": 1793
+  },
+  "recall": 0.06614583333333333
+}

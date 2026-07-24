@@ -1,0 +1,27 @@
+{
+  "artifact_sha256": {
+    "data/features/v3.1.0-r2/afdb_rhythm_episodes.npz": "ff387bde5b9ba4fd54943c38869353a0f284eda1dcd892f5303720717bbc5e07",
+    "data/features/v3.1.0-r2/afdb_rhythm_episodes.parquet": "c7676252b519aad487a95cc84829b1c8a9c00f2c809d3756944e025d8da8e791",
+    "data/features/v3.1.0-r2/finetuning_mitbih_family.manifest.json": "0ba785716e07577137bcf6525baddef77826479e475d878811a6de24a9e22c06",
+    "data/features/v3.1.0-r2/finetuning_mitbih_family.npz": "783201e643ab7219c221d8528b0b591c2731df2838994b0015e53f12f802b1b6",
+    "data/features/v3.1.0-r2/finetuning_mitbih_family.parquet": "0743721dc06c3fa12209fbbaddbac8d675f3f2dae027947cac0bda0952e0abf1"
+  },
+  "disposition": "Artifacts retained as immutable failed-generation evidence and must never be used for training.",
+  "generation_id": "advanced-training-v3.1.0-r2",
+  "preflight_report_published": false,
+  "pretraining_gate_published": false,
+  "reasons": [
+    {
+      "code": "FAMILY_CANONICAL_SHAPE_INVALID",
+      "evidence": "parent NPZ rows were shape (500,) rather than required (500, 1)"
+    },
+    {
+      "code": "AFDB_PICKLE_FREE_CONTRACT_INVALID",
+      "evidence": "sample_id and waveform_sha256 were serialized as object arrays"
+    }
+  ],
+  "recorded_at_utc": "2026-07-22T03:05:18.414492+00:00",
+  "schema_version": "dataset-generation-rejection-v1",
+  "split_published": false,
+  "status": "GENERATION_REJECTED"
+}

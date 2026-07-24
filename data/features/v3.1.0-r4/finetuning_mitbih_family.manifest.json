@@ -1,0 +1,75 @@
+{
+  "version": "3.0.0",
+  "generated_at": "2026-07-22T03:24:51.457557Z",
+  "config_version": "3.0.0",
+  "datasets_included": [
+    "mitdb",
+    "svdb",
+    "incart"
+  ],
+  "n_records": 201,
+  "n_beats": 469723,
+  "per_dataset": {
+    "mitdb": {
+      "n_records": 48,
+      "n_beats": 109440,
+      "class_distribution": {
+        "N": 90584,
+        "S": 2781,
+        "V": 7235,
+        "F": 802,
+        "Q": 8038
+      },
+      "mean_segment_amplitude": null,
+      "std_segment_amplitude": null,
+      "pct_flatline_beats": null
+    },
+    "svdb": {
+      "n_records": 78,
+      "n_beats": 184494,
+      "class_distribution": {
+        "N": 162256,
+        "S": 12195,
+        "V": 9941,
+        "F": 23,
+        "Q": 79
+      },
+      "mean_segment_amplitude": null,
+      "std_segment_amplitude": null,
+      "pct_flatline_beats": null
+    },
+    "incart": {
+      "n_records": 75,
+      "n_beats": 175789,
+      "class_distribution": {
+        "N": 153600,
+        "S": 1958,
+        "V": 20006,
+        "F": 219,
+        "Q": 6
+      },
+      "mean_segment_amplitude": null,
+      "std_segment_amplitude": null,
+      "pct_flatline_beats": null
+    }
+  },
+  "global_class_distribution": {
+    "N": 406440,
+    "S": 16934,
+    "V": 37182,
+    "F": 1044,
+    "Q": 8123
+  },
+  "quality_flags": {
+    "no_nan_inf": true,
+    "no_flatline_records": true,
+    "all_lineage_valid": true,
+    "all_checksums_match": true,
+    "aami_labels_valid": true,
+    "pii_free": true,
+    "group_kfold_feasible": true,
+    "class_balance_reported": true
+  },
+  "features_schema_version": "1.0.0",
+  "notes": "Fine-tuning dataset MIT-BIH family v3.0.0 — relógio canônico 500 Hz (DQ-01/DQ-02 corrigidos), ontologia única v3.0.0 (FUSION≠AFIB, Q_OR_UNKNOWN=rejeição, desconhecidos excluídos), AFDB fora do classificador de batimentos (tarefa de ritmo separada, D3)."
+}

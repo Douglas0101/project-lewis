@@ -1,0 +1,33 @@
+{
+  "include": ["src", "tests"],
+  "exclude": [
+    "**/__pycache__",
+    ".venv",
+    ".git",
+    ".pytest_cache",
+    ".mypy_cache",
+    "notebooks",
+    "build",
+    "firmware"
+  ],
+  "pythonVersion": "3.12",
+  "pythonPlatform": "Linux",
+  "typeCheckingMode": "basic",
+  "useLibraryCodeForTypes": true,
+  "extraPaths": ["src"],
+  "stubPath": "typings",
+  "reportMissingImports": "warning",
+  "reportMissingModuleSource": "none",
+  "reportIncompatibleMethodOverride": "warning",
+  "reportAttributeAccessIssue": "warning",
+  "reportOptionalMemberAccess": "warning",
+  "reportOptionalOperand": "warning",
+  "reportArgumentType": "warning",
+  "reportCallIssue": "warning",
+  "reportPossiblyUnboundVariable": "error",
+  "reportGeneralTypeIssues": "warning",
+  "reportIndexIssue": "warning",
+  "reportInvalidTypeForm": "warning",
+  "reportOperatorIssue": "warning",
+  "reportReturnType": "warning"
+}

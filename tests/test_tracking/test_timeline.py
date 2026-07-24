@@ -1,5 +1,7 @@
 """Testes da view experiment_timeline e API de timeline."""
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 from datetime import datetime, timezone

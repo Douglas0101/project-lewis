@@ -3,8 +3,9 @@
 Regras mandatórias (ecg-preprocessing-pipeline + Camada-02 spec):
 - NUNCA hardcode gain=200, baseline=1024. Sempre ler do .hea via wfdb.rdheader().
 - Validar range físico [-5.0, +5.0] mV.
-- Mapear anotações WFDB → AAMI EC57.
-- SVDB fs = 250 Hz (correção crítica).
+- Mapear anotações WFDB → AAMI EC57 (fonte única: src/features/ontology_v3.py).
+- SVDB fs = 128 Hz (confirmado nos headers .hea; o valor 250 Hz que constava
+  aqui como "correção crítica" estava errado — corrigido na v3).
 """
 
 from __future__ import annotations
@@ -16,34 +17,25 @@ from typing import Any, Dict, Iterator, List, Optional, Tuple
 import numpy as np
 import wfdb
 
+from src.features.ontology_v3 import BEAT_MAP_V3, CANONICAL_TO_LEGACY
+
 LOGGER = logging.getLogger("lewis.camada02.loader")
 
-# Fs nativos canônicos por dataset (skill + Camada-02)
+# Fs nativos canônicos por dataset (confirmados nos headers .hea e na linhagem
+# C02: mitdb 360, svdb 128, afdb 250, incart 257, chapman 500)
 DATASET_CONFIG = {
     "mitbih": {"fs": 360.0, "subdir": "raw_mitbih", "lead": "MLII"},
-    "svdb": {"fs": 250.0, "subdir": "raw_svdb", "lead": "ECG1"},
+    "svdb": {"fs": 128.0, "subdir": "raw_svdb", "lead": "ECG1"},
     "afdb": {"fs": 250.0, "subdir": "raw_afdb", "lead": "ECG1"},
     "incart": {"fs": 257.0, "subdir": "raw_incart", "lead": "II"},
     "chapman": {"fs": 500.0, "subdir": "raw_chapman", "lead": "II"},
 }
 
-# AAMI EC57 mapping — apenas beat annotations (códigos 0–29 no formato MIT)
+# AAMI EC57 mapping — apenas beat annotations (códigos 0–29 no formato MIT).
+# Fonte única: src/features/ontology_v3.py (v3.0.0); símbolos não listados
+# (incluindo '|') são excluídos — nunca → Q.
 AAMI_BEAT_MAP = {
-    "N": "N",
-    "L": "N",
-    "R": "N",
-    "e": "N",
-    "j": "N",
-    "V": "V",
-    "E": "V",
-    "A": "S",
-    "a": "S",
-    "J": "S",
-    "S": "S",
-    "F": "F",
-    "/": "Q",
-    "f": "Q",
-    "Q": "Q",
+    sym: CANONICAL_TO_LEGACY[canonical] for sym, (canonical, _, _) in BEAT_MAP_V3.items()
 }
 
 _BEAT_SYMBOLS = set(AAMI_BEAT_MAP.keys())
@@ -140,6 +132,7 @@ class MITBIHLoader:
             physical=(units == "physical"),
         )
         sig = rec.p_signal if units == "physical" else rec.d_signal
+        assert sig is not None
         sig = sig.squeeze().astype(np.float64)
 
         if units == "physical":

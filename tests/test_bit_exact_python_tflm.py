@@ -14,7 +14,7 @@ from __future__ import annotations
 import random
 import tempfile
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import joblib
 import numpy as np
@@ -22,6 +22,7 @@ import pytest
 import tensorflow as tf
 
 from src.inference.quantized_runner import QuantizedModelRunner
+from src.models.keras_loader import load_keras_model
 
 
 def _set_global_seeds(seed: int = 123) -> None:
@@ -35,7 +36,18 @@ ROOT = Path(__file__).resolve().parents[1]
 MODELS_DIR = ROOT / "models"
 DATA_DIR = ROOT / "data" / "features"
 
-STAGE_CONFIGS = [
+
+class StageConfig(TypedDict):
+    """Typed artifact family used by bit-exact tests."""
+
+    name: str
+    keras: Path
+    tflite: Path
+    scaler: Path
+    data: Path
+
+
+STAGE_CONFIGS: list[StageConfig] = [
     {
         "name": "stage1",
         "keras": MODELS_DIR / "stage1_float32_v2.0.keras",
@@ -53,7 +65,7 @@ STAGE_CONFIGS = [
 ]
 
 
-def _artifact_exists(config: dict[str, Path]) -> bool:
+def _artifact_exists(config: StageConfig) -> bool:
     """Verifica se todos os artefatos de um estágio estão presentes."""
     return all(path.exists() for path in config.values() if isinstance(path, Path))
 
@@ -66,7 +78,7 @@ def loaded_models() -> dict[str, dict[str, Any]]:
         if not _artifact_exists(config):
             continue
         loaded[config["name"]] = {
-            "keras": tf.keras.models.load_model(str(config["keras"]), compile=False),
+            "keras": load_keras_model(str(config["keras"]), compile=False),
             "runner": QuantizedModelRunner(config["tflite"]).allocate(),
             "scaler": joblib.load(config["scaler"]),
         }
@@ -105,7 +117,10 @@ def _compare_logits(
     norm_i8 = logits_i8 / (np.linalg.norm(logits_i8, axis=1, keepdims=True) + 1e-12)
     cosine = np.sum(norm_f32 * norm_i8, axis=1)
     argmatch = np.mean(np.argmax(logits_f32, axis=1) == np.argmax(logits_i8, axis=1))
-    return float(cosine.min()), float(cosine.mean()), float(argmatch)
+    try:
+        return float(cosine.min()), float(cosine.mean()), float(argmatch)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Unable to summarize float32/INT8 similarity") from error
 
 
 @pytest.mark.parametrize("stage", ["stage1", "stage2"])
@@ -240,14 +255,16 @@ def test_bit_exact_with_synthetic_model() -> None:
         workdir = Path(tmp)
         float_path, int8_path, x_train = _build_and_quantize_tiny_model(3, workdir)
 
-        keras_model = tf.keras.models.load_model(str(float_path), compile=False)
+        keras_model = load_keras_model(str(float_path), compile=False)
         runner = QuantizedModelRunner(int8_path).allocate()
 
         # Usa amostras de treino para validar equivalência numérica, já que
         # o modelo não generaliza para ruído puro após apenas 1 época.
         x = x_train[:64]
 
-        logits_f32 = keras_model.predict(x, verbose=0)
+        # Keras 3 accepts integer verbosity modes; its unannotated signature
+        # makes Pyright infer ``str`` from the default ``"auto"``.
+        logits_f32 = keras_model.predict(x, verbose=0)  # pyright: ignore[reportArgumentType]
         logits_i8 = np.concatenate([runner.run(x[i]) for i in range(x.shape[0])], axis=0)
 
         cosine_min, cosine_mean, argmatch = _compare_logits(logits_f32, logits_i8)

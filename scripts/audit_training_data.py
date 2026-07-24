@@ -17,14 +17,12 @@ import hashlib
 import json
 import logging
 import sys
-import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 import numpy as np
-import yaml
 
 # Ajustar PYTHONPATH implicitamente quando rodado como script
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -34,7 +32,6 @@ if str(PROJECT_ROOT / "src") not in sys.path:
 from src.data._schemas import validate_catalog_line  # type: ignore
 from src.data.training_schemas import (
     AuditCheck,
-    DatasetName,
     ProcessedSignalRecord,
     TrainingDataAuditReport,
 )
@@ -409,7 +406,7 @@ class DataQualityAuditor:
                 per_dataset[dataset]["mean_std"] += std
 
             except Exception as exc:
-                n_fail = 1
+                _ = exc  # type: ignore
                 self._flag_anomaly(
                     record_id,
                     dataset,
@@ -426,7 +423,6 @@ class DataQualityAuditor:
                 per_dataset[dataset]["mean_std"] /= n
 
         # Adiciona checks
-        critical_count = n_nan_inf + n_flatline + n_checksum_mismatch
         self._add_check(
             "statistical",
             "no_nan_inf",
@@ -472,16 +468,28 @@ class DataQualityAuditor:
         if source_path:
             p = Path(source_path).with_suffix("")
             if p.with_suffix(".dat").exists() or p.with_suffix(".hea").exists():
-                return p.with_suffix(".dat") if p.with_suffix(".dat").exists() else p.with_suffix(".hea")
+                return (
+                    p.with_suffix(".dat")
+                    if p.with_suffix(".dat").exists()
+                    else p.with_suffix(".hea")
+                )
         dataset = rec["dataset"]
         record_name = rec["record_name"]
         raw_dir = PROJECT_ROOT / "data" / f"raw_{dataset if dataset != 'mitdb' else 'mitbih'}"
         direct = raw_dir / record_name
         if (direct.with_suffix(".hea")).exists():
-            return direct.with_suffix(".dat") if (direct.with_suffix(".dat")).exists() else direct.with_suffix(".hea")
+            return (
+                direct.with_suffix(".dat")
+                if (direct.with_suffix(".dat")).exists()
+                else direct.with_suffix(".hea")
+            )
         for hea in raw_dir.rglob(f"{record_name}.hea"):
             base = hea.with_suffix("")
-            return base.with_suffix(".dat") if base.with_suffix(".dat").exists() else base.with_suffix(".hea")
+            return (
+                base.with_suffix(".dat")
+                if base.with_suffix(".dat").exists()
+                else base.with_suffix(".hea")
+            )
         return None
 
     # -----------------------------------------------------------------------
@@ -751,7 +759,8 @@ class DataQualityAuditor:
         for check in report.checks:
             details = (check.details or "").replace("|", "\\|")
             lines.append(
-                f"| {check.category} | {check.name} | {check.status} | {check.count} | {details} |"
+                f"| {check.category} | {check.name} | {check.status} | {check.count} | "
+                f"{details} |"
             )
 
         lines.extend(

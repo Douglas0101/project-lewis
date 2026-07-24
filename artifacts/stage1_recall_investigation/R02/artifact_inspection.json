@@ -1,0 +1,479 @@
+{
+  "schema_version": "1.0",
+  "inspection_mode": "zip_only_no_model_deserialization",
+  "model_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "model_sha256_before": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347",
+  "model_sha256_after": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347",
+  "model_size": 209985,
+  "archive_members": [
+    {
+      "name": "metadata.json",
+      "size": 64,
+      "compressed_size": 64,
+      "sha256": "d7a51ba9e0fc667c1aa067233e22c4a49b774f2004728872dd2305fb99dfa4b9"
+    },
+    {
+      "name": "config.json",
+      "size": 9123,
+      "compressed_size": 9123,
+      "sha256": "6fc94bc111430510445bce4af1770cce954702622d5e941cc21e2dc7b0fece9d"
+    },
+    {
+      "name": "model.weights.h5",
+      "size": 200468,
+      "compressed_size": 200468,
+      "sha256": "a742efbc9a78c4f3635be52b2bb9efd20f032f9a5397ff265c421810f0382a28"
+    }
+  ],
+  "metadata": {
+    "keras_version": "3.14.1",
+    "date_saved": "2026-07-04@00:43:26"
+  },
+  "config_sha256": "6fc94bc111430510445bce4af1770cce954702622d5e941cc21e2dc7b0fece9d",
+  "metadata_sha256": "d7a51ba9e0fc667c1aa067233e22c4a49b774f2004728872dd2305fb99dfa4b9",
+  "weights_sha256": "a742efbc9a78c4f3635be52b2bb9efd20f032f9a5397ff265c421810f0382a28",
+  "top_level_module": "keras.src.models.functional",
+  "top_level_class_name": "Functional",
+  "registered_name": "Functional",
+  "keras_family": "KERAS_3_STANDALONE",
+  "model_name": "lewis_backbone",
+  "input_layers": [
+    "input",
+    0,
+    0
+  ],
+  "output_layers": [
+    "output",
+    0,
+    0
+  ],
+  "input_shape": [
+    null,
+    500,
+    1
+  ],
+  "input_dtype": "float32",
+  "output_shape": [
+    null,
+    2
+  ],
+  "output_units": 2,
+  "output_activation": "softmax",
+  "output_domain": "probabilities_sum_to_one",
+  "layer_count": 11,
+  "layers": [
+    {
+      "index": 0,
+      "name": "input",
+      "module": "keras.layers",
+      "class_name": "InputLayer",
+      "dtype": "float32",
+      "batch_shape": [
+        null,
+        500,
+        1
+      ],
+      "units": null,
+      "activation": null
+    },
+    {
+      "index": 1,
+      "name": "conv1d_1",
+      "module": "keras.layers",
+      "class_name": "Conv1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": "relu"
+    },
+    {
+      "index": 2,
+      "name": "maxpool_1",
+      "module": "keras.layers",
+      "class_name": "MaxPooling1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": null
+    },
+    {
+      "index": 3,
+      "name": "conv1d_2",
+      "module": "keras.layers",
+      "class_name": "Conv1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": "relu"
+    },
+    {
+      "index": 4,
+      "name": "maxpool_2",
+      "module": "keras.layers",
+      "class_name": "MaxPooling1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": null
+    },
+    {
+      "index": 5,
+      "name": "conv1d_3",
+      "module": "keras.layers",
+      "class_name": "Conv1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": "relu"
+    },
+    {
+      "index": 6,
+      "name": "maxpool_3",
+      "module": "keras.layers",
+      "class_name": "MaxPooling1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": null
+    },
+    {
+      "index": 7,
+      "name": "gap",
+      "module": "keras.layers",
+      "class_name": "GlobalAveragePooling1D",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": null
+    },
+    {
+      "index": 8,
+      "name": "embedding",
+      "module": "keras.layers",
+      "class_name": "Dense",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": 64,
+      "activation": "relu"
+    },
+    {
+      "index": 9,
+      "name": "dropout",
+      "module": "keras.layers",
+      "class_name": "Dropout",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": null,
+      "activation": null
+    },
+    {
+      "index": 10,
+      "name": "output",
+      "module": "keras.layers",
+      "class_name": "Dense",
+      "dtype": "float32",
+      "batch_shape": null,
+      "units": 2,
+      "activation": "softmax"
+    }
+  ],
+  "batch_normalization_layers": [],
+  "dropout_layers": [
+    "dropout"
+  ],
+  "lambda_layers": [],
+  "custom_object_references": [],
+  "serialized_reference_counts": {
+    "keras.src": 1,
+    "tf_keras.src": 0,
+    "tensorflow.keras": 0,
+    "tensorflow.python.keras": 0,
+    "custom_objects": 0
+  },
+  "compile_optimizer": "Adam",
+  "compile_loss": "sparse_categorical_crossentropy",
+  "compile_metrics": [
+    "accuracy"
+  ],
+  "model_weight_count": 10,
+  "model_parameter_count": 13218,
+  "weight_datasets": [
+    {
+      "name": "layers/conv1d/vars/0",
+      "shape": [
+        7,
+        1,
+        16
+      ],
+      "dtype": "float32",
+      "element_count": 112
+    },
+    {
+      "name": "layers/conv1d/vars/1",
+      "shape": [
+        16
+      ],
+      "dtype": "float32",
+      "element_count": 16
+    },
+    {
+      "name": "layers/conv1d_1/vars/0",
+      "shape": [
+        5,
+        16,
+        32
+      ],
+      "dtype": "float32",
+      "element_count": 2560
+    },
+    {
+      "name": "layers/conv1d_1/vars/1",
+      "shape": [
+        32
+      ],
+      "dtype": "float32",
+      "element_count": 32
+    },
+    {
+      "name": "layers/conv1d_2/vars/0",
+      "shape": [
+        3,
+        32,
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 6144
+    },
+    {
+      "name": "layers/conv1d_2/vars/1",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 64
+    },
+    {
+      "name": "layers/dense/vars/0",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 4096
+    },
+    {
+      "name": "layers/dense/vars/1",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 64
+    },
+    {
+      "name": "layers/dense_1/vars/0",
+      "shape": [
+        64,
+        2
+      ],
+      "dtype": "float32",
+      "element_count": 128
+    },
+    {
+      "name": "layers/dense_1/vars/1",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "element_count": 2
+    },
+    {
+      "name": "optimizer/vars/0",
+      "shape": [],
+      "dtype": "int64",
+      "element_count": 1
+    },
+    {
+      "name": "optimizer/vars/1",
+      "shape": [],
+      "dtype": "float32",
+      "element_count": 1
+    },
+    {
+      "name": "optimizer/vars/10",
+      "shape": [
+        3,
+        32,
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 6144
+    },
+    {
+      "name": "optimizer/vars/11",
+      "shape": [
+        3,
+        32,
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 6144
+    },
+    {
+      "name": "optimizer/vars/12",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 64
+    },
+    {
+      "name": "optimizer/vars/13",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 64
+    },
+    {
+      "name": "optimizer/vars/14",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 4096
+    },
+    {
+      "name": "optimizer/vars/15",
+      "shape": [
+        64,
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 4096
+    },
+    {
+      "name": "optimizer/vars/16",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 64
+    },
+    {
+      "name": "optimizer/vars/17",
+      "shape": [
+        64
+      ],
+      "dtype": "float32",
+      "element_count": 64
+    },
+    {
+      "name": "optimizer/vars/18",
+      "shape": [
+        64,
+        2
+      ],
+      "dtype": "float32",
+      "element_count": 128
+    },
+    {
+      "name": "optimizer/vars/19",
+      "shape": [
+        64,
+        2
+      ],
+      "dtype": "float32",
+      "element_count": 128
+    },
+    {
+      "name": "optimizer/vars/2",
+      "shape": [
+        7,
+        1,
+        16
+      ],
+      "dtype": "float32",
+      "element_count": 112
+    },
+    {
+      "name": "optimizer/vars/20",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "element_count": 2
+    },
+    {
+      "name": "optimizer/vars/21",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "element_count": 2
+    },
+    {
+      "name": "optimizer/vars/3",
+      "shape": [
+        7,
+        1,
+        16
+      ],
+      "dtype": "float32",
+      "element_count": 112
+    },
+    {
+      "name": "optimizer/vars/4",
+      "shape": [
+        16
+      ],
+      "dtype": "float32",
+      "element_count": 16
+    },
+    {
+      "name": "optimizer/vars/5",
+      "shape": [
+        16
+      ],
+      "dtype": "float32",
+      "element_count": 16
+    },
+    {
+      "name": "optimizer/vars/6",
+      "shape": [
+        5,
+        16,
+        32
+      ],
+      "dtype": "float32",
+      "element_count": 2560
+    },
+    {
+      "name": "optimizer/vars/7",
+      "shape": [
+        5,
+        16,
+        32
+      ],
+      "dtype": "float32",
+      "element_count": 2560
+    },
+    {
+      "name": "optimizer/vars/8",
+      "shape": [
+        32
+      ],
+      "dtype": "float32",
+      "element_count": 32
+    },
+    {
+      "name": "optimizer/vars/9",
+      "shape": [
+        32
+      ],
+      "dtype": "float32",
+      "element_count": 32
+    }
+  ],
+  "label_mapping_serialized": false
+}

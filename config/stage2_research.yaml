@@ -1,0 +1,156 @@
+schema_version: stage2-research-v1
+project_root: .
+output_root: experiments/stage2_v2.4_research
+
+datasets:
+  stage2_npz:
+    path: data/features/stage2_multiclass.npz
+    sha256: 68fb0a8e9fa3bc3fd06df7af074222c9837b8a04dc644b9f823d26919ba6b04a
+  stage2_parquet:
+    path: data/features/stage2_multiclass.parquet
+    sha256: 870b386e160790cce5a102ccc447e736c5f5381e76ef9fd5fba7cde3ee9d3802
+  full_npz:
+    path: data/features/finetuning_mitbih_family.npz
+    sha256: 6b38eaf8e118ea25190459c83c90272a14f5dfd08c6b9e47d3e61a8aa236a54a
+  full_parquet:
+    path: data/features/finetuning_mitbih_family.parquet
+    sha256: 9efe6681cdef7c48cabc26992bcfba3011315d580531af9007fbbfd532330c26
+
+uv_lock_sha256: 8c0d70adb5548388b044ce3e3266c9df93586d346bf1f650cf6b942b6a478bef
+
+candidates:
+  baseline:
+    name: baseline
+    fusion_template_count: 0
+    feature_families: [base16]
+    complexity_rank: 0
+    rr_context_source: stage2_filtered
+  H6:
+    name: H6
+    fusion_template_count: 8
+    feature_families: [base16, causal_rr_h3, class_templates_h5]
+    complexity_rank: 1
+    rr_context_source: stage2_filtered
+  H11:
+    name: H11
+    fusion_template_count: 16
+    feature_families: [base16, causal_rr_h3, class_templates_h5]
+    complexity_rank: 2
+    rr_context_source: stage2_filtered
+  H12:
+    name: H12
+    fusion_template_count: 24
+    feature_families: [base16, causal_rr_h3, class_templates_h5]
+    complexity_rank: 3
+    rr_context_source: stage2_filtered
+
+folds: [1, 2, 3, 4, 5]
+seeds: [17, 29, 43, 71, 101]
+
+profiles:
+  smoke:
+    max_epochs: 2
+    patience: 0
+    batch_size: 512
+    deterministic: true
+    max_parallel: 1
+    publication_eligible: false
+  screening:
+    max_epochs: 30
+    patience: 5
+    batch_size: 512
+    deterministic: false
+    max_parallel: 1
+    publication_eligible: false
+  audit:
+    max_epochs: 30
+    patience: 5
+    batch_size: 512
+    deterministic: true
+    max_parallel: 1
+    publication_eligible: true
+  performance:
+    max_epochs: 30
+    patience: 5
+    batch_size: 512
+    deterministic: false
+    max_parallel: 4
+    publication_eligible: false
+
+gates:
+  publication_f1_f: 0.50
+  material_gain_outside_208_213: 0.05
+  minimum_macro_f1: 0.45
+  research_baseline_f1_f: 0.18
+  research_candidate_f1_f: 0.25
+  architecture_candidate_f1_f: 0.30
+
+e07:
+  samplers:
+    - natural
+    - random_oversampling
+    - patient_uniform
+    - patient_sqrt
+    - smote
+  screening_seeds: [17, 29, 43]
+  final_seeds: [17, 29, 43, 71, 101]
+  smote_k_neighbors: 5
+
+e08:
+  methods:
+    - ce_control
+    - crt_patient_aware
+    - logit_adjustment
+    - balanced_softmax
+    - ldam_drw
+    - focal_legacy
+  screening_seeds: [17, 29, 43]
+  final_seeds: [17, 29, 43, 71, 101]
+  logit_adjustment_tau: 1.0
+  ldam_max_margin: 0.5
+  ldam_drw_epoch_fraction: 0.5
+  focal_alpha: [0.20, 0.15, 3.00]
+  focal_gamma: 2.0
+  focal_class_weight: [1.0, 1.0, 8.0]
+
+resources:
+  minimum_free_disk_gib: 2.0
+  estimated_mib_per_run: 2.0
+
+split_contract:
+  sampling: natural
+  loss: sparse_categorical_crossentropy
+  class_weight: null
+  decision: raw_softmax_argmax
+  architecture: minimal_mlp_128
+  outer_test_used_for_early_stopping: false
+  imputation: outer_train_median
+  scaling: outer_train_standard_scaler
+  n_splits: 5
+  inner_splits: 4
+  random_seed: 42
+
+default_experiment_ids:
+  e065_smoke: e065-smoke-v5
+  e065_audit: e065-audit-v1
+  e07_screening: e07-screening-v1
+  e07_audit: e07-audit-v1
+  e08_screening: e08-screening-v1
+  e08_audit: e08-audit-v1
+
+validation_commands:
+  - [make, lint]
+  - [uv, run, --locked, pyright, src, tests]
+  - - uv
+    - run
+    - --locked
+    - pytest
+    - tests/test_e06_protocol.py
+    - tests/test_e06_context_features.py
+    - tests/test_e06_class_template_features.py
+    - tests/test_stage2_research_cli.py
+    - tests/test_stage2_research_splits.py
+    - tests/test_stage2_research_resume.py
+    - tests/test_stage2_research_sampling.py
+    - tests/test_stage2_research_long_tail.py
+    - -q

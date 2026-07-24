@@ -1,8 +1,11 @@
 """Testes do gerador de resumos de experimentos para RAG."""
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 from datetime import datetime, timezone
+
 import pytest
 from sqlalchemy.orm import Session
 

@@ -1,0 +1,20 @@
+[
+  {
+    "name": "metadata.json",
+    "size": 64,
+    "compressed_size": 64,
+    "sha256": "d7a51ba9e0fc667c1aa067233e22c4a49b774f2004728872dd2305fb99dfa4b9"
+  },
+  {
+    "name": "config.json",
+    "size": 9123,
+    "compressed_size": 9123,
+    "sha256": "6fc94bc111430510445bce4af1770cce954702622d5e941cc21e2dc7b0fece9d"
+  },
+  {
+    "name": "model.weights.h5",
+    "size": 200468,
+    "compressed_size": 200468,
+    "sha256": "a742efbc9a78c4f3635be52b2bb9efd20f032f9a5397ff265c421810f0382a28"
+  }
+]

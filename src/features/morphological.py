@@ -2,17 +2,19 @@
 
 Regras mandatórias (ecg-preprocessing-pipeline + Camada-03 spec §3.6):
 - QRS width via envelope method (onset 300ms before, offset 150ms after, threshold 50% |R|)
+  with amplitude fallback and physiological validation [20, 180] ms.
 - ST slope: J+60ms → J+80ms (ACC/AHA/HRS standard)
 - q_depth: min in 100ms before R
 - t_amplitude: max in 300ms after R
 - qrs_area: trapezoid of |QRS|
-- Sem NaN/Inf — marcar NaN apenas se onset ≥ offset (falha de detecção)
+- qrs_asymmetry_index, t_r_ratio, qrs_raggedness: auxiliary low-cost features.
+- Sem NaN/Inf em saída — valores inválidos são imputados posteriormente.
 """
 
 from __future__ import annotations
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple, cast
 
 import numpy as np
 from scipy import signal
@@ -36,10 +38,13 @@ class MorphologicalFeatures:
         """Compute signal envelope using Hilbert transform (bandpass 5-30 Hz)."""
         # Bandpass 5-30 Hz for envelope
         nyq = fs / 2.0
-        b, a = signal.butter(2, [5.0 / nyq, 30.0 / nyq], btype="band")
+        b, a = cast(
+            Tuple[np.ndarray, np.ndarray],
+            signal.butter(2, [5.0 / nyq, 30.0 / nyq], btype="band"),
+        )
         filtered = signal.filtfilt(b, a, seg)
         # Analytic signal envelope
-        analytic = signal.hilbert(filtered)
+        analytic = cast(np.ndarray, signal.hilbert(filtered))
         return np.abs(analytic)
 
     def _find_qrs_onset_offset(
@@ -80,6 +85,38 @@ class MorphologicalFeatures:
                 offset = offset_search_end - 1
 
         if onset >= offset:
+            onset, offset = self._find_qrs_onset_offset_fallback(seg, r_idx, r_amp, fs)
+        if onset >= offset:
+            return -1, -1
+        return onset, offset
+
+    def _find_qrs_onset_offset_fallback(
+        self,
+        seg: np.ndarray,
+        r_idx: int,
+        r_amp: float,
+        fs: float,
+    ) -> tuple[int, int]:
+        """Fallback based on absolute amplitude threshold when envelope fails."""
+        threshold = 0.25 * abs(r_amp)
+
+        onset_search_start = max(0, r_idx - int(round(0.300 * fs)))
+        onset_region = seg[onset_search_start:r_idx]
+        onset = onset_search_start
+        if len(onset_region) > 0:
+            below = np.where(np.abs(onset_region) < threshold)[0]
+            if len(below) > 0:
+                onset = onset_search_start + below[-1]
+
+        offset_search_end = min(len(seg), r_idx + int(round(0.150 * fs)) + 1)
+        offset_region = seg[r_idx:offset_search_end]
+        offset = offset_search_end - 1
+        if len(offset_region) > 0:
+            below = np.where(np.abs(offset_region) < threshold)[0]
+            if len(below) > 0:
+                offset = r_idx + below[0]
+
+        if onset >= offset:
             return -1, -1
         return onset, offset
 
@@ -105,13 +142,16 @@ class MorphologicalFeatures:
         List[Dict[str, float]]
             One dict per segment with keys:
             {
-                "r_amplitude": float,      # mV
-                "q_depth": float,          # mV (negative)
-                "t_amplitude": float,      # mV
-                "qrs_width_ms": float,     # ms (NaN if detection fails)
-                "qrs_area": float,         # mV·s
-                "st_slope_mV_s": float,    # mV/s
-                "j_point": int,            # sample index
+                "r_amplitude": float,           # mV
+                "q_depth": float,               # mV (negative)
+                "t_amplitude": float,           # mV
+                "qrs_width_ms": float,          # ms (NaN if detection fails)
+                "qrs_area": float,              # mV·s
+                "st_slope_mV_s": float,         # mV/s
+                "j_point": int,                 # sample index
+                "qrs_asymmetry_index": float,   # adimensional
+                "t_r_ratio": float,             # adimensional
+                "qrs_raggedness": float,        # mV
             }
         """
         fs = fs if fs is not None else self.fs
@@ -145,14 +185,35 @@ class MorphologicalFeatures:
 
             if onset >= 0 and offset > onset:
                 qrs_width_ms = (offset - onset) / fs * 1000.0
-                j_point = offset
-                # 12. QRS area
-                qrs_area = float(np.trapezoid(np.abs(seg[onset:offset]), dx=1.0 / fs))
+                if qrs_width_ms < 20.0 or qrs_width_ms > 180.0:
+                    qrs_width_ms = np.nan
+                    j_point = actual_r_idx
+                    qrs_area = np.nan
+                else:
+                    j_point = offset
+                    # 12. QRS area
+                    qrs_area = float(np.trapezoid(np.abs(seg[onset:offset]), dx=1.0 / fs))
             else:
                 qrs_width_ms = np.nan
                 j_point = actual_r_idx
                 qrs_area = np.nan
                 LOGGER.debug("Segment %d: QRS onset/offset detection failed", i)
+
+            # 13-15. Additional morphological features
+            if onset >= 0 and offset > onset and actual_r_idx > onset and offset > actual_r_idx:
+                qrs_asymmetry_index = float((actual_r_idx - onset) / (offset - actual_r_idx))
+            else:
+                qrs_asymmetry_index = np.nan
+
+            if abs(r_amplitude) > 1e-9:
+                t_r_ratio = t_amplitude / abs(r_amplitude)
+            else:
+                t_r_ratio = np.nan
+
+            if onset >= 0 and offset > onset:
+                qrs_raggedness = float(np.std(np.abs(seg[onset:offset])))
+            else:
+                qrs_raggedness = np.nan
 
             # 9-11. ST slope: J+60ms → J+80ms
             st_start = j_point + int(round(0.060 * fs))
@@ -177,6 +238,9 @@ class MorphologicalFeatures:
                     "qrs_area": qrs_area,
                     "st_slope_mV_s": st_slope_mV_s,
                     "j_point": j_point,
+                    "qrs_asymmetry_index": qrs_asymmetry_index,
+                    "t_r_ratio": t_r_ratio,
+                    "qrs_raggedness": qrs_raggedness,
                 }
             )
 

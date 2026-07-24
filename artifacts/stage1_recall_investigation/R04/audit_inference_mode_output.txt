@@ -1,0 +1,26 @@
+$ uv run python scripts/audit_stage1_inference_mode.py --output-dir artifacts/stage1_recall_investigation/R04
+{
+  "predict_reproducible": true,
+  "training_false_reproducible": true,
+  "predict_vs_training_false_equal": true,
+  "predict_vs_training_false_max_delta": 0.0,
+  "predict_argmax_disagreements": 0,
+  "predict_threshold_disagreements": 0,
+  "training_true_weights_immutable": true,
+  "training_true_any_rng_state_changed": true,
+  "model_state_trainable_weights_immutable": true,
+  "rng_not_advanced_in_predict": true,
+  "rng_not_advanced_in_training_false": true,
+  "cross_process_first_training_true_identical": true
+}
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783912430.260135 1734646 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783912430.260600 1734646 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+I0000 00:00:1783912430.331386 1734646 cpu_feature_guard.cc:227] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 AVX512F AVX512_VNNI FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1783912432.152945 1734646 port.cc:153] oneDNN custom operations are on. You may see slightly different numerical results due to floating-point round-off errors from different computation orders. To turn them off, set the environment variable `TF_ENABLE_ONEDNN_OPTS=0`.
+I0000 00:00:1783912432.153424 1734646 cudart_stub.cc:31] Could not find cuda drivers on your machine, GPU will not be used.
+E0000 00:00:1783912474.824625 1734646 cuda_platform.cc:52] failed call to cuInit: INTERNAL: CUDA error: Failed call to cuInit: UNKNOWN ERROR (303)
+
+[exit_code=0]

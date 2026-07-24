@@ -70,7 +70,7 @@ def build_groups(df: pd.DataFrame) -> np.ndarray:
     """Monta array de grupos a partir de ``record_id`` para GroupKFold."""
     unique_records = df["record_id"].unique()
     record_to_group = {rec: idx for idx, rec in enumerate(unique_records)}
-    groups = df["record_id"].map(record_to_group).to_numpy(dtype=np.int64)
+    groups = df["record_id"].map(lambda rec: record_to_group[rec]).to_numpy(dtype=np.int64)
     LOGGER.info("Built groups | n_patients=%d", len(unique_records))
     return groups
 

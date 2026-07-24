@@ -12,7 +12,6 @@ Os headers gerados ficam em firmware/tests/fixtures/generated/.
 from __future__ import annotations
 
 import argparse
-import json
 import subprocess
 import sys
 from pathlib import Path
@@ -29,18 +28,20 @@ GROUND_TRUTH_SCRIPT = GROUND_TRUTH_DIR / "generate_ground_truth.py"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
+from src.features.ampt_500hz import AMPTDetector  # noqa: E402
+from src.quantization.firmware_params import (  # noqa: E402
+    TensorQuantizationParams,
+    load_firmware_quantization_params,
+)
 from tests.fixtures.adc_stub import adc_stub_get_beat  # noqa: E402
 from tests.fixtures.dsp_filters import filter_chain  # noqa: E402
 from tests.fixtures.normalizer import zscore_normalize  # noqa: E402
-from src.features.ampt_500hz import AMPTDetector  # noqa: E402
 
 
-def _load_quant_params() -> tuple[dict, dict]:
-    path = PROJECT_ROOT / "models" / "quantized" / "quantization_params.json"
-    if not path.exists():
-        raise FileNotFoundError(f"Parametros de quantizacao nao encontrados: {path}")
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data["input"], data["output"]
+def _load_quant_params() -> tuple[TensorQuantizationParams, TensorQuantizationParams]:
+    path = FIRMWARE_ROOT / "src" / "ml" / "quantization_params.h"
+    params = load_firmware_quantization_params(path)
+    return params.input, params.output
 
 
 def _quantize_float32_to_int8(values: np.ndarray, scale: float, zero_point: int) -> np.ndarray:
@@ -71,14 +72,19 @@ def _array_float_c(values: np.ndarray) -> str:
 
 
 def _array_int8_c(values: np.ndarray) -> str:
-    return ", ".join(str(int(v)) for v in values)
+    integers = np.asarray(values, dtype=np.int8).astype(np.int64).tolist()
+    return ", ".join(str(value) for value in integers)
 
 
 def _array_uint32_c(values: np.ndarray) -> str:
-    return ", ".join(f"{int(v)}u" for v in values)
+    integers = np.asarray(values, dtype=np.uint32).astype(np.uint64).tolist()
+    return ", ".join(f"{value}u" for value in integers)
 
 
-def generate_pipeline_fixture(num_beats: int, input_quant: dict) -> str:
+def generate_pipeline_fixture(
+    num_beats: int,
+    input_quant: TensorQuantizationParams,
+) -> str:
     """Gera header com inputs float32, inputs int8 processados e expected outputs int8 do modelo."""
     lines = [
         "#ifndef LEWIS_FIXTURE_PIPELINE_H",
@@ -89,8 +95,8 @@ def generate_pipeline_fixture(num_beats: int, input_quant: dict) -> str:
         "",
     ]
 
-    scale = input_quant["scale"]
-    zero_point = input_quant["zero_point"]
+    scale = input_quant.scale
+    zero_point = input_quant.zero_point
 
     for idx in range(num_beats):
         beat_int8 = adc_stub_get_beat(idx)
@@ -119,7 +125,10 @@ def generate_pipeline_fixture(num_beats: int, input_quant: dict) -> str:
     return "\n".join(lines) + "\n"
 
 
-def generate_dsp_fixture(num_beats: int, input_quant: dict) -> str:
+def generate_dsp_fixture(
+    num_beats: int,
+    input_quant: TensorQuantizationParams,
+) -> str:
     """Gera header com inputs float32 e saida filtrada esperada (Python)."""
     lines = [
         "#ifndef LEWIS_FIXTURE_DSP_H",
@@ -130,8 +139,8 @@ def generate_dsp_fixture(num_beats: int, input_quant: dict) -> str:
         "",
     ]
 
-    scale = input_quant["scale"]
-    zero_point = input_quant["zero_point"]
+    scale = input_quant.scale
+    zero_point = input_quant.zero_point
 
     for idx in range(num_beats):
         beat_int8 = adc_stub_get_beat(idx)
@@ -160,30 +169,30 @@ def _synthetic_ecg(
 ) -> tuple[np.ndarray, np.ndarray]:
     """Gera sinal ECG sintetico com picos R conhecidos (mesma logica de test_r_peak_firmware.py)."""
     rng = np.random.default_rng(seed)
-    rr_samples = int(round(rr_ms * fs / 1000.0))
+    rr_samples = round(rr_ms * fs / 1000.0)
     total_samples = rr_samples * n_beats + 500
 
     sig = np.zeros(total_samples, dtype=np.float64)
     r_peaks = np.array([rr_samples * i + rr_samples // 2 for i in range(n_beats)], dtype=np.int64)
 
     for rp in r_peaks:
-        qrs_width = int(round(0.080 * fs))
+        qrs_width = round(0.080 * fs)
         start = max(0, rp - qrs_width)
         end = min(total_samples, rp + qrs_width + 1)
         idx = np.arange(start, end)
         sig[idx] += 1.0 * np.exp(-0.5 * ((idx - rp) / (qrs_width / 3)) ** 2)
 
     for rp in r_peaks:
-        tw_start = rp + int(round(0.25 * fs))
-        tw_width = int(round(0.150 * fs))
+        tw_start = rp + round(0.25 * fs)
+        tw_width = round(0.150 * fs)
         start = max(0, tw_start)
         end = min(total_samples, tw_start + tw_width)
         idx = np.arange(start, end)
         sig[idx] += 0.3 * np.exp(-0.5 * ((idx - tw_start - tw_width // 2) / (tw_width / 3)) ** 2)
 
     for rp in r_peaks:
-        pw_start = rp - int(round(0.15 * fs))
-        pw_width = int(round(0.10 * fs))
+        pw_start = rp - round(0.15 * fs)
+        pw_width = round(0.10 * fs)
         start = max(0, pw_start)
         end = min(total_samples, pw_start + pw_width)
         idx = np.arange(start, end)
@@ -204,7 +213,7 @@ def generate_rpeak_fixture() -> str:
     py_peaks = det.detect(sig.astype(np.float64))
     py_peaks_uint32 = py_peaks.astype(np.uint32)
 
-    tol_samples = int(round(0.150 * 500.0))
+    tol_samples = round(0.150 * 500.0)
 
     lines = [
         "#ifndef LEWIS_FIXTURE_RPEAK_H",

@@ -1,0 +1,21 @@
+$ uv run pytest tests/test_stage1_loader_direct_equivalence.py tests/test_stage1_keras_artifact_contract.py -vv
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.0, pluggy-1.6.0 -- /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/bin/python3
+cachedir: .pytest_cache
+rootdir: /home/douglas-souza/PycharmProjects/Project-Lewis
+configfile: pyproject.toml
+plugins: xdist-3.8.0, hydra-core-1.3.3, cov-7.1.0, anyio-4.14.1, timeout-2.4.0
+collecting ... collected 8 items
+
+tests/test_stage1_loader_direct_equivalence.py::test_helper_selects_standalone_keras_safe_mode PASSED [ 12%]
+tests/test_stage1_loader_direct_equivalence.py::test_legacy_metadata_remains_recognizable PASSED [ 25%]
+tests/test_stage1_loader_direct_equivalence.py::test_shared_fixture_is_hashed_and_policy_complete PASSED [ 37%]
+tests/test_stage1_loader_direct_equivalence.py::test_lane_structures_weights_and_predictions_are_equivalent PASSED [ 50%]
+tests/test_stage1_loader_direct_equivalence.py::test_compile_true_preserves_reference_predictions PASSED [ 62%]
+tests/test_stage1_keras_artifact_contract.py::test_stage1_keras_archive_contract PASSED [ 75%]
+tests/test_stage1_keras_artifact_contract.py::test_stage1_keras_archive_layers_and_compile_contract PASSED [ 87%]
+tests/test_stage1_keras_artifact_contract.py::test_stage1_keras_archive_is_immutable_during_inspection PASSED [100%]
+
+============================== 8 passed in 39.36s ==============================
+
+[exit_code=0]

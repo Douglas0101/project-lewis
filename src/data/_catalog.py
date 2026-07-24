@@ -97,7 +97,7 @@ def extract_metadata(record_path: Path, dataset: str) -> RecordMetadata:
     duration = sig_len / fs if fs else 0.0
 
     return RecordMetadata(
-        record_name=rec.record_name,
+        record_name=str(rec.record_name) if rec.record_name is not None else "",
         dataset=dataset,
         fs=fs,
         n_sig=int(rec.n_sig) if rec.n_sig else 0,

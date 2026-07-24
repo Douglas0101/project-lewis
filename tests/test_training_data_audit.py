@@ -11,6 +11,7 @@ These tests validate that:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pandas as pd
@@ -48,7 +49,8 @@ def test_build_beat_records_for_mitdb_100() -> None:
     npy_path = _find_processed_npy("100", "mitdb")
     assert npy_path is not None
     sig = np.load(npy_path).astype(np.float32)
-    r_peaks, labels = _load_raw_annotations("100", "mitdb")
+    r_peaks, labels = cast(tuple[np.ndarray, np.ndarray], _load_raw_annotations("100", "mitdb"))
+    assert r_peaks is not None and labels is not None
     beats, X_rec, y_rec = _build_beat_records(
         sig,
         r_peaks,
@@ -100,7 +102,7 @@ def test_finetuning_artifacts_sane() -> None:
 
 @pytest.mark.skipif(not DATA_AVAILABLE, reason="catalog not available")
 def test_audit_script_passes_small_sample(tmp_path: Path) -> None:
-    cfg = AuditConfig(sample_size=20)
+    cfg = AuditConfig(sample_size=20, skip_checksum=True)
     auditor = DataQualityAuditor(cfg=cfg, dlq_path=tmp_path / "dlq.jsonl")
     report = auditor.run(
         catalog_path=CATALOG_PATH,

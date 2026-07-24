@@ -159,9 +159,18 @@ bool lewis_hal_watchdog_expired(void)
 #endif
 #define LEWIS_CYCLES_PER_MS (LEWIS_SYSTICK_HZ / 1000UL)
 
-/* TIM2CLK = 2 * APB1. Com SYSCLK=168 MHz e APB1=42 MHz, TIM2CLK=84 MHz. */
+/* TIM2CLK = 2 * APB1. Com SYSCLK=168 MHz e APB1=42 MHz, TIM2CLK=84 MHz.
+ * Porem o Renode 1.15.3 modela os timers STM32F4 com frequencia fixa de
+ * 10 MHz (platforms/cpus/stm32f4.repl: timer2 frequency: 10000000),
+ * ignorando o RCC. Sem esta calibracao, 1 ms de firmware = 8,4 ms virtuais
+ * e timeouts longos estouram os waits (em segundos virtuais) dos testes
+ * Robot (falha QG11). Hardware real mantem 84 MHz. */
 #ifndef LEWIS_TIM2CLK_HZ
+#if defined(RENODE_SIMULATION) && RENODE_SIMULATION
+#define LEWIS_TIM2CLK_HZ 10000000UL
+#else
 #define LEWIS_TIM2CLK_HZ 84000000UL
+#endif
 #endif
 #define TIM2_TICKS_PER_MS   (LEWIS_TIM2CLK_HZ / 1000UL)
 

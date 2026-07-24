@@ -1,0 +1,188 @@
+{
+  "lane": "helper",
+  "artifact_family_detected": "KERAS_3_STANDALONE",
+  "selected_loader": "keras.saving.load_model",
+  "compile": false,
+  "safe_mode": true,
+  "custom_objects": [],
+  "model_path_resolved": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "model_sha256": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347",
+  "fixture_path_resolved": "/home/douglas-souza/PycharmProjects/Project-Lewis/artifacts/stage1_recall_investigation/R03/loader_fixture.npz",
+  "fixture_sha256": "59d08ed5ae4a15e55e45f2c09afd3cebcdf4921782c71e8febd649df81d48794",
+  "structure": {
+    "model_type": "Functional",
+    "model_module": "keras.src.models.functional",
+    "input_shape": [
+      null,
+      500,
+      1
+    ],
+    "output_shape": [
+      null,
+      2
+    ],
+    "parameter_count": 13218,
+    "layer_count": 11,
+    "layer_names": [
+      "input",
+      "conv1d_1",
+      "maxpool_1",
+      "conv1d_2",
+      "maxpool_2",
+      "conv1d_3",
+      "maxpool_3",
+      "gap",
+      "embedding",
+      "dropout",
+      "output"
+    ],
+    "layer_classes": [
+      "InputLayer",
+      "Conv1D",
+      "MaxPooling1D",
+      "Conv1D",
+      "MaxPooling1D",
+      "Conv1D",
+      "MaxPooling1D",
+      "GlobalAveragePooling1D",
+      "Dense",
+      "Dropout",
+      "Dense"
+    ],
+    "layer_modules": [
+      "keras.src.layers.core.input_layer",
+      "keras.src.layers.convolutional.conv1d",
+      "keras.src.layers.pooling.max_pooling1d",
+      "keras.src.layers.convolutional.conv1d",
+      "keras.src.layers.pooling.max_pooling1d",
+      "keras.src.layers.convolutional.conv1d",
+      "keras.src.layers.pooling.max_pooling1d",
+      "keras.src.layers.pooling.global_average_pooling1d",
+      "keras.src.layers.core.dense",
+      "keras.src.layers.regularization.dropout",
+      "keras.src.layers.core.dense"
+    ],
+    "weight_tensor_count": 10,
+    "weight_tensors": [
+      {
+        "tensor_index": 0,
+        "layer_name": "conv1d_1",
+        "layer_tensor_index": 0,
+        "shape": [
+          7,
+          1,
+          16
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 1,
+        "layer_name": "conv1d_1",
+        "layer_tensor_index": 1,
+        "shape": [
+          16
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 2,
+        "layer_name": "conv1d_2",
+        "layer_tensor_index": 0,
+        "shape": [
+          5,
+          16,
+          32
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 3,
+        "layer_name": "conv1d_2",
+        "layer_tensor_index": 1,
+        "shape": [
+          32
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 4,
+        "layer_name": "conv1d_3",
+        "layer_tensor_index": 0,
+        "shape": [
+          3,
+          32,
+          64
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 5,
+        "layer_name": "conv1d_3",
+        "layer_tensor_index": 1,
+        "shape": [
+          64
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 6,
+        "layer_name": "embedding",
+        "layer_tensor_index": 0,
+        "shape": [
+          64,
+          64
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 7,
+        "layer_name": "embedding",
+        "layer_tensor_index": 1,
+        "shape": [
+          64
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 8,
+        "layer_name": "output",
+        "layer_tensor_index": 0,
+        "shape": [
+          64,
+          2
+        ],
+        "dtype": "float32",
+        "trainable": true
+      },
+      {
+        "tensor_index": 9,
+        "layer_name": "output",
+        "layer_tensor_index": 1,
+        "shape": [
+          2
+        ],
+        "dtype": "float32",
+        "trainable": true
+      }
+    ],
+    "dtype_policy": "float32",
+    "trainable_variable_count": 10,
+    "non_trainable_variable_count": 1
+  },
+  "prediction_shape": [
+    11,
+    2
+  ],
+  "prediction_dtype": "float32",
+  "prediction_nan_count": 0,
+  "prediction_inf_count": 0,
+  "compile_true": null
+}

@@ -1,0 +1,105 @@
+schema_version: advanced-training-config-v3.1.0
+generation_id: advanced-training-v3.1.0-r2
+project_root: .
+family_npz: data/features/v3.1.0-r2/finetuning_mitbih_family.npz
+family_parquet: data/features/v3.1.0-r2/finetuning_mitbih_family.parquet
+stage1_npz: data/features/v3.1.0-r2/stage1_binary.npz
+stage1_parquet: data/features/v3.1.0-r2/stage1_binary.parquet
+afdb_rhythm_npz: data/features/v3.1.0-r2/afdb_rhythm_episodes.npz
+afdb_rhythm_parquet: data/features/v3.1.0-r2/afdb_rhythm_episodes.parquet
+identity_policy: config/patient_identity_v3.1.yaml
+legacy_split_dir: data/splits/groupkfold_5_stratified/v3
+split_output_dir: data/splits/groupkfold_5_stratified/v3.1.0
+report_json: reports/training_preflight_v3.1.r2.json
+report_markdown: reports/training_preflight_v3.1.r2.md
+report_completion_marker: reports/training_preflight_v3.1.r2.COMPLETE
+pretraining_gate_marker: >-
+  experiments/advanced_training_v3.1.0-r2/preflight/PRETRAINING_GATE_PASS
+families: [A, B, C, D]
+folds: [0, 1, 2, 3, 4]
+seeds: [17, 29, 43, 71, 101]
+n_splits: 5
+split_random_state: 42
+target_sampling_rate: 500
+input_shape: [500, 1]
+feature_columns:
+  - rr_prev
+  - rr_next
+  - rr_ratio
+  - rr_local_mean
+  - rr_local_std
+  - rmssd
+  - heart_rate
+  - r_amplitude
+  - q_depth
+  - t_amplitude
+  - qrs_width_ms
+  - qrs_area
+  - st_slope_mV_s
+  - j_point
+  - qrs_asymmetry_index
+  - t_r_ratio
+  - qrs_raggedness
+quality_heads: [qf_flatline, qf_clip, qf_off_center]
+preprocessing_files:
+  - src/data/annotations.py
+  - src/data/resampler.py
+  - src/data/segmenter.py
+  - src/data/training_schemas.py
+  - src/features/aami_mapper.py
+  - src/features/afdb_rhythm.py
+  - src/features/pipeline.py
+  - src/features/time_domain.py
+  - scripts/prepare_two_stage_datasets.py
+  - config/preprocess_v1.0.yaml
+processed_signal_globs:
+  - data/processed/mitdb/*.npy
+  - data/processed/svdb/*.npy
+  - data/processed/incart/*.npy
+  - data/processed/afdb/*.npy
+source_globs:
+  - src/training_integrity/*.py
+  - src/cli/advanced_training_v3.py
+  - src/models/backbone_1d.py
+  - src/models/multitask_v3.py
+  - src/features/afdb_rhythm.py
+  - src/features/ontology_v3.py
+  - src/features/pipeline.py
+  - src/features/time_domain.py
+  - src/data/annotations.py
+  - src/data/resampler.py
+  - src/data/segmenter.py
+  - src/data/training_schemas.py
+  - scripts/prepare_two_stage_datasets.py
+  - scripts/run_stage1_matrix_v3.py
+  - scripts/run_stage1_sanity_cell_v3.py
+  - scripts/build_frozen_splits_v3.py
+  - scripts/build_afdb_frozen_splits_v3.py
+  - config/advanced_training_v3.1.yaml
+  - config/advanced_training_v3.1.r2-bootstrap.yaml
+  - config/advanced_training_v3.1.r2.yaml
+  - config/patient_identity_v3.1.yaml
+  - docs/rebuild_spec/*.md
+  - pyproject.toml
+  - uv.lock
+required_sample_lineage_columns:
+  - dataset_id
+  - patient_id
+  - record_id
+  - beat_index
+  - segment_id
+  - sample_id
+  - waveform_sha256
+  - source_sampling_rate
+  - target_sampling_rate
+  - annotation_index_native
+  - annotation_time_seconds
+  - annotation_index_target
+  - class_original
+  - class_canonical
+  - y
+  - quality_label
+  - split
+  - fold
+research_execution_authorized: true
+promotion_authorized: false

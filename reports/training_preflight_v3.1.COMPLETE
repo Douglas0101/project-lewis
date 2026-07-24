@@ -1,0 +1,8 @@
+{
+  "evidence_bundle_hash": "56c7b379fb67caa4040e85e1a6c836b1fe1f01817f613bb0f942cbf0a6129309",
+  "generation_id": "advanced-training-v3.1.0-r1",
+  "report_json_sha256": "acfd528517a481d3171bdf44828a824a1af9b1af8cf3241d030a24a1f28d10c6",
+  "report_markdown_sha256": "ca35ce5f893f3cb31caf06c69d52474e0fabde4d12a82727587ed68bde89cdd5",
+  "schema_version": "preflight-report-publication-v3.1.0",
+  "status": "REPORT_BUNDLE_COMPLETE"
+}

@@ -17,6 +17,7 @@ from typing import Any
 import joblib
 import numpy as np
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
 from src.inference.quantized_runner import QuantizedModelRunner
 
@@ -126,12 +127,8 @@ class TwoStageInferencePipeline:
             self.stage1_model = QuantizedModelRunner(self.stage1_model_path).allocate()
             self.stage2_model = QuantizedModelRunner(self.stage2_model_path).allocate()
         else:
-            self.stage1_model = tf.keras.models.load_model(
-                str(self.stage1_model_path), compile=False
-            )
-            self.stage2_model = tf.keras.models.load_model(
-                str(self.stage2_model_path), compile=False
-            )
+            self.stage1_model = load_keras_model(str(self.stage1_model_path), compile=False)
+            self.stage2_model = load_keras_model(str(self.stage2_model_path), compile=False)
 
         if self.stage1_threshold_path is not None:
             data = json.loads(Path(self.stage1_threshold_path).read_text(encoding="utf-8"))
@@ -147,6 +144,7 @@ class TwoStageInferencePipeline:
 
     def _run_stage1(self, X: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
         """Executa o Estágio 1 e retorna predições + probabilidade Anormal."""
+        assert self.stage1_model is not None
         X_norm = self._normalize(X, self.stage1_scaler)
         logits = self._forward(self.stage1_model, X_norm)
         score_anormal = logits[:, 1]
@@ -155,12 +153,14 @@ class TwoStageInferencePipeline:
 
     def _run_stage2(self, X: np.ndarray) -> np.ndarray:
         """Executa o Estágio 2 e retorna labels S/V/F."""
+        assert self.stage2_model is not None
         X_norm = self._normalize(X, self.stage2_scaler)
         logits = self._forward(self.stage2_model, X_norm)
         return np.argmax(logits, axis=1).astype(np.int64)
 
     def _stage2_scores(self, X: np.ndarray) -> np.ndarray:
         """Retorna os logits/probabilidades do Estágio 2 para as amostras."""
+        assert self.stage2_model is not None
         X_norm = self._normalize(X, self.stage2_scaler)
         return self._forward(self.stage2_model, X_norm)
 

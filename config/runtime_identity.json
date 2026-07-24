@@ -1,0 +1,6 @@
+{
+  "schema_version": "1.0",
+  "canonical_interpreter": ".venv/bin/python3",
+  "python_major": 3,
+  "python_minor": 12
+}

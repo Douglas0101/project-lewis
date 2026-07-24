@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+from collections.abc import Generator
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -68,7 +69,7 @@ def test_embedding() -> FakeSentenceTransformer:
 
 
 @pytest.fixture
-def db_conn(tmp_path: Path) -> Tuple[Any, Path]:
+def db_conn(tmp_path: Path) -> Generator[Tuple[Any, Path], None, None]:
     """Conexao SQLite + sqlite-vec com schema inicializado e seu caminho."""
     db_path = tmp_path / "knowledge.db"
     connection = db_module.get_connection(db_path)
@@ -244,7 +245,7 @@ def populated_db(
     sample_chunks: List[Tuple[str, str, str, List[str], str]],
     test_embedding: FakeSentenceTransformer,
     monkeypatch: pytest.MonkeyPatch,
-) -> Path:
+) -> Generator[Path, None, None]:
     """Banco temporario populado com chunks de teste e retriever monkeypatched.
 
     A conexao de insercao e fechada antes do yield; sqlite-vec atualiza o

@@ -6,9 +6,9 @@ import json
 from pathlib import Path
 
 import joblib
+import keras
 import numpy as np
 import pytest
-import tensorflow as tf
 
 from src.inference.stage1_mlp_runner import MLPStage1Runner
 
@@ -17,10 +17,10 @@ from src.inference.stage1_mlp_runner import MLPStage1Runner
 def dummy_mlp_artifacts(tmp_path: Path):
     """Cria modelo, scaler e config dummy para testes."""
     feature_names = ["feat_a", "feat_b"]
-    model = tf.keras.Sequential(
+    model = keras.Sequential(
         [
-            tf.keras.layers.Dense(4, activation="relu", input_shape=(2,)),
-            tf.keras.layers.Dense(2, activation="softmax"),
+            keras.layers.Dense(4, activation="relu", input_shape=(2,)),
+            keras.layers.Dense(2, activation="softmax"),
         ]
     )
     model_path = tmp_path / "model.keras"
@@ -28,6 +28,7 @@ def dummy_mlp_artifacts(tmp_path: Path):
 
     scaler_path = tmp_path / "scaler.pkl"
     from sklearn.preprocessing import StandardScaler
+
     scaler = StandardScaler()
     scaler.fit(np.random.randn(10, 2))
     joblib.dump(scaler, scaler_path)

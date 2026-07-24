@@ -1,0 +1,184 @@
+{
+  "schema_version": "1.1",
+  "diagnostic_only": true,
+  "positive_label": 1,
+  "positive_name": "Anormal",
+  "selection_method": "Exact deterministic QG5 selection: first 128 N and first 640 each of S/V/F, then numpy default_rng(42) permutation",
+  "model": {
+    "path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+    "sha256": "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347"
+  },
+  "scaler": {
+    "path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/input_scaler_stage1_v2.0.pkl",
+    "sha256": "80f5fabf5aeb790f9bf6c0bd8dfc993133d6d53f5f9787cc53011fb1c2b3acb3"
+  },
+  "threshold_artifact": {
+    "path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_threshold_v2.0.json",
+    "sha256": "b75e14ab95136d544664a166eaa15fcdcfe38fda821462a781b26265b6966746"
+  },
+  "threshold_used": 0.5800000000000001,
+  "sources": [
+    {
+      "path": "/home/douglas-souza/PycharmProjects/Project-Lewis/data/features/stage1_binary.npz",
+      "sha256": "23adba2139ac691df639b132f4fd52b06fa1d3095d2d3988b011f1382b6a2b35",
+      "keys": [
+        "X",
+        "feature_columns",
+        "features",
+        "y"
+      ],
+      "has_record_id": false,
+      "has_group_id": false
+    },
+    {
+      "path": "/home/douglas-souza/PycharmProjects/Project-Lewis/data/features/stage2_multiclass.npz",
+      "sha256": "68fb0a8e9fa3bc3fd06df7af074222c9837b8a04dc644b9f823d26919ba6b04a",
+      "keys": [
+        "X",
+        "y"
+      ],
+      "has_record_id": false,
+      "has_group_id": false
+    }
+  ],
+  "transformations": [
+    {
+      "file": "/home/douglas-souza/PycharmProjects/Project-Lewis/tests/test_two_stage_qg5.py",
+      "function": "_load_combined_test_subset",
+      "line": 44,
+      "input_shape": null,
+      "output_shape": [
+        2048,
+        500,
+        1
+      ],
+      "dtype": "float32",
+      "minimum": -4.864931106567383,
+      "maximum": 9.49625015258789,
+      "mean": 0.6450551748275757,
+      "std": 0.8488486409187317,
+      "nan_count": 0,
+      "inf_count": 0
+    },
+    {
+      "file": "/home/douglas-souza/PycharmProjects/Project-Lewis/src/inference/two_stage_pipeline.py",
+      "function": "TwoStageInferencePipeline._normalize",
+      "line": 140,
+      "input_shape": [
+        2048,
+        500,
+        1
+      ],
+      "output_shape": [
+        2048,
+        500,
+        1
+      ],
+      "dtype": "float32",
+      "minimum": -6.4329328536987305,
+      "maximum": 12.040265083312988,
+      "mean": 0.6547198295593262,
+      "std": 1.0918983221054077,
+      "nan_count": 0,
+      "inf_count": 0
+    },
+    {
+      "file": "/home/douglas-souza/PycharmProjects/Project-Lewis/src/inference/two_stage_pipeline.py",
+      "function": "TwoStageInferencePipeline._forward",
+      "line": 167,
+      "input_shape": [
+        2048,
+        500,
+        1
+      ],
+      "output_shape": [
+        2048,
+        2
+      ],
+      "dtype": "float32",
+      "minimum": 0.012770771980285645,
+      "maximum": 0.9872292280197144,
+      "mean": 0.5,
+      "std": 0.2757728695869446,
+      "nan_count": 0,
+      "inf_count": 0
+    },
+    {
+      "file": "/home/douglas-souza/PycharmProjects/Project-Lewis/src/inference/two_stage_pipeline.py",
+      "function": "TwoStageInferencePipeline._run_stage1 score_anormal",
+      "line": 145,
+      "input_shape": [
+        2048,
+        2
+      ],
+      "output_shape": [
+        2048
+      ],
+      "dtype": "float32",
+      "minimum": 0.012770771980285645,
+      "maximum": 0.6506867408752441,
+      "mean": 0.2820870280265808,
+      "std": 0.16901074349880219,
+      "nan_count": 0,
+      "inf_count": 0
+    },
+    {
+      "file": "/home/douglas-souza/PycharmProjects/Project-Lewis/src/inference/two_stage_pipeline.py",
+      "function": "TwoStageInferencePipeline._run_stage1 threshold decision",
+      "line": 145,
+      "input_shape": [
+        2048
+      ],
+      "output_shape": [
+        2048
+      ],
+      "dtype": "int64",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "mean": 0.06201171875,
+      "std": 0.24117683447559987,
+      "nan_count": 0,
+      "inf_count": 0
+    }
+  ],
+  "confusion": {
+    "true_positive": 127,
+    "false_positive": 0,
+    "true_negative": 128,
+    "false_negative": 1793
+  },
+  "recall_abnormal": 0.06614583333333333,
+  "precision_abnormal": 1.0,
+  "f1_abnormal": 0.12408402540302882,
+  "specificity": 1.0,
+  "false_negative_rate": 0.9338541666666667,
+  "balanced_accuracy": 0.5330729166666667,
+  "average_precision": 0.9136421076851974,
+  "positive_prevalence": 0.9375,
+  "ap_lift": -0.02385789231480262,
+  "ap_lift_interpretation": "BELOW_PREVALENCE_REFERENCE",
+  "predicted_abnormal_rate": 0.06201171875,
+  "minimum_true_positives_for_gate": 576,
+  "additional_true_positives_needed": 449,
+  "integrity": {
+    "stable_sample_ids": true,
+    "duplicate_sample_ids": 0,
+    "duplicate_selected_sources": 0,
+    "samples_selected": 2048,
+    "targets": 2048,
+    "outputs": 2048,
+    "predictions": 2048,
+    "order_preserved": true,
+    "samples_lost": 0,
+    "canonical_score_max_abs_delta": 0.0,
+    "canonical_threshold_matches": true,
+    "canonical_decision_disagreement": 0
+  },
+  "provenance_warnings": [
+    "Source NPZ files contain no record_id or group_id arrays; those CSV fields are blank.",
+    "Stable sample_id is derived from dataset, original class, and immutable NPZ index.",
+    "QG5 subset uses first class occurrences and is enriched to 93.75% abnormal; it is not a patient-wise generalization estimate.",
+    "raw_feature_hash refers to the complete 500x1 model input; no ECG samples are saved.",
+    "Interpreted probability is output column 1 as implemented; activation semantics remain to be proven in R02/R07."
+  ]
+}

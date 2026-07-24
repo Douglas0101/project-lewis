@@ -14,8 +14,8 @@ from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
-from src.tracking.models import Base
 from src.tracking.migrations import apply_migrations
+from src.tracking.models import Base
 
 
 def _project_root() -> Path:

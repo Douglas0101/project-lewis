@@ -8,7 +8,9 @@ ENV UV_COMPILE_BYTECODE=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
-    DEBIAN_FRONTEND=noninteractive
+    DEBIAN_FRONTEND=noninteractive \
+    TF_USE_LEGACY_KERAS=0 \
+    KERAS_BACKEND=tensorflow
 
 # Instala dependências de sistema para compilação de pacotes científicos (fallback)
 RUN apt-get update && apt-get install -y --no-install-recommends \

@@ -106,3 +106,8 @@ firmware/third_party/
 !firmware/third_party/tflite-micro.commit
 firmware/test_harness_report.json
 
+
+# --- Pi agent tooling / session state ---
+.pi-subagents/
+.playwright-mcp/
+memory.md

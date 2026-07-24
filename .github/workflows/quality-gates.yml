@@ -6,7 +6,7 @@ on:
   pull_request:
     branches: [master, develop]
   schedule:
-    - cron: "0 3 * * 1"  # Segunda-feiras 03:00 UTC
+    - cron: "0 3 * * 1" # Segunda-feiras 03:00 UTC
   workflow_dispatch:
     inputs:
       run_qg4_qg5:
@@ -27,23 +27,23 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
         with:
           enable-cache: true
 
       - name: Install project dependencies
         run: uv sync --frozen
 
-      # Os comandos abaixo usam `|| true` enquanto o repo não passa por formatação
-      # completa; assim o job reporta problemas sem bloquear o CI.
+      # Estes comandos usam `|| true` enquanto a formatação integral
+      # não foi concluída; os problemas são reportados sem bloquear o CI.
       - name: black
         run: uv run black --check src tests scripts || true
 
@@ -65,30 +65,44 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
         with:
           enable-cache: true
 
       - name: Install project dependencies
         run: uv sync --frozen
 
-      - name: Run unit tests (fast, no real datasets)
+      - name: Run unit tests (fast, source-only)
+        env:
+          UNIT_MARKERS: >-
+            not slow and not integration and not stress and
+            not requires_artifacts and not qg4 and not qg5 and not qg6
+        run: uv run pytest tests/ -m "$UNIT_MARKERS" --tb=short
+
+      - name: Inventory tests requiring external artifacts
         run: |
-          uv run pytest tests/ \
-            -m "not slow and not qg4 and not qg5 and not qg6" \
-            --tb=short
+          uv run pytest tests/ -m requires_artifacts --collect-only -q \
+            > requires-artifacts-tests.txt
+          test -s requires-artifacts-tests.txt
+
+      - name: Upload external-artifact test inventory
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: requires-artifacts-tests
+          path: requires-artifacts-tests.txt
 
       - name: Upload coverage
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: coverage-unit
           path: .coverage
@@ -105,15 +119,15 @@ jobs:
       LEWIS_REQUIRE_DATA: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
         with:
           enable-cache: true
 
@@ -123,21 +137,23 @@ jobs:
       - name: Check DVC remote availability
         id: dvc-check
         run: |
-          if [ -n "${{ secrets.DVC_REMOTE_URL }}" ] && [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
+          if [ -n "${{ secrets.DVC_REMOTE_URL }}" ] && \
+             [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ]; then
             echo "has_dvc=true" >> "$GITHUB_OUTPUT"
           else
             echo "has_dvc=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::DVC remote não configurado (secrets DVC_REMOTE_URL/AWS ausentes); pulando gates que exigem datasets."
+            echo "::warning::DVC/AWS secrets ausentes; " \
+                 "pulando gates que exigem datasets."
           fi
 
-      - name: Configure DVC remote (stub)
+      - name: Configure DVC remote
         if: steps.dvc-check.outputs.has_dvc == 'true'
-        run: |
-          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
         env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: uv run dvc remote add -d storage "$DVC_REMOTE_URL"
 
       - name: Pull datasets via DVC
         if: steps.dvc-check.outputs.has_dvc == 'true'
@@ -150,7 +166,10 @@ jobs:
       - name: QG1 — Resample + Preprocessing
         if: steps.dvc-check.outputs.has_dvc == 'true'
         run: |
-          uv run pytest tests/test_loader.py tests/test_resampler.py tests/test_preprocessing.py \
+          uv run pytest \
+            tests/test_loader.py \
+            tests/test_resampler.py \
+            tests/test_preprocessing.py \
             -m qg1 --tb=short
 
       - name: QG2 — AMPT
@@ -169,7 +188,9 @@ jobs:
 
       - name: Generate quality report
         if: steps.dvc-check.outputs.has_dvc == 'true'
-        run: uv run python scripts/generate_quality_report.py --output reports/quality_report.md
+        run: |
+          uv run python scripts/generate_quality_report.py \
+            --output reports/quality_report.md
 
       - name: Generate skipped-quality report
         if: steps.dvc-check.outputs.has_dvc != 'true'
@@ -177,11 +198,13 @@ jobs:
           mkdir -p reports
           echo "# Quality Report" > reports/quality_report.md
           echo "" >> reports/quality_report.md
-          echo "> Skipped: DVC remote não configurado. Gates QG0–QG3/QG6 não executados." >> reports/quality_report.md
+          echo "> Skipped: DVC remote não configurado. " \
+               "Gates QG0–QG3/QG6 não executados." \
+            >> reports/quality_report.md
 
       - name: Upload quality report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: quality-report
           path: reports/quality_report.md
@@ -199,28 +222,28 @@ jobs:
       LEWIS_REQUIRE_DATA: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86
         with:
           enable-cache: true
 
       - name: Install project dependencies
         run: uv sync --frozen
 
-      - name: Configure DVC remote (stub)
-        run: |
-          uv run dvc remote add -d storage "${{ secrets.DVC_REMOTE_URL || 's3://project-lewis-dvc/datasets' }}"
+      - name: Configure DVC remote
         env:
+          DVC_REMOTE_URL: ${{ secrets.DVC_REMOTE_URL }}
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ secrets.AWS_REGION || 'us-east-1' }}
+        run: uv run dvc remote add -d storage "$DVC_REMOTE_URL"
 
       - name: Pull datasets via DVC
         run: uv run dvc pull
@@ -235,7 +258,7 @@ jobs:
 
       - name: Upload models
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: models-qg4-qg5
           path: |

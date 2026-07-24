@@ -5,6 +5,8 @@ validação, verificando que a queda de F1-macro atende o threshold do quality
 gate QG6 (ΔF1-macro < 2 pontos percentuais).
 """
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 import json
@@ -14,6 +16,7 @@ from typing import Any
 import joblib
 import numpy as np
 import pytest
+from src.models.keras_loader import load_keras_model
 from sklearn.metrics import accuracy_score, f1_score, matthews_corrcoef
 
 from src.inference.quantized_runner import QuantizedModelRunner
@@ -88,9 +91,7 @@ def _normalize(X: np.ndarray, scaler_path: Path) -> np.ndarray:
 
 def _predict_float(model_path: Path, X: np.ndarray, stage: int) -> np.ndarray:
     """Executa inferência com modelo Keras float32 e retorna classes preditas."""
-    import tensorflow as tf
-
-    model = tf.keras.models.load_model(str(model_path), compile=False)
+    model = load_keras_model(str(model_path), compile=False)
     logits = model.predict(X, verbose=0)
 
     if stage == 1:

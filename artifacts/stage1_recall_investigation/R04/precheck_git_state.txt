@@ -1,0 +1,283 @@
+HEAD=7510fdcb9b2046625ed025aa511355cc3756be03
+
+ M CHANGELOG.md
+ M Dockerfile
+ M Makefile
+ M PLAN.md
+ M docker-compose.yml
+AM "docs/STAGE 2 RESEARCH BRANCH v2.4.md"
+ M firmware/scripts/generate_harness_fixtures.py
+ M firmware/scripts/run_renode_tests.py
+ M firmware/src/ml/quantization_params.h
+ M firmware/src/ml/stage1_int8_v2.0.h
+ M firmware/tests/fixtures/generated/fixture_dsp.h
+ M firmware/tests/fixtures/generated/fixture_pipeline.h
+ M firmware/tests/test_adaptive_skipping.c
+ M models/quantized/quantization_params.json
+ M models/quantized/stage1_int8_v2.0.tflite
+ M package-lock.json
+ M scripts/audit_training_data.py
+ M scripts/prepare_stage1_features.py
+ M scripts/prepare_stage2_features.py
+ M scripts/quantize_mlp_features.py
+ M scripts/select_best_mlp_fold.py
+ M scripts/train_stage1_mlp.py
+ M scripts/train_stage2_mlp.py
+ M src/callbacks/calibration_monitor.py
+ M src/callbacks/f1_macro_checkpoint.py
+ M src/callbacks/gradient_monitor.py
+ M src/callbacks/metric_tracker.py
+ M src/data/_catalog.py
+ M src/data/_schemas.py
+ M src/data/aggregator.py
+ M src/data/checksums.json
+ M src/data/loader.py
+ M src/data/preprocessor.py
+ M src/data/resampler.py
+ M src/data/smote_sequence.py
+ M src/features/aami_mapper.py
+ M src/features/ampt_500hz.py
+ M src/features/augmentation.py
+ M src/features/balancer.py
+ M src/features/morphological.py
+ M src/features/pipeline.py
+ M src/features/scaler_utils.py
+ M src/inference/feature_extractor.py
+ M src/inference/stage1_mlp_runner.py
+ M src/inference/two_stage_mlp_pipeline.py
+ M src/inference/two_stage_pipeline.py
+ M src/knowledge/indexer.py
+ M src/knowledge/retriever.py
+ M src/knowledge/structured_query.py
+ M src/models/backbone_1d.py
+ M src/models/evaluate.py
+ M src/models/finetune_mitbih.py
+ M src/models/pretrain_chapman.py
+ M src/models/pruning_qat.py
+ M src/models/slha/monitor.py
+ M src/models/train.py
+ M src/models/training_common.py
+ M src/models/two_stage_pipeline.py
+ M src/quantization/export_tflite.py
+ M src/quantization/ptq.py
+ M src/security/rls.py
+ M src/tracking/db.py
+ M src/tracking/decorators.py
+ M src/utils/path_utils.py
+ M tests/conftest.py
+ M tests/fixtures/dsp_filters.py
+ M tests/ground_truth/ecg_input_00.bin
+ M tests/ground_truth/ecg_input_01.bin
+ M tests/ground_truth/ecg_input_02.bin
+ M tests/ground_truth/ecg_input_03.bin
+ M tests/ground_truth/ecg_input_04.bin
+ M tests/ground_truth/expected_output_00.bin
+ M tests/ground_truth/expected_output_01.bin
+ M tests/ground_truth/expected_output_02.bin
+ M tests/ground_truth/expected_output_03.bin
+ M tests/ground_truth/expected_output_04.bin
+ M tests/ground_truth/generate_ground_truth.py
+ M tests/stress/conftest.py
+ M tests/stress/test_ponte3_timeline.py
+ M tests/test_ampt.py
+ M tests/test_bit_exact_python_tflm.py
+ M tests/test_callbacks.py
+ M tests/test_dsp_fidelity.py
+ M tests/test_evaluation/test_confusion_matrix_norm.py
+ M tests/test_features.py
+ M tests/test_fidelity.py
+ M tests/test_inference_stage1_mlp.py
+ M tests/test_knowledge/conftest.py
+ M tests/test_knowledge/test_experiment_summarizer.py
+ M tests/test_knowledge/test_hybrid_search.py
+ M tests/test_knowledge/test_retriever.py
+ M tests/test_knowledge/test_structured_query.py
+ M tests/test_memory/test_memory_commit.py
+ M tests/test_model.py
+ M tests/test_native_tflm.py
+ M tests/test_observability/test_instrumentation.py
+ M tests/test_observability/test_metrics.py
+ M tests/test_prepare_stage1_features.py
+ M tests/test_preprocessing.py
+ M tests/test_quantization_degradation.py
+ M tests/test_scaler_utils.py
+ M tests/test_segmenter.py
+ M tests/test_tracking/test_timeline.py
+ M tests/test_tracking/test_timeline_refresh.py
+ M tests/test_tracking_db.py
+ M tests/test_tracking_integration.py
+ M tests/test_training_data_audit.py
+ M tests/test_two_stage_mlp_qg5.py
+ M tests/test_two_stage_qg5.py
+?? .env.example
+?? .pi-subagents/
+?? artifacts/
+?? config/runtime_identity.json
+?? docs/auditoria_arquitetura_v2.3.md
+?? docs/dataset_update_proposal_v2.5.md
+?? docs/environment_harmonization.md
+?? docs/keras_model_compatibility.md
+?? docs/positive_class_contract.md
+?? docs/ptbxl_afib_investigation_report.md
+?? docs/quality_gates_report_v2.5.md
+?? docs/script_inventory_refactor_v2.5.md
+?? docs/stage1_inference_contract.md
+?? docs/stage2_v2.4_research_report.md
+?? docs/vistoria_slha_gpu_adaptacao_v2.4.md
+?? memory.md
+?? pyrightconfig.json
+?? scripts/analyze_stage2_thresholds_v11_v13.py
+?? scripts/audit_stage1_loader_equivalence.py
+?? scripts/audit_stage2_feature_separability.py
+?? scripts/audit_stage2_labels_e07.py
+?? scripts/audit_stage2_patient_distribution.py
+?? scripts/audit_stage2_split_protocol.py
+?? scripts/build_stage1_loader_fixture.py
+?? scripts/check_runtime_identity.py
+?? scripts/diagnose_stage1_qg5.py
+?? scripts/engineer_stage2_features_for_class_f.py
+?? scripts/inspect_stage1_keras_artifact.py
+?? scripts/resample_f_by_patient.py
+?? scripts/run_qg5_v2.4_gates.py
+?? scripts/stage1_loader_lane.py
+?? scripts/train_stage2_baseline_enhanced.py
+?? src/features/afdb_beat_loader.py
+?? src/features/ptbxl_beat_loader.py
+?? src/inference/manifest_validator.py
+?? src/models/keras_artifact_inspector.py
+?? src/models/keras_loader.py
+?? src/models/qg5_gates.py
+?? src/models/split_protocol.py
+?? src/quantization/firmware_params.py
+?? src/runtime_identity.py
+?? tests/test_e08_resampled_focal_mlp.py
+?? tests/test_feature_engineering_e06.py
+?? tests/test_feature_separability.py
+?? tests/test_firmware_quantization_params.py
+?? tests/test_label_audit_e07.py
+?? tests/test_manifest_validator.py
+?? tests/test_qg5_v2_4_gates.py
+?? tests/test_runtime_identity.py
+?? tests/test_split_protocol.py
+?? tests/test_stage1_ap_reports_prevalence.py
+?? tests/test_stage1_keras_artifact_contract.py
+?? tests/test_stage1_loader_direct_equivalence.py
+?? tests/test_stage1_positive_class_contract.py
+?? tests/test_stage2_patient_distribution.py
+?? tests/test_v2_4_publication_guard.py
+?? tests/test_v2_4_research_completion.py
+?? typings/
+
+
+DIFF STAT
+ CHANGELOG.md                                       |   49 +
+ Dockerfile                                         |    4 +-
+ Makefile                                           |    4 +
+ PLAN.md                                            |  158 +-
+ docker-compose.yml                                 |    4 +
+ docs/STAGE 2 RESEARCH BRANCH v2.4.md               | 2373 ++++++++
+ firmware/scripts/generate_harness_fixtures.py      |   55 +-
+ firmware/scripts/run_renode_tests.py               |   62 +-
+ firmware/src/ml/quantization_params.h              |    8 +-
+ firmware/src/ml/stage1_int8_v2.0.h                 | 6089 ++++++--------------
+ firmware/tests/fixtures/generated/fixture_dsp.h    |   20 +-
+ .../tests/fixtures/generated/fixture_pipeline.h    |   30 +-
+ firmware/tests/test_adaptive_skipping.c            |    8 +-
+ models/quantized/quantization_params.json          |    6 +-
+ models/quantized/stage1_int8_v2.0.tflite           |  Bin 55664 -> 27264 bytes
+ package-lock.json                                  |    6 +-
+ scripts/audit_training_data.py                     |   29 +-
+ scripts/prepare_stage1_features.py                 |   18 +-
+ scripts/prepare_stage2_features.py                 |   18 +-
+ scripts/quantize_mlp_features.py                   |   46 +-
+ scripts/select_best_mlp_fold.py                    |  273 +-
+ scripts/train_stage1_mlp.py                        |   11 +-
+ scripts/train_stage2_mlp.py                        |  614 +-
+ src/callbacks/calibration_monitor.py               |    6 +-
+ src/callbacks/f1_macro_checkpoint.py               |    8 +-
+ src/callbacks/gradient_monitor.py                  |   19 +-
+ src/callbacks/metric_tracker.py                    |    7 +-
+ src/data/_catalog.py                               |    2 +-
+ src/data/_schemas.py                               |   24 +-
+ src/data/aggregator.py                             |    2 +-
+ src/data/checksums.json                            |   14 +-
+ src/data/loader.py                                 |    1 +
+ src/data/preprocessor.py                           |   13 +-
+ src/data/resampler.py                              |    7 +-
+ src/data/smote_sequence.py                         |    9 +-
+ src/features/aami_mapper.py                        |    2 +-
+ src/features/ampt_500hz.py                         |    7 +-
+ src/features/augmentation.py                       |    4 +-
+ src/features/balancer.py                           |    4 +-
+ src/features/morphological.py                      |    9 +-
+ src/features/pipeline.py                           |   22 +-
+ src/features/scaler_utils.py                       |    4 +-
+ src/inference/feature_extractor.py                 |   11 +-
+ src/inference/stage1_mlp_runner.py                 |   36 +-
+ src/inference/two_stage_mlp_pipeline.py            |  153 +-
+ src/inference/two_stage_pipeline.py                |   12 +-
+ src/knowledge/indexer.py                           |    3 +-
+ src/knowledge/retriever.py                         |    6 +-
+ src/knowledge/structured_query.py                  |    1 +
+ src/models/backbone_1d.py                          |    5 +-
+ src/models/evaluate.py                             |  108 +-
+ src/models/finetune_mitbih.py                      |   10 +-
+ src/models/pretrain_chapman.py                     |   30 +-
+ src/models/pruning_qat.py                          |   11 +-
+ src/models/slha/monitor.py                         |    4 +-
+ src/models/train.py                                |   18 +-
+ src/models/training_common.py                      |    2 +-
+ src/models/two_stage_pipeline.py                   |    3 +-
+ src/quantization/export_tflite.py                  |    3 +-
+ src/quantization/ptq.py                            |    3 +-
+ src/security/rls.py                                |    2 +-
+ src/tracking/db.py                                 |    2 +-
+ src/tracking/decorators.py                         |    2 +
+ src/utils/path_utils.py                            |    1 -
+ tests/conftest.py                                  |   16 +-
+ tests/fixtures/dsp_filters.py                      |    7 +-
+ tests/ground_truth/ecg_input_00.bin                |  Bin 2000 -> 2000 bytes
+ tests/ground_truth/ecg_input_01.bin                |  Bin 2000 -> 2000 bytes
+ tests/ground_truth/ecg_input_02.bin                |  Bin 2000 -> 2000 bytes
+ tests/ground_truth/ecg_input_03.bin                |  Bin 2000 -> 2000 bytes
+ tests/ground_truth/ecg_input_04.bin                |  Bin 2000 -> 2000 bytes
+ tests/ground_truth/expected_output_00.bin          |  Bin 3 -> 3 bytes
+ tests/ground_truth/expected_output_01.bin          |  Bin 3 -> 3 bytes
+ tests/ground_truth/expected_output_02.bin          |  Bin 3 -> 3 bytes
+ tests/ground_truth/expected_output_03.bin          |  Bin 3 -> 3 bytes
+ tests/ground_truth/expected_output_04.bin          |  Bin 3 -> 3 bytes
+ tests/ground_truth/generate_ground_truth.py        |   30 +-
+ tests/stress/conftest.py                           |    6 +-
+ tests/stress/test_ponte3_timeline.py               |    1 +
+ tests/test_ampt.py                                 |    4 +
+ tests/test_bit_exact_python_tflm.py                |   31 +-
+ tests/test_callbacks.py                            |   15 +-
+ tests/test_dsp_fidelity.py                         |   29 +-
+ .../test_evaluation/test_confusion_matrix_norm.py  |    6 +-
+ tests/test_features.py                             |    6 +-
+ tests/test_fidelity.py                             |   50 +-
+ tests/test_inference_stage1_mlp.py                 |    9 +-
+ tests/test_knowledge/conftest.py                   |    5 +-
+ tests/test_knowledge/test_experiment_summarizer.py |    3 +
+ tests/test_knowledge/test_hybrid_search.py         |    5 +-
+ tests/test_knowledge/test_retriever.py             |   22 +-
+ tests/test_knowledge/test_structured_query.py      |    2 +
+ tests/test_memory/test_memory_commit.py            |    4 +-
+ tests/test_model.py                                |    4 +-
+ tests/test_native_tflm.py                          |   41 +-
+ tests/test_observability/test_instrumentation.py   |   11 +-
+ tests/test_observability/test_metrics.py           |   23 +-
+ tests/test_prepare_stage1_features.py              |   17 +-
+ tests/test_preprocessing.py                        |    7 +-
+ tests/test_quantization_degradation.py             |    7 +-
+ tests/test_scaler_utils.py                         |    1 +
+ tests/test_segmenter.py                            |   24 +-
+ tests/test_tracking/test_timeline.py               |    2 +
+ tests/test_tracking/test_timeline_refresh.py       |    2 +
+ tests/test_tracking_db.py                          |   34 +-
+ tests/test_tracking_integration.py                 |    4 +-
+ tests/test_training_data_audit.py                  |    6 +-
+ tests/test_two_stage_mlp_qg5.py                    |  146 +-
+ tests/test_two_stage_qg5.py                        |    2 +
+ 109 files changed, 6070 insertions(+), 4987 deletions(-)
+

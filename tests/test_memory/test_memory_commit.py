@@ -26,7 +26,9 @@ def temp_db(tmp_path: Path):
     init_schema(engine)
     with Session(engine) as session:
         experiment = ExperimentRepository(session).create(
-            ExperimentCreate(name="memory_commit_test", stage="stage1")
+            ExperimentCreate(
+                name="memory_commit_test", stage="stage1", config_path=None, git_commit=None
+            )
         )
         run = RunRepository(session).create(RunCreate(experiment_id=experiment.id, run_type="test"))
         session.commit()

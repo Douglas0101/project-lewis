@@ -11,6 +11,55 @@ simulação: `v1.2-sim-locked` e `v1.3-sim-deep`. A versão do pipeline de ML
 reportada no README é `v2.2+c11+fase2` e evolui independentemente dos marcos
 deste changelog.
 
+## [Unreleased]
+
+### Adicionado
+
+- **Vistoria SLHA e caminho CPU/GPU**
+  - `docs/vistoria_slha_gpu_adaptacao_v2.4.md` documentando a vistoria avançada do Sistema de Leitura de Hardware Automático (SLHA) e a adaptação de treinamento sem GPU.
+  - Verificação de 15 testes SLHA e discovery funcional em CPU-only.
+- **Experimentos Stage 2 v11–v16**
+  - Variações de MLP com `hidden=256` e `dropout=0.5` (v11, v12), focal loss agressiva (v13, v14), arquitetura com duas camadas ocultas (v15) e `class_weight` (v16).
+  - Suporte a `--optimize-thresholds`, `--class-weight`, `--hidden-units-2` e `--dropout-2` em `scripts/train_stage2_mlp.py`.
+- **Quality Gate QG5' atualizado**
+  - `tests/test_two_stage_mlp_qg5.py`: threshold `F1(F) >= 0.50` (anterior 0.15).
+  - `scripts/select_best_mlp_fold.py`: critério de publicação com `F1(F) >= 0.50`.
+
+### Modificado
+
+- `scripts/train_stage2_mlp.py`: adicionadas flags `--optimize-thresholds`, `--threshold-metric`, `--class-weight`, `--hidden-units-2` e `--hidden-units-2`.
+- `scripts/select_best_mlp_fold.py`: tratamento de exceções, tipagem `dict` nativa e threshold F1(F) elevado para 0.50.
+- `tests/test_two_stage_mlp_qg5.py`: `STAGE2_MIN_F1_F` atualizado para 0.50 e ajustes de `zero_division` para compatibilidade de tipos.
+
+### Publicado
+
+- Artefatos v2.3 em `models/`:
+  - `stage1_float32_v2.3.keras` (origem: `experiments/stage1_mlp_features_v2.3_retrain`).
+  - `stage2_float32_v2.3.keras` (origem: `experiments/stage2_mlp_features_v2.3_focal_smote_v14`, fold 4).
+  - Thresholds Stage 1 e Stage 2 otimizados por Youden/F1.
+
+### Resultados
+
+- Stage 1: Recall(Anormal)=0.8352, Precision(Anormal)=0.8286, F1-macro=0.9021.
+- Stage 2 (subset balanceado QG5): F1-macro=0.8654, F1(S)=0.8544, F1(V)=0.8038, F1(F)=0.9379.
+- 18 testes relevantes passaram (`test_two_stage_mlp_qg5` + `test_slha_*`).
+
+### Research Branch v2.4 — Classe F em Stage 2
+
+- **E00–E09 concluídas** com checkpoints `PASS` ou `PASS_HYPOTHESIS_REJECTED`.
+- **E00**: snapshot forense do baseline v14 em `experiments/stage2_v2.4_research/E00_baseline_snapshot/`.
+- **E01**: auditoria de distribuição de F por registro; 70% concentrado em 208/213.
+- **E02**: manifestos imutáveis de dataset/features e validador em `src/inference/manifest_validator.py`.
+- **E03**: protocolo de split `StratifiedGroupKFold` selecionado; F presente em todos os folds.
+- **E04**: QG5 redesenhado com gate `QG5_PATIENTWISE`; status `RESEARCH_CANDIDATE_NOT_PUBLICATION_READY`.
+- **E05**: auditoria de separabilidade das 16 features; top features RR-dominadas.
+- **E06**: engenharia de features enhanced (33 dimensões); hipótese rejeitada.
+- **E07**: reescrita de rótulos não justificada; reamostragem por paciente melhorou F1(F) baseline para 0.465.
+- **E08**: MLP 256 + focal loss + class-weight sobre F reamostrado; F1-macro=0.607, F1(F)=0.453 (ainda < 0.50).
+- **E09**: relatório final em `docs/stage2_v2.4_research_report.md`; decisão **NÃO PUBLICAR v2.4**; artefatos v2.3 preservados.
+- **Investigação PTB-XL**: 21.799 registros locais, 48 com `AFIB=100`, 961 com texto validado, potencial de ~1.000–21.000 batimentos F. Documentado em `docs/ptbxl_afib_investigation_report.md` e proposta em `docs/dataset_update_proposal_v2.5.md`.
+- **Testes**: 79 testes passaram (`tests/test_v2_4_*`, `tests/test_two_stage_mlp_qg5.py`, `tests/test_slha_*.py`).
+
 ## [3.1.0] — 2026-07-06
 
 ### Adicionado

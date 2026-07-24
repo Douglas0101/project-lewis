@@ -7,6 +7,8 @@ Validates the AccYouRate Modified Pan-Tompkins detector:
 * QG2.4 — T-wave discrimination: no false peaks within refractory.
 """
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 import logging
@@ -209,6 +211,7 @@ class TestAMPTMITBIH:
 
         # Load signal (lead MLII = channel 0) and resample to 500 Hz (AMPT target)
         rec = wfdb.rdrecord(str(record_path), channels=[0], physical=True)
+        assert rec.p_signal is not None
         sig = rec.p_signal.squeeze().astype(np.float64)
         fs_native = float(rec.fs)
         sig = signal.resample_poly(sig, up=500, down=int(fs_native), padtype="line")
@@ -248,6 +251,7 @@ class TestAMPTMITBIH:
             pytest.skip("Record 100 not found")
 
         rec = wfdb.rdrecord(str(record_path), channels=[0], physical=True)
+        assert rec.p_signal is not None
         sig = rec.p_signal.squeeze().astype(np.float64)
         fs_native = float(rec.fs)
         sig = signal.resample_poly(sig, up=500, down=int(fs_native), padtype="line")

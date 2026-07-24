@@ -73,6 +73,20 @@ def _make_callbacks(
     ]
 
 
+def _sample_one_batch(
+    train_dataset: Optional[tf.data.Dataset],
+    data_generator: Optional[Callable],
+) -> Tuple[np.ndarray, np.ndarray]:
+    """Extrai um batch de amostras para configuracao do SLHA."""
+    if train_dataset is not None:
+        for X_sample, y_sample in train_dataset.take(1):
+            return X_sample.numpy(), y_sample.numpy()
+    assert data_generator is not None
+    gen = data_generator()
+    X_sample, y_sample = next(gen)
+    return X_sample, y_sample
+
+
 def pretrain_chapman(
     data_generator: Optional[Callable] = None,
     val_generator: Optional[Callable] = None,
@@ -162,7 +176,11 @@ def pretrain_chapman(
     # Salvar summary
     summary_path = experiment_dir / "model_summary.txt"
     with summary_path.open("w", encoding="utf-8") as fh:
-        model.summary(print_fn=lambda x: fh.write(x + "\n"))
+
+        def _write_line(line: str) -> None:
+            fh.write(line + "\n")
+
+        model.summary(print_fn=_write_line)
 
     # Callbacks
     callbacks = _make_callbacks(experiment_dir)
@@ -170,15 +188,7 @@ def pretrain_chapman(
     # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
     if use_slha:
         slha = _maybe_import_slha()
-        if train_dataset is not None:
-            for X_sample, y_sample in train_dataset.take(1):
-                X_sample = X_sample.numpy()
-                y_sample = y_sample.numpy()
-                break
-        else:
-            assert data_generator is not None
-            gen = data_generator()
-            X_sample, y_sample = next(gen)
+        X_sample, y_sample = _sample_one_batch(train_dataset, data_generator)
         config = slha.auto_configure_training(
             X_sample=X_sample[:8],
             y_sample=y_sample[:8],

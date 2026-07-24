@@ -24,7 +24,7 @@ class TestRetrieverPrecision:
             # Usa o mesmo texto indexado (source + content) para maximizar
             # a similaridade com o modelo fake determinístico.
             query = f"{source}\n{content}"
-            req = QueryRequest(query=query, k=5, fetch_k=10)
+            req = QueryRequest(query=query, k=5, fetch_k=10, layer=None, version=None, tags=None)
             results = search(req)
             for rank, r in enumerate(results, start=1):
                 if r.source == source:
@@ -37,7 +37,9 @@ class TestRetrieverPrecision:
         assert mrr >= 0.80, f"MRR@5 = {mrr:.2f}, abaixo do threshold 0.80"
 
     def test_search_returns_ranked_results(self, populated_db: Any) -> None:
-        req = QueryRequest(query="F1-macro QG5", k=3, fetch_k=10)
+        req = QueryRequest(
+            query="F1-macro QG5", k=3, fetch_k=10, layer=None, version=None, tags=None
+        )
         results = search(req)
         assert len(results) <= 3
         assert all(r.rank == i + 1 for i, r in enumerate(results))
@@ -51,31 +53,37 @@ class TestRetrieverFilters:
     """QG-C11-04: filtros 3D (layer, version, tags)."""
 
     def test_layer_filter_returns_only_requested_layer(self, populated_db: Any) -> None:
-        req = QueryRequest(query="STM32 TFLM", layer="C08", k=5, fetch_k=10)
+        req = QueryRequest(
+            query="STM32 TFLM", layer="C08", k=5, fetch_k=10, version=None, tags=None
+        )
         results = search(req)
         assert results, "Filtro por layer não retornou resultados"
         assert all(r.layer == "C08" for r in results), "Resultado fora do layer filtrado"
 
     def test_version_filter_returns_only_requested_version(self, populated_db: Any) -> None:
-        req = QueryRequest(query="quantizacao INT8", version="v1.1", k=5, fetch_k=10)
+        req = QueryRequest(
+            query="quantizacao INT8", version="v1.1", k=5, fetch_k=10, layer=None, tags=None
+        )
         results = search(req)
         assert results, "Filtro por versão não retornou resultados"
         assert all(r.version == "v1.1" for r in results), "Resultado fora da versão filtrada"
 
     def test_tags_filter_returns_only_matching_tags(self, populated_db: Any) -> None:
-        req = QueryRequest(query="quantizacao", tags=["quantizacao"], k=5, fetch_k=10)
+        req = QueryRequest(
+            query="quantizacao", tags=["quantizacao"], k=5, fetch_k=10, layer=None, version=None
+        )
         results = search(req)
         assert results, "Filtro por tags não retornou resultados"
         assert all("quantizacao" in r.tags for r in results), "Tag obrigatória não presente"
 
     def test_invalid_layer_is_rejected_by_schema(self) -> None:
         with pytest.raises(ValueError):
-            QueryRequest(query="teste", layer="INVALID")
+            QueryRequest(query="teste", layer="INVALID", version=None, tags=None, k=5, fetch_k=10)
 
     def test_build_where_clause_handles_metadata_filters(self) -> None:
         """sqlite-vec não suporta LIKE em metadata; tags são filtradas em Python."""
         req = QueryRequest(
-            query="teste", layer="C04", version="v1.1", tags=["ml", "quantizacao"], k=5
+            query="teste", layer="C04", version="v1.1", tags=["ml", "quantizacao"], k=5, fetch_k=10
         )
         where, params = _build_where_clause(req)
         assert "layer = ?" in where

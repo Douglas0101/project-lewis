@@ -8,7 +8,7 @@ arquivos de log.
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional
+from typing import Any, List, Mapping, Optional
 
 import tensorflow as tf
 
@@ -55,6 +55,7 @@ class MetricTracker(tf.keras.callbacks.Callback):
             from src.tracking.schemas import MetricCreate
 
             self._session = self._session_factory() if self._session_factory else get_session()
+            assert self._session is not None
             self._repo = MetricRepository(self._session)
             self._metric_create_cls = MetricCreate
             return True
@@ -71,7 +72,7 @@ class MetricTracker(tf.keras.callbacks.Callback):
             self._session = None
             self._repo = None
 
-    def on_epoch_end(self, epoch: int, logs: Optional[dict] = None) -> None:
+    def on_epoch_end(self, epoch: int, logs: Mapping[str, Any] | None = None) -> None:
         """Persiste métricas da época no banco."""
         if not logs:
             return
@@ -109,5 +110,5 @@ class MetricTracker(tf.keras.callbacks.Callback):
             except Exception:  # nosec B110
                 pass
 
-    def on_train_end(self, logs: Optional[dict] = None) -> None:
+    def on_train_end(self, logs: Mapping[str, Any] | None = None) -> None:
         self._close()

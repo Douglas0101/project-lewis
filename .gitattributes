@@ -1,0 +1,8 @@
+# Markdown uses two trailing spaces for explicit hard line breaks.
+*.md text eol=lf whitespace=-trailing-space
+
+# Reproducible text files.
+*.py text eol=lf
+*.json text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf

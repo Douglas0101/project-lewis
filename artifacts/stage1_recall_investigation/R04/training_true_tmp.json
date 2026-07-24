@@ -1,0 +1,233 @@
+{
+  "mode": "training_true",
+  "model_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "fixture_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/artifacts/stage1_recall_investigation/R03/loader_fixture.npz",
+  "fixture_shape": [
+    11,
+    500,
+    1
+  ],
+  "fixture_dtype": "float32",
+  "trainable_weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_before": "235d54c934c5a802bc65283ec4885e8f23fac439c12f5e3bcab7a1e1a132c0f3",
+  "initial_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "235d54c934c5a802bc65283ec4885e8f23fac439c12f5e3bcab7a1e1a132c0f3",
+      "values": [
+        103832914,
+        0
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "run": {
+    "mode": "training_true",
+    "samples": [
+      {
+        "output_shape": [
+          11,
+          2
+        ],
+        "output_dtype": "float32",
+        "output_sha256": "d214e7368a8b09eaa5e4fb988b197141661464be1b46f6b815984b82c7b26c9f",
+        "state_before": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "235d54c934c5a802bc65283ec4885e8f23fac439c12f5e3bcab7a1e1a132c0f3",
+            "values": [
+              103832914,
+              0
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "state_after": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "925d55de7203e6cb212c4e6888eac26cc93ea881637a78bc3872181f37699fa7",
+            "values": [
+              103832914,
+              1
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+        "weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+      },
+      {
+        "output_shape": [
+          11,
+          2
+        ],
+        "output_dtype": "float32",
+        "output_sha256": "a51164c28d9d5f1aa2f4755338f1d2949f2d5772519beafddc5afde5b55ea691",
+        "state_before": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "925d55de7203e6cb212c4e6888eac26cc93ea881637a78bc3872181f37699fa7",
+            "values": [
+              103832914,
+              1
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "state_after": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "b4e65eca3b2959b306933ec9b5018f80ac28fa4d309cc9064b5fc81fbf929e97",
+            "values": [
+              103832914,
+              2
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+        "weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+      },
+      {
+        "output_shape": [
+          11,
+          2
+        ],
+        "output_dtype": "float32",
+        "output_sha256": "3880c7ed99468ddefc75104c774d9aca5e1786266edd031cec2bd4777b67df89",
+        "state_before": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "b4e65eca3b2959b306933ec9b5018f80ac28fa4d309cc9064b5fc81fbf929e97",
+            "values": [
+              103832914,
+              2
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "state_after": {
+          "state": {
+            "shape": [
+              2
+            ],
+            "dtype": "int64",
+            "sha256": "edc6436d60cfb84c0e68f1b07c79f996e353510e67b7f3e20eb6c4e9b11e864b",
+            "values": [
+              103832914,
+              3
+            ]
+          },
+          "_state": null,
+          "seed": null,
+          "_seed": null,
+          "counter": null
+        },
+        "weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+        "weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+      }
+    ],
+    "pairwise": [
+      {
+        "label": "training_true_1_vs_2",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.09111934900283813,
+        "mean_abs_delta": 0.042623717337846756,
+        "p99_abs_delta": 0.09111934155225754,
+        "array_equal": false,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 3
+      },
+      {
+        "label": "training_true_1_vs_3",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.09050148725509644,
+        "mean_abs_delta": 0.03472485765814781,
+        "p99_abs_delta": 0.09050147235393524,
+        "array_equal": false,
+        "argmax_disagreement_count": 1,
+        "threshold_disagreement_count": 0
+      },
+      {
+        "label": "training_true_2_vs_3",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.08433113992214203,
+        "mean_abs_delta": 0.03138083592057228,
+        "p99_abs_delta": 0.08433113247156143,
+        "array_equal": false,
+        "argmax_disagreement_count": 1,
+        "threshold_disagreement_count": 3
+      }
+    ],
+    "trainable_weights_immutable": true,
+    "any_rng_state_changed": true
+  },
+  "trainable_weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_after": "edc6436d60cfb84c0e68f1b07c79f996e353510e67b7f3e20eb6c4e9b11e864b",
+  "final_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "edc6436d60cfb84c0e68f1b07c79f996e353510e67b7f3e20eb6c4e9b11e864b",
+      "values": [
+        103832914,
+        3
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "trainable_weights_immutable": true
+}

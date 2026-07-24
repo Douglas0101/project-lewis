@@ -1,0 +1,22 @@
+{
+  "predict_reproducible": true,
+  "training_false_reproducible": true,
+  "predict_vs_training_false": {
+    "label": "predict_vs_training_false",
+    "shape": [
+      11,
+      2
+    ],
+    "dtype": "float32",
+    "max_abs_delta": 0.0,
+    "mean_abs_delta": 0.0,
+    "p99_abs_delta": 0.0,
+    "array_equal": true,
+    "argmax_disagreement_count": 0,
+    "threshold_disagreement_count": 0
+  },
+  "trainable_weight_hash_before_predict": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "trainable_weight_hash_after_predict": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "trainable_weight_hash_before_training_false": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "trainable_weight_hash_after_training_false": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30"
+}

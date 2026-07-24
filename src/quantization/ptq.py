@@ -13,6 +13,7 @@ from typing import Callable, Optional
 
 import numpy as np
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
 LOGGER = logging.getLogger("lewis.camada05.ptq")
 
@@ -271,7 +272,7 @@ def main(
         output_path = Path("models/quantized/model_int8.tflite")
 
     if model_path is not None:
-        model = tf.keras.models.load_model(model_path)
+        model = load_keras_model(model_path)
     else:
         from src.models.backbone_1d import build_backbone_1d
 

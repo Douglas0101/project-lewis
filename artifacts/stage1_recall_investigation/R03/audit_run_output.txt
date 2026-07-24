@@ -1,0 +1,38 @@
+{
+  "prediction_shape_reference": [
+    11,
+    2
+  ],
+  "prediction_shape_helper": [
+    11,
+    2
+  ],
+  "prediction_dtype_reference": "float32",
+  "prediction_dtype_helper": "float32",
+  "nan_count_reference": 0,
+  "nan_count_helper": 0,
+  "inf_count_reference": 0,
+  "inf_count_helper": 0,
+  "max_abs_prediction_delta": 0.0,
+  "mean_abs_prediction_delta": 0.0,
+  "p99_abs_prediction_delta": 0.0,
+  "argmax_disagreement_count": 0,
+  "threshold_0_58_disagreement_count": 0,
+  "compile_true_max_abs_prediction_delta": 0.0,
+  "compile_true_mean_abs_prediction_delta": 0.0,
+  "compile_true_argmax_disagreement_count": 0,
+  "compile_true_threshold_disagreement_count": 0,
+  "compile_optimizer_restored": true,
+  "compile_optimizer_class": "Adam",
+  "compile_loss": "sparse_categorical_crossentropy",
+  "structural_equivalence": true,
+  "weight_tensor_count_reference": 10,
+  "weight_tensor_count_helper": 10,
+  "all_weight_shapes_equal": true,
+  "all_weight_dtypes_equal": true,
+  "all_weights_array_equal": true,
+  "max_abs_weight_delta": 0.0,
+  "criteria_passed": true
+}
+
+[exit_code=0]

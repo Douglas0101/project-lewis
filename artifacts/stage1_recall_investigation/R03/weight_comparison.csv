@@ -1,0 +1,11 @@
+tensor_index,layer_name,shape_reference,shape_helper,dtype_reference,dtype_helper,array_equal,allclose,max_abs_delta,mean_abs_delta
+0,conv1d_1,"[7, 1, 16]","[7, 1, 16]",float32,float32,True,True,0.0,0.0
+1,conv1d_1,[16],[16],float32,float32,True,True,0.0,0.0
+2,conv1d_2,"[5, 16, 32]","[5, 16, 32]",float32,float32,True,True,0.0,0.0
+3,conv1d_2,[32],[32],float32,float32,True,True,0.0,0.0
+4,conv1d_3,"[3, 32, 64]","[3, 32, 64]",float32,float32,True,True,0.0,0.0
+5,conv1d_3,[64],[64],float32,float32,True,True,0.0,0.0
+6,embedding,"[64, 64]","[64, 64]",float32,float32,True,True,0.0,0.0
+7,embedding,[64],[64],float32,float32,True,True,0.0,0.0
+8,output,"[64, 2]","[64, 2]",float32,float32,True,True,0.0,0.0
+9,output,[2],[2],float32,float32,True,True,0.0,0.0

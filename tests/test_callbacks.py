@@ -9,11 +9,13 @@ import json
 import os
 import shutil
 import tempfile
+from collections.abc import Generator
 from pathlib import Path
 
 import numpy as np
 import pytest
 import tensorflow as tf
+from sqlalchemy.orm import Session
 
 from src.callbacks.calibration_monitor import CalibrationMonitor
 from src.callbacks.f1_macro_checkpoint import F1MacroCheckpoint
@@ -70,6 +72,7 @@ class TestGradientMonitor:
         callback.set_model(toy_model_binary)
         callback.on_train_begin()
 
+        assert callback.layer_names is not None
         assert "dense_1" in callback.layer_names
         assert "dense_out" in callback.layer_names
 
@@ -150,6 +153,7 @@ class TestGradientMonitor:
 
         assert callback.val_data.shape[0] == 16
         assert callback.val_labels.shape[0] == 16
+        assert callback._sample_indices is not None
         assert callback._sample_indices.shape[0] == 16
 
     def test_max_samples_consistent_results(self, toy_model_binary, tmp_callback_dir):
@@ -315,6 +319,7 @@ class TestCalibrationMonitor:
 
         assert callback.val_data.shape[0] == 16
         assert callback.val_labels.shape[0] == 16
+        assert callback._sample_indices is not None
         assert callback._sample_indices.shape[0] == 16
 
     def test_max_samples_consistent_results(self, toy_model_binary, tmp_callback_dir):
@@ -496,7 +501,7 @@ class TestMetricTracker:
     """Testes para MetricTracker."""
 
     @pytest.fixture
-    def tracking_session(self):
+    def tracking_session(self) -> Generator[Session, None, None]:
         """Sessão SQLAlchemy em banco in-memory para tracking."""
         from sqlalchemy import create_engine
         from sqlalchemy.orm import Session
@@ -515,7 +520,9 @@ class TestMetricTracker:
         from src.tracking.schemas import ExperimentCreate, RunCreate
 
         exp = ExperimentRepository(tracking_session).create(
-            ExperimentCreate(name="metric_tracker_test", stage="stage1")
+            ExperimentCreate(
+                name="metric_tracker_test", stage="stage1", config_path=None, git_commit=None
+            )
         )
         run = RunRepository(tracking_session).create(
             RunCreate(experiment_id=exp.id, run_type="train")
@@ -549,7 +556,9 @@ class TestMetricTracker:
         from src.tracking.schemas import ExperimentCreate, RunCreate
 
         exp = ExperimentRepository(tracking_session).create(
-            ExperimentCreate(name="metric_tracker_test2", stage="stage1")
+            ExperimentCreate(
+                name="metric_tracker_test2", stage="stage1", config_path=None, git_commit=None
+            )
         )
         run = RunRepository(tracking_session).create(
             RunCreate(experiment_id=exp.id, run_type="train")

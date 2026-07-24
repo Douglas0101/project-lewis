@@ -1,0 +1,126 @@
+{
+  "mode": "predict",
+  "model_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/models/stage1_float32_v2.0.keras",
+  "fixture_path": "/home/douglas-souza/PycharmProjects/Project-Lewis/artifacts/stage1_recall_investigation/R03/loader_fixture.npz",
+  "fixture_shape": [
+    11,
+    500,
+    1
+  ],
+  "fixture_dtype": "float32",
+  "trainable_weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_before": "f72f143f0a082adce4ab7a87180534634500ac5acbfb02ca2247ad150cfbfe9d",
+  "initial_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "f72f143f0a082adce4ab7a87180534634500ac5acbfb02ca2247ad150cfbfe9d",
+      "values": [
+        961886673,
+        0
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "run": {
+    "mode": "predict",
+    "outputs_shape": [
+      [
+        11,
+        2
+      ],
+      [
+        11,
+        2
+      ],
+      [
+        11,
+        2
+      ]
+    ],
+    "outputs_dtype": [
+      "float32",
+      "float32",
+      "float32"
+    ],
+    "nan_counts": [
+      0,
+      0,
+      0
+    ],
+    "inf_counts": [
+      0,
+      0,
+      0
+    ],
+    "pairwise": [
+      {
+        "label": "predict_1_vs_2",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.0,
+        "mean_abs_delta": 0.0,
+        "p99_abs_delta": 0.0,
+        "array_equal": true,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 0
+      },
+      {
+        "label": "predict_1_vs_3",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.0,
+        "mean_abs_delta": 0.0,
+        "p99_abs_delta": 0.0,
+        "array_equal": true,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 0
+      },
+      {
+        "label": "predict_2_vs_3",
+        "shape": [
+          11,
+          2
+        ],
+        "dtype": "float32",
+        "max_abs_delta": 0.0,
+        "mean_abs_delta": 0.0,
+        "p99_abs_delta": 0.0,
+        "array_equal": true,
+        "argmax_disagreement_count": 0,
+        "threshold_disagreement_count": 0
+      }
+    ]
+  },
+  "trainable_weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_after": "f72f143f0a082adce4ab7a87180534634500ac5acbfb02ca2247ad150cfbfe9d",
+  "final_rng_state": {
+    "state": {
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "sha256": "f72f143f0a082adce4ab7a87180534634500ac5acbfb02ca2247ad150cfbfe9d",
+      "values": [
+        961886673,
+        0
+      ]
+    },
+    "_state": null,
+    "seed": null,
+    "_seed": null,
+    "counter": null
+  },
+  "trainable_weights_immutable": true
+}

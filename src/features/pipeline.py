@@ -4,7 +4,7 @@ This module consolidates Camada 2 outputs (processed .npy + lineage) into
 segmented beats with AAMI labels and engineered features, producing:
 
 * ``data/features/finetuning_mitbih_family.parquet`` — beats from MIT-BIH,
-  SVDB, AFDB and INCART for fine-tuning (single-label AAMI).
+  SVDB and INCART for fine-tuning (single-label AAMI). AFDB is rhythm-only.
 * ``data/features/training_manifest.json`` — pydantic-validated manifest.
 
 The pre-training dataset for Chapman/PTB-XL is intentionally kept as a
@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple, cast
 
@@ -33,9 +34,17 @@ from src.data.training_schemas import (
     QualityFlags,
     TrainingDatasetManifest,
 )
-from src.features.aami_mapper import AAMI_CLASSES, map_annotations_array
+from src.features.aami_mapper import AAMI_CLASSES
 from src.features.morphological import MorphologicalFeatures as MorphologicalExtractor
+from src.features.ontology_v3 import map_symbols_v3_legacy
 from src.features.time_domain import TimeDomainFeatures
+from src.training_integrity.integrity import (
+    beat_sample_id,
+    exclusive_publication,
+    publish_staged_file_exclusive,
+    temporary_staging_path,
+    waveform_row_sha256,
+)
 
 AAMI_TO_INT: Dict[AAMIClass, int] = {
     "N": 0,
@@ -53,11 +62,40 @@ PROCESSED_DIR = PROJECT_ROOT / "data" / "processed"
 LINEAGE_DIR = PROJECT_ROOT / "data" / "lineage"
 CATALOG_PATH = PROJECT_ROOT / "data" / "catalog" / "dataset_catalog.jsonl"
 
-FINETUNE_DATASETS: Tuple[DatasetName, ...] = ("mitdb", "svdb", "afdb", "incart")
+# Frequência canônica de trabalho (rebuild_spec/02, decisão D1).
+TARGET_FS = 500.0
+
+FINETUNE_DATASETS: Tuple[DatasetName, ...] = ("mitdb", "svdb", "incart")
+
+
+@dataclass(frozen=True)
+class AnnotationCustody:
+    """Aligned native/target clocks and ontology labels for one WFDB record."""
+
+    native_samples: np.ndarray
+    target_samples: np.ndarray
+    original_symbols: np.ndarray
+    canonical_labels: np.ndarray
+    source_sampling_rate: float
+
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _safe_int(value: Any, *, context: str) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f"invalid integer for {context}: {value!r}") from error
+
+
+def _safe_float(value: Any, *, context: str) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError(f"invalid float for {context}: {value!r}") from error
 
 
 def _load_catalog(path: Path) -> List[Dict[str, Any]]:
@@ -68,7 +106,13 @@ def _load_catalog(path: Path) -> List[Dict[str, Any]]:
             line = line.strip()
             if not line:
                 continue
-            records.append(json.loads(line))
+            try:
+                record = json.loads(line)
+            except (json.JSONDecodeError, TypeError) as error:
+                raise ValueError(f"invalid catalog JSONL row in {path}") from error
+            if not isinstance(record, dict):
+                raise ValueError(f"catalog row is not an object in {path}")
+            records.append(record)
     return records
 
 
@@ -90,8 +134,9 @@ def _find_processed_npy(record_id: str, dataset: str) -> Optional[Path]:
     if lineage_path.exists():
         try:
             lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
-            out_path = Path(lineage["output"]["path"])
-            if out_path.exists():
+            out_path = Path(lineage["output"]["path"]).resolve()
+            expected_root = (PROCESSED_DIR / dataset).resolve()
+            if out_path.is_relative_to(expected_root) and out_path.is_file():
                 return out_path
         except Exception as exc:  # pragma: no cover - lineage is best-effort
             LOGGER.debug("Failed to read lineage for %s/%s: %s", dataset, record_id, exc)
@@ -99,8 +144,11 @@ def _find_processed_npy(record_id: str, dataset: str) -> Optional[Path]:
     return candidates[0] if candidates else None
 
 
-def _load_raw_annotations(record_id: str, dataset: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
-    """Load WFDB annotations and return (samples, aami_labels) for beat annotations only."""
+def _load_raw_annotation_custody(
+    record_id: str,
+    dataset: str,
+) -> Optional[AnnotationCustody]:
+    """Load aligned native/target annotation clocks and ontology labels."""
     raw_dir = PROJECT_ROOT / "data" / f"raw_{dataset if dataset != 'mitdb' else 'mitbih'}"
     direct = raw_dir / record_id
     if (direct.with_suffix(".hea")).exists():
@@ -119,14 +167,52 @@ def _load_raw_annotations(record_id: str, dataset: str) -> Optional[Tuple[np.nda
     symbols = np.array(ann.symbol)
     samples = np.array(ann.sample)
 
-    # Drop non-beat annotations so r_peaks and labels stay aligned.
-    excluded = {"~", "+", "x"}
-    mask = ~np.isin(symbols, list(excluded))
-    symbols = symbols[mask]
-    samples = samples[mask]
+    # Relógio nativo da anotação (360/128/257 Hz). DQ-01/DQ-02: os índices
+    # DEVEM ser reescalonados para o relógio do sinal processado (500 Hz)
+    # antes de segmentar ou calcular features temporais.
+    fs_native = (
+        _safe_float(ann.fs, context="annotation sampling rate")
+        if ann.fs
+        else _safe_float("nan", context="missing annotation sampling rate")
+    )
+    if not np.isfinite(fs_native) or fs_native <= 0:
+        header = wfdb.rdheader(str(base))
+        fs_native = _safe_float(header.fs, context="header sampling rate")
+    if fs_native <= 0:
+        raise ValueError(f"fs nativo inválido para {dataset}/{record_id}: {fs_native}")
 
-    labels, _ = map_annotations_array(symbols)
-    return samples, labels
+    # Filtragem e mapeamento pela ontologia única v3 (mantém alinhamento
+    # símbolo↔amostra por construção; desconhecidos são excluídos, nunca → Q).
+    labels, keep_mask_arr, stats = map_symbols_v3_legacy([str(s) for s in symbols])
+    keep = np.asarray(keep_mask_arr, dtype=bool)
+    samples = samples[keep]
+    symbols = symbols[keep]
+    if stats.get("n_unknown_excluded"):
+        LOGGER.warning(
+            "%s/%s: %d símbolos desconhecidos excluídos pela ontologia v3",
+            dataset,
+            record_id,
+            stats["n_unknown_excluded"],
+        )
+
+    # Reescalonamento para o relógio canônico de 500 Hz:
+    # t_i = round(s_i * f_t / f_d), com |t_i/f_t − s_i/f_d| ≤ 0,5/f_t (rebuild_spec/02).
+    samples_500 = np.rint(samples.astype(np.float64) * (TARGET_FS / fs_native)).astype(np.int64)
+    return AnnotationCustody(
+        native_samples=samples.astype(np.int64),
+        target_samples=samples_500,
+        original_symbols=symbols.astype(str),
+        canonical_labels=np.asarray(labels),
+        source_sampling_rate=fs_native,
+    )
+
+
+def _load_raw_annotations(record_id: str, dataset: str) -> Optional[Tuple[np.ndarray, np.ndarray]]:
+    """Compatibility wrapper returning canonical target samples and labels."""
+    custody = _load_raw_annotation_custody(record_id, dataset)
+    if custody is None:
+        return None
+    return custody.target_samples, custody.canonical_labels
 
 
 # ---------------------------------------------------------------------------
@@ -134,16 +220,78 @@ def _load_raw_annotations(record_id: str, dataset: str) -> Optional[Tuple[np.nda
 # ---------------------------------------------------------------------------
 
 
-def _build_beat_records(
+def build_beat_records(
     sig: np.ndarray,
     r_peaks: np.ndarray,
     aami_labels: np.ndarray,
     record_id: str,
     dataset: DatasetName,
     lineage_path: str,
+    *,
+    native_annotation_indices: np.ndarray | None = None,
+    original_symbols: np.ndarray | None = None,
+    source_sampling_rate: float | None = None,
 ) -> Tuple[List[BeatRecord], np.ndarray, np.ndarray]:
-    """Segment signal and extract temporal + morphological features."""
-    fs = 500.0
+    """Segment signal and extract temporal + morphological features.
+
+    Contrato de relógio (rebuild_spec/02): ``r_peaks`` DEVE estar no mesmo
+    relógio do sinal ``sig`` (canônico ``TARGET_FS``). Índices em relógio
+    nativo são rejeitados — ver DQ-01/DQ-02.
+    """
+    fs = TARGET_FS
+    r_peaks = np.asarray(r_peaks, dtype=np.int64)
+    source_annotation_indices = np.arange(len(r_peaks), dtype=np.int64)
+    custody_supplied = (
+        native_annotation_indices is not None,
+        original_symbols is not None,
+        source_sampling_rate is not None,
+    )
+    if any(custody_supplied) and not all(custody_supplied):
+        raise ValueError(
+            "native indices, original symbols, and source rate must be supplied together"
+        )
+    if source_sampling_rate is not None and (
+        not np.isfinite(source_sampling_rate) or source_sampling_rate <= 0
+    ):
+        raise ValueError("source sampling rate must be finite and positive")
+    native_indices = (
+        np.asarray(native_annotation_indices, dtype=np.int64)
+        if native_annotation_indices is not None
+        else None
+    )
+    symbols = np.asarray(original_symbols).astype(str) if original_symbols is not None else None
+    if native_indices is not None and (
+        len(native_indices) != len(r_peaks) or symbols is None or len(symbols) != len(r_peaks)
+    ):
+        raise ValueError("annotation custody arrays must align with target R peaks")
+    if len(r_peaks):
+        in_range = (r_peaks >= 0) & (r_peaks < len(sig))
+        n_out = _safe_int((~in_range).sum(), context="out-of-range annotations")
+        if n_out:
+            frac_out = n_out / len(r_peaks)
+            if frac_out > 0.01:
+                raise ValueError(
+                    f"{n_out}/{len(r_peaks)} r_peaks fora do alcance do sinal "
+                    f"({dataset}/{record_id}): "
+                    f"max={_safe_int(r_peaks.max(), context='maximum R peak')} "
+                    f"vs len(sig)={len(sig)}. "
+                    "Provável índice em relógio nativo sem reescalonamento (DQ-01)."
+                )
+            LOGGER.warning(
+                "%s/%s: %d anotações de borda fora do alcance do sinal descartadas "
+                "(max=%d, len(sig)=%d)",
+                dataset,
+                record_id,
+                n_out,
+                _safe_int(r_peaks.max(), context="maximum R peak"),
+                len(sig),
+            )
+            r_peaks = r_peaks[in_range]
+            source_annotation_indices = source_annotation_indices[in_range]
+            aami_labels = np.asarray(aami_labels)[in_range]
+            if native_indices is not None and symbols is not None:
+                native_indices = native_indices[in_range]
+                symbols = symbols[in_range]
     segmenter = ECGSegmenter(fs=fs, window_ms=1000.0, min_window_ms=600.0)
     morph = MorphologicalExtractor(fs=fs)
     temporal = TimeDomainFeatures(fs=fs)
@@ -158,26 +306,55 @@ def _build_beat_records(
 
     records: List[BeatRecord] = []
     for seg_i, beat_i in enumerate(kept_indices):
-        r_global = int(r_peaks[beat_i])
-        r_in_seg = int(np.argmax(np.abs(X[seg_i])))
+        source_beat_i = _safe_int(
+            source_annotation_indices[beat_i],
+            context="source annotation index",
+        )
+        r_global = _safe_int(r_peaks[beat_i], context="target R peak")
+        r_in_seg = _safe_int(np.argmax(np.abs(X[seg_i])), context="segment R peak")
         morph_raw = morph_feats[seg_i]
+
+        def _sentinel_if_nan(value: float, sentinel: float = -1.0) -> float:
+            parsed = _safe_float(value, context="morphological feature")
+            return sentinel if np.isnan(parsed) else parsed
+
         morph_clean = {
             **morph_raw,
-            "qrs_width_ms": (
-                0.0 if np.isnan(morph_raw["qrs_width_ms"]) else float(morph_raw["qrs_width_ms"])
-            ),
-            "qrs_area": 0.0 if np.isnan(morph_raw["qrs_area"]) else float(morph_raw["qrs_area"]),
+            "qrs_width_ms": _sentinel_if_nan(morph_raw["qrs_width_ms"], 0.0),
+            "qrs_area": _sentinel_if_nan(morph_raw["qrs_area"], 0.0),
+            "qrs_asymmetry_index": _sentinel_if_nan(morph_raw["qrs_asymmetry_index"]),
+            "t_r_ratio": _sentinel_if_nan(morph_raw["t_r_ratio"]),
+            "qrs_raggedness": _sentinel_if_nan(morph_raw["qrs_raggedness"]),
         }
+        native_index = (
+            _safe_int(native_indices[beat_i], context="native annotation index")
+            if native_indices is not None
+            else None
+        )
+        original_symbol = str(symbols[beat_i]) if symbols is not None else "N"
+        canonical_label = str(y[seg_i])
+        canonical_label = {"F": "FUSION", "Q": "Q_OR_UNKNOWN"}.get(canonical_label, canonical_label)
         records.append(
             BeatRecord(
                 record_id=record_id,
-                beat_idx=int(beat_i),
+                beat_idx=source_beat_i,
                 dataset=dataset,
                 segment_shape=X[seg_i].shape,
-                label_wfdb="N",  # WFDB symbol not retained per-segment
+                label_wfdb=original_symbol,  # type: ignore[arg-type]
                 label_aami=y[seg_i],  # type: ignore[arg-type]
                 r_peak_sample=r_global,
                 r_peak_in_segment=r_in_seg,
+                source_sampling_rate=source_sampling_rate,
+                target_sampling_rate=TARGET_FS if source_sampling_rate is not None else None,
+                annotation_index_native=native_index,
+                annotation_time_seconds=(
+                    native_index / source_sampling_rate
+                    if native_index is not None and source_sampling_rate is not None
+                    else None
+                ),
+                annotation_index_target=(r_global if source_sampling_rate is not None else None),
+                class_original=original_symbol if source_sampling_rate is not None else None,
+                class_canonical=canonical_label if source_sampling_rate is not None else None,
                 temporal=temporal_feats[beat_i],
                 morph=MorphologicalFeatures.model_validate(morph_clean),
                 augmentation_applied=False,
@@ -186,6 +363,10 @@ def _build_beat_records(
             )
         )
     return records, X, y
+
+
+# Alias retrocompatível para uso interno
+_build_beat_records = build_beat_records
 
 
 # ---------------------------------------------------------------------------
@@ -205,6 +386,13 @@ def _records_to_dataframe(records: List[BeatRecord]) -> pd.DataFrame:
                 "label_aami": rec.label_aami,
                 "r_peak_sample": rec.r_peak_sample,
                 "r_peak_in_segment": rec.r_peak_in_segment,
+                "source_sampling_rate": rec.source_sampling_rate,
+                "target_sampling_rate": rec.target_sampling_rate,
+                "annotation_index_native": rec.annotation_index_native,
+                "annotation_time_seconds": rec.annotation_time_seconds,
+                "annotation_index_target": rec.annotation_index_target,
+                "class_original": rec.class_original,
+                "class_canonical": rec.class_canonical,
                 "rr_prev": rec.temporal.rr_prev,
                 "rr_next": rec.temporal.rr_next,
                 "rr_ratio": rec.temporal.rr_ratio,
@@ -219,6 +407,9 @@ def _records_to_dataframe(records: List[BeatRecord]) -> pd.DataFrame:
                 "qrs_area": rec.morph.qrs_area,
                 "st_slope_mV_s": rec.morph.st_slope_mV_s,
                 "j_point": rec.morph.j_point,
+                "qrs_asymmetry_index": rec.morph.qrs_asymmetry_index,
+                "t_r_ratio": rec.morph.t_r_ratio,
+                "qrs_raggedness": rec.morph.qrs_raggedness,
                 "lineage_path": rec.lineage_path,
             }
         )
@@ -245,6 +436,10 @@ def build_finetuning_dataset(
     """
     if output_path is None:
         output_path = FEATURES_DIR / "finetuning_mitbih_family.parquet"
+    npz_output_path = output_path.with_suffix(".npz")
+    manifest_path = output_path.with_suffix(".manifest.json")
+    if output_path.exists() or npz_output_path.exists() or manifest_path.exists():
+        raise FileExistsError("fine-tuning outputs are write-once; choose a new generation path")
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     selected_datasets: List[DatasetName] = (
@@ -272,13 +467,14 @@ def build_finetuning_dataset(
                 LOGGER.warning("No processed .npy for %s/%s", ds, record_id)
                 continue
 
-            ann = _load_raw_annotations(record_id, ds)
-            if ann is None:
+            custody = _load_raw_annotation_custody(record_id, ds)
+            if custody is None:
                 LOGGER.warning("No annotations for %s/%s", ds, record_id)
                 continue
 
-            r_peaks, labels = ann
-            sig = np.load(npy_path).astype(np.float32)
+            r_peaks = custody.target_samples
+            labels = custody.canonical_labels
+            sig = np.load(npy_path, allow_pickle=False).astype(np.float32)
             lineage_path = str(LINEAGE_DIR / ds / f"{record_id}_lineage.json")
 
             beats, X_rec, y_rec = _build_beat_records(
@@ -288,6 +484,9 @@ def build_finetuning_dataset(
                 record_id=record_id,
                 dataset=ds,
                 lineage_path=lineage_path,
+                native_annotation_indices=custody.native_samples,
+                original_symbols=custody.original_symbols,
+                source_sampling_rate=custody.source_sampling_rate,
             )
             ds_records.extend(beats)
             ds_X.append(X_rec)
@@ -312,27 +511,40 @@ def build_finetuning_dataset(
         raise RuntimeError("No beats generated for fine-tuning dataset")
 
     X_full = np.concatenate(all_X, axis=0)
+    if X_full.ndim == 2:
+        X_full = X_full[..., np.newaxis]
+    expected_shape = (_safe_int(TARGET_FS, context="target sampling rate"), 1)
+    if X_full.ndim != 3 or X_full.shape[1:] != expected_shape:
+        raise ValueError(
+            "fine-tuning waveforms must satisfy the canonical input shape "
+            f"{expected_shape}; observed {X_full.shape[1:]}"
+        )
     y_full = np.concatenate(all_y, axis=0)
 
     df = _records_to_dataframe(all_records)
-    df.to_parquet(output_path, index=False, compression="zstd")
+    sample_ids = np.asarray(
+        [
+            beat_sample_id(
+                record.dataset,
+                record.record_id,
+                record.beat_idx,
+                record.r_peak_sample,
+            )
+            for record in all_records
+        ],
+        dtype=str,
+    )
+    waveform_hashes = np.asarray([waveform_row_sha256(row) for row in X_full], dtype=str)
+    df["sample_id"] = sample_ids
+    df["segment_id"] = sample_ids
+    df["waveform_sha256"] = waveform_hashes
     y_int = np.array([AAMI_TO_INT[cast(AAMIClass, label)] for label in y_full], dtype=np.int8)
-    np.savez_compressed(
-        output_path.with_suffix(".npz"),
-        X=X_full.astype(np.float32),
-        y=y_int,
-    )
-    LOGGER.info(
-        "Saved %d beats to %s and %s",
-        len(df),
-        output_path,
-        output_path.with_suffix(".npz"),
-    )
+    df["y"] = y_int
 
     # Persist manifest
     manifest = TrainingDatasetManifest(
-        version="1.0.0",
-        config_version="1.0.0",
+        version="3.0.0",
+        config_version="3.0.0",
         datasets_included=selected_datasets,
         n_records=sum(len(catalog_by_ds[ds]) for ds in selected_datasets),
         n_beats=len(all_records),
@@ -348,11 +560,40 @@ def build_finetuning_dataset(
             group_kfold_feasible=True,
             class_balance_reported=True,
         ),
-        notes="Fine-tuning dataset for MIT-BIH family (AAMI 5-class single-label).",
+        notes=(
+            "Fine-tuning dataset MIT-BIH family v3.0.0 — relógio canônico 500 Hz "
+            "(DQ-01/DQ-02 corrigidos), ontologia única v3.0.0 (FUSION≠AFIB, "
+            "Q_OR_UNKNOWN=rejeição, desconhecidos excluídos), AFDB fora do "
+            "classificador de batimentos (tarefa de ritmo separada, D3)."
+        ),
     )
-    manifest_path = FEATURES_DIR / "training_manifest.json"
-    manifest_path.write_text(manifest.model_dump_json(indent=2), encoding="utf-8")
-    LOGGER.info("Manifest saved to %s", manifest_path)
+    lock_path = output_path.parent / f".{output_path.stem}.publish.lock"
+    targets = (output_path, npz_output_path, manifest_path)
+    with exclusive_publication(lock_path, targets):
+        with (
+            temporary_staging_path(output_path) as staged_parquet,
+            temporary_staging_path(npz_output_path) as staged_npz,
+            temporary_staging_path(manifest_path) as staged_manifest,
+        ):
+            df.to_parquet(staged_parquet, index=False, compression="zstd")
+            np.savez_compressed(
+                staged_npz,
+                X=X_full.astype(np.float32),
+                y=y_int,
+                sample_id=sample_ids,
+                waveform_sha256=waveform_hashes,
+            )
+            staged_manifest.write_text(manifest.model_dump_json(indent=2) + "\n", encoding="utf-8")
+            publish_staged_file_exclusive(staged_parquet, output_path)
+            publish_staged_file_exclusive(staged_npz, npz_output_path)
+            publish_staged_file_exclusive(staged_manifest, manifest_path)
+    LOGGER.info(
+        "Saved %d beats to %s and %s; manifest=%s",
+        len(df),
+        output_path,
+        npz_output_path,
+        manifest_path,
+    )
     return manifest
 
 

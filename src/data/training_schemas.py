@@ -117,6 +117,15 @@ class MorphologicalFeatures(BaseModel):
     qrs_area: float = Field(..., ge=0, description="Absolute QRS area in mV·s")
     st_slope_mV_s: float = Field(..., description="ST slope from J+60ms to J+80ms in mV/s")
     j_point: int = Field(..., ge=0, description="QRS offset sample index within segment")
+    qrs_asymmetry_index: Optional[float] = Field(
+        None, description="QRS asymmetry (R-onset)/(offset-R); None if detection failed"
+    )
+    t_r_ratio: Optional[float] = Field(
+        None, description="T-wave amplitude over R-wave absolute amplitude; None if R=0"
+    )
+    qrs_raggedness: Optional[float] = Field(
+        None, description="Std of absolute QRS segment; None if onset/offset failed"
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -135,6 +144,13 @@ class BeatRecord(BaseModel):
     label_aami: AAMIClass
     r_peak_sample: int = Field(..., ge=0, description="R-peak index within the full record")
     r_peak_in_segment: int = Field(..., ge=0, description="R-peak index within the segment")
+    source_sampling_rate: Optional[float] = Field(None, gt=0)
+    target_sampling_rate: Optional[float] = Field(None, gt=0)
+    annotation_index_native: Optional[int] = Field(None, ge=0)
+    annotation_time_seconds: Optional[float] = Field(None, ge=0)
+    annotation_index_target: Optional[int] = Field(None, ge=0)
+    class_original: Optional[str] = Field(None, min_length=1)
+    class_canonical: Optional[str] = Field(None, min_length=1)
     temporal: TemporalFeatures
     morph: MorphologicalFeatures
     augmentation_applied: bool = False

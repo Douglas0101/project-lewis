@@ -1,5 +1,7 @@
 """Testes da Ponte 2: consulta natural → SQL estruturado."""
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 import json

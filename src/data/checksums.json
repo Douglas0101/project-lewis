@@ -1,13 +1,13 @@
 {
   "version": "1.1",
-  "generated_at": "2026-06-26T02:40:00+00:00",
+  "generated_at": "2026-07-12T02:35:00+00:00",
   "datasets": {
     "chapman_shaoxing": {
-      "sha256": "2ac8e91a0830f8b1a7c3d06a698c0b27981adc4b6fc301149876d8dd126c3a83",
-      "size_bytes": 2458352898,
+      "sha256": "27fbb6f0e5a688fda2fd1d0b1499422369752f4925a82048c6b16add908b4134",
+      "size_bytes": 2459143126,
       "source": "physionet",
       "url": "https://physionet.org/files/challenge-2021/1.0.3/training/chapman_shaoxing/",
-      "verified_at": "2026-06-13T04:00:00+00:00",
+      "verified_at": "2026-07-12T02:35:00+00:00",
       "verified_by": "douglas-souza"
     },
     "mitdb": {
@@ -54,11 +54,11 @@
   },
   "mirrors": {
     "chapman_shaoxing": {
-      "sha256": "2ac8e91a0830f8b1a7c3d06a698c0b27981adc4b6fc301149876d8dd126c3a83",
-      "size_bytes": 2458352898,
+      "sha256": "27fbb6f0e5a688fda2fd1d0b1499422369752f4925a82048c6b16add908b4134",
+      "size_bytes": 2459143126,
       "path": "data/mirrors/chapman_shaoxing.tar.gz",
       "source": "local_mirror",
-      "verified_at": "2026-06-26T02:40:00+00:00",
+      "verified_at": "2026-07-12T02:35:00+00:00",
       "verified_by": "douglas-souza"
     },
     "mitbih_family_zip": {

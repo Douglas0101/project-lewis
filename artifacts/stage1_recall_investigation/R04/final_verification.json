@@ -1,0 +1,11 @@
+{
+  "lint": 0,
+  "pyright": 0,
+  "gitcheck": 0,
+  "r04_tests": 0,
+  "model_sha256": true,
+  "scaler_sha256": true,
+  "threshold_sha256": true,
+  "stage1_npz_sha256": true,
+  "stage2_npz_sha256": true
+}

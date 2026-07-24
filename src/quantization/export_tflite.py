@@ -18,6 +18,7 @@ from typing import Callable, Optional
 
 import numpy as np
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
 from src.quantization.ptq import calibrate
 
@@ -338,7 +339,7 @@ def main(
         output_dir = Path("models/quantized")
 
     if model_path is not None:
-        model = tf.keras.models.load_model(model_path)
+        model = load_keras_model(model_path)
     else:
         from src.models.backbone_1d import build_backbone_1d
         from src.quantization.ptq import representative_dataset_random

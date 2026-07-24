@@ -72,7 +72,10 @@ class ECGSegmenter:
         sig : np.ndarray
             Sinal pré-processado 1-D (já em mV, filtrado, resampleado 500 Hz).
         r_peaks : np.ndarray
-            Índices de amostra dos R-peaks.
+            Índices de amostra dos R-peaks **no mesmo relógio de ``sig``**
+            (rebuild_spec/02). Índices em relógio nativo (360/128/257 Hz)
+            aplicados a sinal de 500 Hz causam desalinhamento janela↔rótulo
+            (DQ-01) e são rejeitados quando fora do alcance do sinal.
         labels : np.ndarray
             Rótulos AAMI (N, V, S, F, Q) para cada batimento.
         rr_intervals_ms : np.ndarray, optional

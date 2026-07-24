@@ -1,0 +1,179 @@
+.venv/bin/pytest tests/ -q --tb=short
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.1.0, pluggy-1.6.0
+rootdir: /home/douglas-souza/PycharmProjects/Project-Lewis
+configfile: pyproject.toml
+plugins: xdist-3.8.0, hydra-core-1.3.3, cov-7.1.0, anyio-4.14.1, timeout-2.4.0
+collected 656 items
+
+tests/stress/test_adversarial_fuzz.py ..........                         [  1%]
+tests/stress/test_ponte1_rag.py ......                                   [  2%]
+tests/stress/test_ponte2_sql.py .......                                  [  3%]
+tests/stress/test_ponte3_timeline.py ........                            [  4%]
+tests/test_adaptive_skipping_sim.py ........                             [  5%]
+tests/test_ampt.py ............                                          [  7%]
+tests/test_analyze_training_dynamics.py ................                 [ 10%]
+tests/test_arena_limits.py .                                             [ 10%]
+tests/test_augmentation.py .......                                       [ 11%]
+tests/test_bit_exact_python_tflm.py .....                                [ 12%]
+tests/test_callbacks.py ......................                           [ 15%]
+tests/test_callbacks_integration.py .........                            [ 16%]
+tests/test_data/test_smote_sequence.py ...                               [ 17%]
+tests/test_data/test_stratified_group_split.py ...                       [ 17%]
+tests/test_data_leakage.py .                                             [ 17%]
+tests/test_download.py ......................                            [ 21%]
+tests/test_download_smoke.py ...                                         [ 21%]
+tests/test_dsp_fidelity.py .....                                         [ 22%]
+tests/test_dsp_filters.py ......                                         [ 23%]
+tests/test_e08_resampled_focal_mlp.py .....                              [ 24%]
+tests/test_evaluate.py ....                                              [ 24%]
+tests/test_evaluation/test_confusion_matrix_norm.py ..                   [ 25%]
+tests/test_evaluation/test_metrics_ci.py ...                             [ 25%]
+tests/test_evaluation/test_scaler_drift.py ....                          [ 26%]
+tests/test_evaluation/test_threshold_optimizer.py ...                    [ 26%]
+tests/test_fault_injection.py .                                          [ 26%]
+tests/test_feature_engineering_e06.py .....                              [ 27%]
+tests/test_feature_separability.py .....                                 [ 28%]
+tests/test_features.py ....................................              [ 33%]
+tests/test_fidelity.py .....                                             [ 34%]
+tests/test_finetune.py .............                                     [ 36%]
+tests/test_firmware_filters_python.py ..                                 [ 36%]
+tests/test_firmware_qg.py .....                                          [ 37%]
+tests/test_firmware_quantization_params.py ..                            [ 37%]
+tests/test_inference_pipeline.py ......                                  [ 38%]
+tests/test_inference_stage1_mlp.py ..                                    [ 39%]
+tests/test_knowledge/test_deps_compliance.py ..                          [ 39%]
+tests/test_knowledge/test_experiment_summarizer.py ......                [ 40%]
+tests/test_knowledge/test_hybrid_search.py ....                          [ 41%]
+tests/test_knowledge/test_indexer.py ..............                      [ 43%]
+tests/test_knowledge/test_integration.py .....                           [ 43%]
+tests/test_knowledge/test_lgpd_compliance.py .......                     [ 44%]
+tests/test_knowledge/test_mcp_server.py .....                            [ 45%]
+tests/test_knowledge/test_retriever.py .......                           [ 46%]
+tests/test_knowledge/test_structured_query.py .......................... [ 50%]
+.......                                                                  [ 51%]
+tests/test_label_audit_e07.py ......                                     [ 52%]
+tests/test_loader.py .................                                   [ 55%]
+tests/test_manifest_validator.py .........                               [ 56%]
+tests/test_memory/test_memory_commit.py ..                               [ 57%]
+tests/test_model.py ......................                               [ 60%]
+tests/test_models/test_architecture_v3.py ...                            [ 60%]
+tests/test_models/test_ensemble_fusion.py ...                            [ 61%]
+tests/test_morphological_features.py ....                                [ 61%]
+tests/test_native_tflm.py ...                                            [ 62%]
+tests/test_observability/test_api.py ..                                  [ 62%]
+tests/test_observability/test_instrumentation.py ....                    [ 63%]
+tests/test_observability/test_metrics.py ....                            [ 63%]
+tests/test_observability/test_ragas_eval.py ..                           [ 64%]
+tests/test_pipeline.py ...                                               [ 64%]
+tests/test_prepare_stage1_features.py ...                                [ 65%]
+tests/test_prepare_two_stage_datasets.py ....                            [ 65%]
+tests/test_preprocessing.py ........................                     [ 69%]
+tests/test_pretrain.py ....                                              [ 69%]
+tests/test_pruning_qat.py ...........                                    [ 71%]
+tests/test_qg5_v2_4_gates.py .......                                     [ 72%]
+tests/test_quantization/test_qat_pipeline.py ..                          [ 73%]
+tests/test_quantization/test_representative_dataset.py ...               [ 73%]
+tests/test_quantization.py ...............                               [ 75%]
+tests/test_quantization_degradation.py ..                                [ 76%]
+tests/test_quantized_runner.py ......                                    [ 76%]
+tests/test_r_peak_firmware.py ..                                         [ 77%]
+tests/test_renode_runner.py .......                                      [ 78%]
+tests/test_resampler.py ........                                         [ 79%]
+tests/test_run_stage_training.py ....                                    [ 80%]
+tests/test_scaler_utils.py ..                                            [ 80%]
+tests/test_security/test_rls.py ..................                       [ 83%]
+tests/test_segmenter.py ...................                              [ 86%]
+tests/test_slha_decision.py ...                                          [ 86%]
+tests/test_slha_discovery.py ...                                         [ 87%]
+tests/test_slha_integration.py ..                                        [ 87%]
+tests/test_slha_monitor.py ...                                           [ 87%]
+tests/test_slha_training_integration.py ..                               [ 88%]
+tests/test_slha_warmup.py ..                                             [ 88%]
+tests/test_split_protocol.py .........                                   [ 89%]
+tests/test_stage2_patient_distribution.py ........                       [ 91%]
+tests/test_stress/test_corpus_loader.py ............                     [ 92%]
+tests/test_tflm_bitexact.py ..                                           [ 93%]
+tests/test_tracking/test_integrations.py .                               [ 93%]
+tests/test_tracking/test_timeline.py ......                              [ 94%]
+tests/test_tracking/test_timeline_refresh.py ..                          [ 94%]
+tests/test_tracking_cli.py ...                                           [ 94%]
+tests/test_tracking_db.py .......                                        [ 96%]
+tests/test_tracking_integration.py ....                                  [ 96%]
+tests/test_training_data_audit.py .....                                  [ 97%]
+tests/test_two_stage_mlp_qg5.py ...                                      [ 97%]
+tests/test_two_stage_pipeline.py .....                                   [ 98%]
+tests/test_two_stage_qg5.py F                                            [ 98%]
+tests/test_v2_4_publication_guard.py ...                                 [ 99%]
+tests/test_v2_4_research_completion.py ....                              [ 99%]
+tests/test_watchdog.py .                                                 [100%]
+
+=================================== FAILURES ===================================
+________________________ test_two_stage_qg5_end_to_end _________________________
+tests/test_two_stage_qg5.py:271: in test_two_stage_qg5_end_to_end
+    assert stage1.recall + tolerance >= STAGE1_MIN_RECALL_ANORMAL, (
+E   AssertionError: QG5' v2.2: Recall(Anormal) do Estágio 1 (0.0661) abaixo do threshold (0.3)
+E   assert (0.06614583333333333 + 1e-06) >= 0.3
+E    +  where 0.06614583333333333 = StageMetrics(recall=0.06614583333333333, precision=1.0, f1_macro=0.1245115100172782, accuracy=0.12451171875, mcc=0.06638845296803621, per_class_f1={'N': 0.12493899463152758, 'Anormal': 0.12408402540302882}).recall
+----------------------------- Captured stdout call -----------------------------
+
+[QG5' v2.2] Pipeline two-stage end-to-end
+  Estágio 1 | Recall(Anormal)=0.0661 Precision(Anormal)=1.0000 F1-macro=0.1245 Acc=0.1245 MCC=0.0664
+  Estágio 2 | F1-macro=0.6420 Acc=0.6578 MCC=0.5088 per-class F1={'S': 0.7168784029038112, 'V': 0.4626728110599078, 'F': 0.7465214761040533}
+=============================== warnings summary ===============================
+.venv/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+.venv/lib/python3.12/site-packages/tensorflow_model_optimization/__init__.py:65
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/tensorflow_model_optimization/__init__.py:65: DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+    if (distutils.version.LooseVersion(tf.version.VERSION) <
+
+.venv/lib/python3.12/site-packages/tensorflow_model_optimization/__init__.py:66
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/tensorflow_model_optimization/__init__.py:66: DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.
+    distutils.version.LooseVersion(required_tensorflow_version)):
+
+tests/stress/test_ponte1_rag.py: 1 warning
+tests/test_knowledge/test_hybrid_search.py: 1 warning
+tests/test_knowledge/test_indexer.py: 4 warnings
+tests/test_knowledge/test_integration.py: 4 warnings
+tests/test_knowledge/test_lgpd_compliance.py: 1 warning
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/pydantic/main.py:263: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+tests/test_bit_exact_python_tflm.py: 2 warnings
+tests/test_callbacks.py: 24 warnings
+tests/test_inference_pipeline.py: 100 warnings
+tests/test_inference_stage1_mlp.py: 8 warnings
+tests/test_pruning_qat.py: 30 warnings
+tests/test_slha_training_integration.py: 16 warnings
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/keras/src/backend/tensorflow/core.py:171: DeprecationWarning: __array__ implementation doesn't accept a copy keyword, so passing copy=False failed. __array__ must implement 'dtype' and 'copy' keyword arguments. To learn more, see the migration guide https://numpy.org/devdocs/numpy_2_0_migration_guide.html#adapting-to-changes-in-the-copy-keyword
+    return np.array(x)
+
+tests/test_fidelity.py::TestFidelity::test_beat_fidelity[0]
+tests/test_fidelity.py::TestFidelity::test_beat_fidelity[0]
+tests/test_native_tflm.py::TestNativeTflm::test_binary_does_not_contain_stub_marker
+tests/test_quantization.py::TestTFLMExport::test_export_creates_tflite
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/_pytest/fixtures.py:1312: PytestRemovedIn10Warning: Class-scoped fixture defined as instance method is deprecated.
+  Instance attributes set in this fixture will NOT be visible to test methods,
+  as each test gets a new instance while the fixture runs only once per class.
+  Use @classmethod decorator and set attributes on cls instead.
+  See https://docs.pytest.org/en/stable/deprecations.html#class-scoped-fixture-as-instance-method
+    fixturefunc = resolve_fixture_function(fixturedef, request)
+
+tests/test_inference_stage1_mlp.py::test_predict_returns_expected_shapes
+tests/test_inference_stage1_mlp.py::test_predict_with_threshold
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/keras/src/layers/core/dense.py:107: UserWarning: Do not pass an `input_shape`/`input_dim` argument to a layer. When using Sequential models, prefer using an `Input(shape)` object as the first layer in the model instead.
+    super().__init__(activity_regularizer=activity_regularizer, **kwargs)
+
+tests/test_slha_training_integration.py::test_finetune_mitbih_accepts_use_slha
+  /home/douglas-souza/PycharmProjects/Project-Lewis/.venv/lib/python3.12/site-packages/keras/src/callbacks/callback_list.py:171: UserWarning: Learning rate reduction is conditioned on metric `val_loss` which is not available. Available metrics are: accuracy,loss,learning_rate.
+    callback.on_epoch_end(epoch, logs)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_two_stage_qg5.py::test_two_stage_qg5_end_to_end - Assertion...
+=========== 1 failed, 655 passed, 201 warnings in 1072.85s (0:17:52) ===========
+make: *** [Makefile:212: test] Erro 1
+
+[exit_code=2]

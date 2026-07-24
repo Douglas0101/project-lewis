@@ -8,6 +8,8 @@ Validates beat segmentation:
 * QG3.5 — RR < 600 ms uses min_window, RR >= 600 ms uses standard window.
 """
 
+# pyright: reportArgumentType=false
+
 from __future__ import annotations
 
 import numpy as np
@@ -23,13 +25,13 @@ from src.data.segmenter import ECGSegmenter
 def _synthetic_signal_with_peaks(
     n_samples: int = 5000,
     fs: float = 500.0,
-    r_peaks: list[int] | None = None,
+    r_peaks: list[int] | np.ndarray | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Create a synthetic signal with impulses at R-peak positions."""
     sig = np.zeros(n_samples, dtype=np.float64)
     if r_peaks is None:
         # 5 peaks spaced 1000 ms apart (500 samples)
-        r_peaks = [500, 1000, 1500, 2000, 2500]
+        r_peaks = np.array([500, 1000, 1500, 2000, 2500], dtype=np.int64)
     for rp in r_peaks:
         if 0 <= rp < n_samples:
             sig[rp] = 1.0
@@ -95,7 +97,7 @@ class TestSegmenterNoPadding:
 
     def test_all_valid_peaks_kept(self):
         # Peaks well inside the signal
-        r_peaks = [1000, 2000, 3000, 4000]
+        r_peaks = np.array([1000, 2000, 3000, 4000], dtype=np.int64)
         sig, _ = _synthetic_signal_with_peaks(n_samples=5500, r_peaks=r_peaks)
         labels = np.array(["N", "V", "S", "F"])
         seg = ECGSegmenter(fs=500.0)
@@ -106,7 +108,7 @@ class TestSegmenterNoPadding:
         assert list(y) == ["N", "V", "S", "F"]
 
     def test_no_padding_in_output(self):
-        r_peaks = [1500, 2500]
+        r_peaks = np.array([1500, 2500], dtype=np.int64)
         sig, _ = _synthetic_signal_with_peaks(n_samples=4000, r_peaks=r_peaks)
         labels = np.array(["N", "N"])
         seg = ECGSegmenter(fs=500.0)
@@ -130,7 +132,7 @@ class TestSegmenterCentered:
     """Validate that the R-peak is near the center of each segment."""
 
     def test_r_peak_at_center(self):
-        r_peaks = [1500, 2500]
+        r_peaks = np.array([1500, 2500], dtype=np.int64)
         sig, _ = _synthetic_signal_with_peaks(n_samples=4000, r_peaks=r_peaks)
         labels = np.array(["N", "N"])
         seg = ECGSegmenter(fs=500.0)
@@ -149,7 +151,7 @@ class TestSegmenterCentered:
 
     def test_r_peak_at_center_600ms_fallback(self):
         # Short RR intervals (< 600ms) -> 600ms windows with edge padding to 1000ms
-        r_peaks = [500, 800, 1100]
+        r_peaks = np.array([500, 800, 1100], dtype=np.int64)
         rr_intervals_ms = np.array([500.0, 500.0, 500.0])
         sig, _ = _synthetic_signal_with_peaks(n_samples=2000, r_peaks=r_peaks)
         labels = np.array(["N", "N", "N"])
@@ -179,7 +181,7 @@ class TestSegmenterOutputQuality:
     """Validate output dtype, shape, and absence of NaN/Inf."""
 
     def test_output_dtype_float32(self):
-        r_peaks = [1500]
+        r_peaks = np.array([1500], dtype=np.int64)
         sig, _ = _synthetic_signal_with_peaks(n_samples=3000, r_peaks=r_peaks)
         labels = np.array(["N"])
         seg = ECGSegmenter(fs=500.0)
@@ -201,7 +203,7 @@ class TestSegmenterOutputQuality:
         assert meta["n_total"] == 0
 
     def test_single_beat(self):
-        r_peaks = [1500]
+        r_peaks = np.array([1500], dtype=np.int64)
         sig, _ = _synthetic_signal_with_peaks(n_samples=3000, r_peaks=r_peaks)
         labels = np.array(["V"])
         seg = ECGSegmenter(fs=500.0)
@@ -222,7 +224,7 @@ class TestSegmenterRRSelection:
 
     def test_tachycardia_uses_600ms(self):
         # RR = 500 ms (< 600) -> should use min_window
-        r_peaks = [500, 1000, 1500]
+        r_peaks = np.array([500, 1000, 1500], dtype=np.int64)
         rr_intervals_ms = np.array([500.0, 500.0, 500.0])
         sig, _ = _synthetic_signal_with_peaks(n_samples=2500, r_peaks=r_peaks)
         labels = np.array(["N", "N", "N"])
@@ -233,7 +235,7 @@ class TestSegmenterRRSelection:
 
     def test_normal_rr_uses_1000ms(self):
         # RR = 1000 ms (>= 600) -> should use standard window
-        r_peaks = [1000, 2000, 3000]
+        r_peaks = np.array([1000, 2000, 3000], dtype=np.int64)
         rr_intervals_ms = np.array([1000.0, 1000.0, 1000.0])
         sig, _ = _synthetic_signal_with_peaks(n_samples=4500, r_peaks=r_peaks)
         labels = np.array(["N", "N", "N"])
@@ -255,7 +257,7 @@ class TestSegmenterRRSelection:
 
     def test_mixed_rr_intervals(self):
         # Mix of tachycardia and normal
-        r_peaks = [500, 1000, 2000]
+        r_peaks = np.array([500, 1000, 2000], dtype=np.int64)
         rr_intervals_ms = np.array([500.0, 500.0, 1000.0])
         sig, _ = _synthetic_signal_with_peaks(n_samples=3000, r_peaks=list(r_peaks))
         labels = np.array(["N", "N", "N"])

@@ -8,8 +8,10 @@ from pathlib import Path
 import pytest
 from sqlalchemy.orm import Session
 
-from src.knowledge.db import get_connection, init_schema as init_knowledge_schema
-from src.tracking.db import get_engine, init_schema as init_tracking_schema
+from src.knowledge.db import get_connection
+from src.knowledge.db import init_schema as init_knowledge_schema
+from src.tracking.db import get_engine
+from src.tracking.db import init_schema as init_tracking_schema
 from src.tracking.models import Alert, Experiment, Metric, Run
 
 

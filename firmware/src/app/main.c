@@ -170,7 +170,18 @@ static uint8_t uart_read_byte(void)
     return lewis_hal_uart_rx();
 }
 
-#define UART_BYTE_TIMEOUT_MS 100
+/* Renode injeta cada byte por um comando monitor sincronizado. Em runners
+ * compartilhados, um stall do host pode durar minutos de tempo real e, com
+ * a emulacao lenta (~20x), consumir varios segundos virtuais entre dois
+ * comandos. Com o TIM2 calibrado para o modelo de 10 MHz do Renode
+ * (hal_sim.c), 30000 ms = 30 s virtuais por byte: margem que absorve stalls
+ * extremos sem abortar o frame (QG10). O caminho de timeout por byte passa
+ * a proteger apenas frames truncados (host morto no meio do envio); o QG11
+ * valida o tratamento de erro via frame completo com terminador invalido
+ * (FRAME ERR imediato), sem depender deste timeout. Este limite existe
+ * somente em RENODE_SIMULATION; o timeout total do frame continua sendo o
+ * gate fail-closed. */
+#define UART_BYTE_TIMEOUT_MS 30000
 #define UART_FRAME_TIMEOUT_MS 180000
 
 static bool uart_read_byte_timeout(uint8_t *out, uint32_t timeout_ms)

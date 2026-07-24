@@ -1,5 +1,5 @@
 #include "harness.h"
-#include "dsp/adaptive_skipping.h"
+#include "../src/dsp/adaptive_skipping.h"
 #include <string.h>
 
 #define THRESHOLD_MS 10U
@@ -34,7 +34,11 @@ static void test_stable_rhythm_triggers_skip(harness_result_t* r) {
     (void)lewis_adaptive_skipping_should_skip(&ctx, 800U, THRESHOLD_MS, THRESHOLD_RATIO);
     bool skip = lewis_adaptive_skipping_should_skip(&ctx, 800U, THRESHOLD_MS, THRESHOLD_RATIO);
 
-    harness_assert_true(r, skip, "stable rhythm should skip");
+#if ADAPTIVE_SKIPPING_ENABLED
+    harness_assert_true(r, skip, "stable rhythm should skip when enabled");
+#else
+    harness_assert_true(r, !skip, "stable rhythm should not skip when disabled");
+#endif
 }
 
 static void test_unstable_rhythm_does_not_skip(harness_result_t* r) {

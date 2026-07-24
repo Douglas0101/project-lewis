@@ -25,10 +25,11 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, Optional
+from typing import Any, Callable, Dict, Iterable, Optional, cast
 
 import numpy as np
 import tensorflow as tf
+from src.models.keras_loader import load_keras_model
 
 LOGGER = logging.getLogger("lewis.camada04.pruning_qat")
 
@@ -143,7 +144,7 @@ def _rebuild_pruned_model(
         Modelo podado com pesos copiados.
     """
     layer_inputs: Dict[str, tf.Tensor] = {}
-    x: Optional[tf.Tensor] = None
+    x: tf.Tensor = cast(tf.Tensor, None)
     inputs: Optional[tf.keras.Input] = None
 
     prev_conv_name: Optional[str] = None
@@ -160,8 +161,8 @@ def _rebuild_pruned_model(
         if isinstance(layer, tf.keras.layers.InputLayer):
             input_shape = model.input_shape[1:]
             inputs = tf.keras.Input(shape=input_shape, name=layer.name)
-            x = inputs
-            layer_inputs[layer.name] = inputs
+            x = cast(tf.Tensor, inputs)
+            layer_inputs[layer.name] = x
             continue
 
         if isinstance(layer, tf.keras.layers.Conv1D):
@@ -580,7 +581,7 @@ def prune_qat_pipeline(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # 1. Carrega modelo original.
-    model = tf.keras.models.load_model(str(model_path), compile=False)
+    model = load_keras_model(str(model_path), compile=False)
     original_params = int(model.count_params())
     LOGGER.info("Modelo original carregado | params=%d", original_params)
 

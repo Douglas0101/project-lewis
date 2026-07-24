@@ -1,0 +1,8 @@
+{
+  "trainable_weight_hash_before": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "trainable_weight_hash_after": "fdc6069d2fcda3a406fa7aeb683f5d3ad244cfde5cfc7969fa532d8fca58bf30",
+  "non_trainable_weight_hash_before": "05398e3672e20425fb9b5880026a1e27ccde759decf0be6a9adaea53b146c4e5",
+  "non_trainable_weight_hash_after": "05398e3672e20425fb9b5880026a1e27ccde759decf0be6a9adaea53b146c4e5",
+  "trainable_weights_immutable": true,
+  "non_trainable_weights_changed": false
+}
