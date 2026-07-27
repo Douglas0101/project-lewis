@@ -120,10 +120,10 @@ A camada de dados unifica sinais de ECG de múltiplas fontes públicas em um for
 ### ⚙️ Fluxo de Pré-processamento
 
 ```bash
-make env          # uv + dependências
-make download-all # PhysioNet / ZIP / mirror
-make process      # resample → lead → filter → detrend → normalize
-make test         # QG0 → QG1
+make env                # uv + dependências
+make data-download-all  # PhysioNet / ZIP / mirror
+make data-process       # resample → lead → filter → detrend → normalize
+make test               # QG0 → QG1
 ```
 
 1. **Ingestão:** `wfdb.io.dl_database` com retry exponencial + DLQ (`data/.dlq/`) para falhas.
@@ -205,9 +205,9 @@ Comandos:
 
 ```bash
 # Pipeline produtivo atual (v2.3) — MLP sobre features
-make mlp-pipeline
+make mlp-run                # completo; FEATURES=1 regenera features
 
-# Pipeline legado (v1.1) — ainda disponível no Makefile
+# Pipeline legado (v1.1) — alvos internos, fora do help
 make pretrain
 make finetune
 
@@ -227,9 +227,14 @@ models/input_scaler_stage2_v2.0.pkl
 models/stage1_threshold_v2.0.json
 ```
 
+> ⚠️ **Integridade (E07R, 2026-07-26):** `models/` está congelado por 101 pins de hash
+> do freeze E07R. Qualquer escrita em `models/` (treino, quantização, seleção de fold)
+> é detectada pelo preflight fail-closed e bloqueia os workflows E07R. Não execute
+> alvos que promovam artefatos para `models/` sem disposição de governança.
+
 ### 👤 Validação Inter-Patient
 
-Nunca misturamos batimentos do mesmo paciente entre treino e teste. Usamos **GroupKFold por paciente** (`n_splits=5`) para evitar *data leakage*.
+Nunca misturamos batimentos do mesmo paciente entre treino e teste. Usamos **GroupKFold por paciente** (`n_splits=5`) para evitar *data leakage*. Desde 2026-07-26, a avaliação de pesquisa usa splits **patient-disjoint v4.0** (`data/splits/stage2_multiclass_patient_disjoint_v4.0/`), com MIT-BIH 201/202 unificados por evidência oficial PhysioNet.
 
 ### 📊 Métricas AAMI EC57 — Thresholds v2.2
 
@@ -254,9 +259,8 @@ Os thresholds originais v1.1 (Acc > 93%, F1-macro > 0,85) não foram atingíveis
 Cada modelo (Stage 1 e Stage 2) é quantizado separadamente com **PTQ per-channel INT8** e 512 amostras estratificadas AAMI:
 
 ```bash
-make quantize
-# ou
 uv run python scripts/quantize_two_stage_v2.0.py
+# alvo interno equivalente: make quantize
 ```
 
 | Critério | Limite | Valor obtido |
@@ -289,17 +293,17 @@ Sistema de recuperação semântica local para dar contexto a agentes de coding 
 - **Metadados 3D:** camada (C01–C11), versão, tags semânticas.
 - **Segurança/LGPD:** scan de PII e bloqueio automático de dados brutos de ECG.
 - **Hybrid Search:** combinação de `BM25` via FTS5 + busca vetorial + RRF, ativada pela flag `--hybrid` no CLI/API.
-- **RAGAS Evaluation:** avaliação da qualidade do RAG com `make ragas-eval` (requer o grupo opcional de dependências `eval` e `OPENAI_API_KEY`).
+- **RAGAS Evaluation:** avaliação da qualidade do RAG com `make rag-eval-ragas` (requer o grupo opcional de dependências `eval` e `OPENAI_API_KEY`).
 - **NL → SQL:** respostas a perguntas estruturadas sobre runs/experimentos com RLS e audit log.
 
 ```bash
-make knowledge-index      # reindexa docs/src/firmware
-make knowledge-status     # status do índice
-make knowledge-query      # query interativa
-make knowledge-test       # roda tests/test_knowledge/
-make knowledge-validate   # valida índice gerado
-make hybrid-eval          # avaliação do hybrid search
-make ragas-eval           # avaliação RAGAS (requer OPENAI_API_KEY)
+make kb-index             # reindexa docs/src/firmware
+make kb-status            # status do índice
+make kb-query             # query interativa
+make kb-test              # roda tests/test_knowledge/
+make kb-validate          # valida índice gerado
+make rag-eval-hybrid      # avaliação do hybrid search
+make rag-eval-ragas       # avaliação RAGAS (requer OPENAI_API_KEY)
 ```
 
 Tools MCP expostas:
@@ -320,13 +324,13 @@ Tools MCP expostas:
 Stack de métricas e health checks para acompanhar latência, throughput e disponibilidade dos componentes Python, especialmente a Camada C11 e os endpoints de consulta.
 
 - **Métricas Prometheus:** coletadas em `src/observability/metrics.py` (`LatencyTracker`, contadores de queries, erros e duração).
-- **FastAPI `/metrics` e `/health`:** expõem métricas no formato Prometheus e health check via `make observability-up`.
+- **FastAPI `/metrics` e `/health`:** expõem métricas no formato Prometheus e health check via `make obs-up`.
 - **Docker Compose:** stack completo Prometheus + Grafana + app de métricas.
 - **Dashboards Grafana:** JSONs versionados em `observability/grafana/dashboards/` (provisionamento automático).
 
 ```bash
-make observability-up     # sobe Prometheus + Grafana + app de métricas
-make observability-down   # derruba a stack
+make obs-up     # sobe Prometheus + Grafana + app de métricas
+make obs-down   # derruba a stack
 ```
 
 ---
@@ -351,7 +355,7 @@ Testes de resistência contra entradas maliciosas, prompts de injeção e consul
 - **CI stress gate:** `.github/workflows/stress-gate.yml` executa os stress tests a cada push/PR.
 
 ```bash
-make stress-test          # pytest -m stress
+make stress-test          # pytest -m stress (alvo interno)
 ```
 
 ---
@@ -399,12 +403,12 @@ O relatório é gerado em `firmware/test_harness_report.json` com o resumo `nati
 ### 🧪 Simulação Renode
 
 ```bash
-make firmware-deps     # ARM GCC 13.3 + Renode 1.15.3
-make firmware-tflm     # clone + build do TensorFlow Lite Micro (host + ARM)
-make firmware-build    # ELF para STM32F4
-make firmware-test     # 5 s de simulação headless
-make hard-gates        # Hard Gates HG-01..HG-06
-make harness-renode    # harness de testes no Renode
+make firmware-deps     # ARM GCC 13.3 + Renode 1.15.3 (alvo interno)
+make firmware-tflm     # clone + build do TensorFlow Lite Micro (alvo interno)
+make fw-build          # ELF para STM32F4
+make fw-test           # 5 s de simulação headless
+make gates-firmware    # Hard Gates HG-01..HG-06
+cd firmware && make harness-renode   # harness de testes no Renode
 ```
 
 > ⚠️ **Limites:** timings são representativos, energia não é estimada e há tolerância de 1 LSB entre CMSIS-NN e kernels de referência. Veja [`docs/SIMULATION_LIMITS.md`](docs/SIMULATION_LIMITS.md).
@@ -412,16 +416,16 @@ make harness-renode    # harness de testes no Renode
 ### 🔄 CI/CD & Reprodutibilidade
 
 - **`uv` + `pyproject.toml`**: lockfile determinístico e ambientes isolados.
-- **Makefile**: targets por camada executados sequencialmente; evite `make -j` porque stages compartilham artefatos mutáveis.
+- **Makefile**: alvos públicos por domínio (`make help` por seção; flags `DRY_RUN/FORCE/RUN_ID/STAGE/JSON`); aliases legados com aviso `DEPRECATED`; evite `make -j` porque stages compartilham artefatos mutáveis. Guia completo: [`docs/make_commands.md`](docs/make_commands.md).
 - **Docker + Docker Compose**: reprodutibilidade total entre máquinas.
 - **GitHub Actions**: lint → unit tests → integration tests → quality gates.
 - **Pre-commit**: Black, isort, flake8, mypy, bandit.
 
 ```bash
 make env              # cria ambiente
-make all              # pipeline completo
+make all              # pipeline completo (alvo interno)
 make docker-build     # imagem reprodutível
-make quality-report   # relatório QG0–QG6
+make quality-report   # relatório QG0–QG6 (alvo interno)
 ```
 
 ---
@@ -443,10 +447,11 @@ project-lewis/
 │   ├── raw_incart/
 │   ├── processed/
 │   ├── features/
+│   ├── splits/            # splits v3 (grupo) + v4.0 patient-disjoint (congelados)
 │   ├── lineage/
 │   ├── .dlq/
 │   └── knowledge.db       # RAG sqlite-vec (C11)
-├── docs/                  # Especificações por camada
+├── docs/                  # Especificações por camada + evidência E07R
 │   ├── ESPECIFICACAO_Fase1_Agentes-v1.1.md
 │   ├── Camada-01-Ingestao-v1.1.md
 │   ├── Camada-02-Resample-Preprocessamento-v1.1.md
@@ -461,7 +466,10 @@ project-lewis/
 │   ├── SDD_Project-Lewis_v3.md
 │   ├── SDD-C11-Knowledge-Impl-v2.0.md
 │   ├── DEBITO_TECNICO_Energia_Renode-v1.4.md
+│   ├── make_commands.md
 │   └── SIMULATION_LIMITS.md
+├── experiments/           # Runs, checkpoints e integridade E07R
+│   └── stage2_v2.4_research/
 ├── firmware/              # Firmware embarcado
 │   ├── src/               # app, dsp, hal, ml, platform, utils
 │   ├── renode/            # scripts .resc, .robot
@@ -470,7 +478,7 @@ project-lewis/
 │   ├── Makefile
 │   ├── third_party/       # tflite-micro (clonado em build time, ver .commit)
 │   └── tools/             # ARM GCC e Renode (instalados localmente)
-├── models/                # Modelos treinados e quantizados
+├── models/                # Modelos treinados e quantizados (congelados por hash — E07R)
 │   ├── stage1_float32_v2.0.keras
 │   ├── stage2_float32_v2.0.keras
 │   ├── input_scaler_stage1_v2.0.pkl
@@ -507,7 +515,7 @@ project-lewis/
 ```bash
 make doctor    # verifica ambiente
 make setup     # instala dependências e hooks
-make help      # lista todos os comandos disponíveis
+make help      # lista os comandos públicos por seção
 ```
 
 ### 2. Ambiente
@@ -525,80 +533,91 @@ make docker-run
 ### 3. Pipeline de Dados
 
 ```bash
-make download-all   # QG0
-make process        # QG1
+make data-download-all   # QG0
+make data-process        # QG1
 ```
 
 ### 4. Features e Modelagem
 
 ```bash
-make features       # QG2/QG3
+make data-features    # QG2/QG3
 
 # Pipeline atual (v2.3) — MLP sobre features morfológicas + time-domain
-make mlp-pipeline   # prepare → treino stage1/2 → seleção → quantização → validação → QG5'
+make mlp-run          # prepare → treino stage1/2 → seleção → quantização → validação → QG5'
 
 # Ou passo a passo
-make mlp-prepare-features
 make mlp-train
 make mlp-select-best
 make mlp-quantize
-make mlp-validate-quantized
-make mlp-test-qg5
+make mlp-validate-quant
+make mlp-qg5
 
-# Pipeline legado (v2.2 / v1.1) — ainda disponível
+# Pipeline legado (v2.2 / v1.1) — scripts/alvos internos
 uv run python scripts/run_stage1_training.py
 uv run python scripts/run_stage2_training.py
 uv run python scripts/run_two_stage_pipeline.py
-make pretrain       # QG4
-make finetune       # QG5
+make pretrain       # QG4 (alvo interno)
+make finetune       # QG5 (alvo interno; escreve em models/ — ver nota de integridade)
 ```
 
-### 5. Quantização e Exportação
+### 5. Pipeline E07R — pesquisa patient-disjoint
 
 ```bash
-make quantize       # QG6
-make export         # headers C
+make e07r-check            # preflight de integridade (9 checks, fail-closed)
+make e07r-status           # painel: freeze, células DONE, seleção H*-PD
+make e07r-e065             # E06.5-PD 100 células (resume write-once)
+make e07r-e065 DRY_RUN=1   # apenas planejamento
+make e07r-e065 FORCE=1     # arquiva evidência e re-treina com run-id novo
+make e07r-e07              # E07-PD (bloqueado por pré-registro: sem H*-PD válido)
+make e07r-watch            # dashboard TUI dos treinamentos (STAGE=e065|e07)
 ```
 
-### 6. Firmware, Harness e Simulação
+### 6. Quantização e Exportação
 
 ```bash
-cd firmware
-make firmware-deps
-make firmware-tflm
-make firmware-build
-make firmware-test
-make harness           # test harness native + renode
+make quantize       # QG6 (alvo interno)
+make export         # headers C (alvo interno)
 ```
 
-### 7. Camada C11 — Knowledge Layer
+### 7. Firmware, Harness e Simulação
 
 ```bash
-make knowledge-index     # indexa docs/src/firmware
-make knowledge-status    # status do índice
-make knowledge-query     # query interativa
-make knowledge-test      # testes C11
-make knowledge-validate  # validação do índice
-make hybrid-eval         # avaliação do hybrid search
-make ragas-eval          # avaliação RAGAS (requer OPENAI_API_KEY)
+make firmware-deps   # toolchain ARM + Renode (alvo interno)
+make firmware-tflm   # TFLM host + ARM (alvo interno)
+make fw-build
+make fw-test
+cd firmware && make harness   # test harness native + renode
 ```
 
-### 8. Observabilidade e Stress Tests
+### 8. Camada C11 — Knowledge Layer
 
 ```bash
-make observability-up    # sobe Prometheus + Grafana + app de métricas
-make observability-down  # derruba a stack de métricas
-make stress-test         # pytest -m stress
+make kb-index            # indexa docs/src/firmware
+make kb-status           # status do índice
+make kb-query            # query interativa
+make kb-test             # testes C11
+make kb-validate         # validação do índice
+make rag-eval-hybrid     # avaliação do hybrid search
+make rag-eval-ragas      # avaliação RAGAS (requer OPENAI_API_KEY)
 ```
 
-### 9. Testes Completos
+### 9. Observabilidade e Stress Tests
 
 ```bash
-make test              # pytest completo (578 testes)
-make hard-gates        # Hard Gates HG-01..HG-06
-make quality-report    # relatório consolidado
+make obs-up              # sobe Prometheus + Grafana + app de métricas
+make obs-down            # derruba a stack de métricas
+make stress-test         # pytest -m stress (alvo interno)
+```
+
+### 10. Testes Completos
+
+```bash
+make test              # pytest completo
+make test-e2e          # slow + integração
+make gates-firmware    # Hard Gates HG-01..HG-06
+make gates-ci          # hard gates de CI
 make lint              # flake8 + mypy + bandit
-make stress-test       # stress tests (RAG, SQL, Timeline)
+make check             # lint + markers + integridade E07R
 ```
 
 ---
@@ -623,16 +642,16 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 
 | Gate | Foco | Threshold | Comando |
 | :--- | :--- | :--- | :--- |
-| **QG7** | Build firmware | `-Werror`; FlatBuffer < 64 KB | `make firmware-build` |
+| **QG7** | Build firmware | `-Werror`; FlatBuffer < 64 KB | `make fw-build` |
 | **QG8** | Bit-exatidão C vs Python | `atol = 1` LSB | `pytest -m qg8` |
 | **QG9** | Latência TFLM | < 200 ms/batimento | Relatório Renode |
 | **QG10** | Fidelidade DSP | cosine > 0,99 | `pytest -m qg10` |
 | **QG11** | Fault injection | Graceful degradation | `pytest -m qg11` |
 | **QG12** | Arena limit (48 KB RAM) | `INIT FAIL` sem HardFault | `pytest -m qg12` |
 | **QG13** | Watchdog de inferência | Reset após timeout | `pytest -m qg13` |
-| **QG16** | Filtros DSP vs Python | correlação > 0,99 / RMSE < 1e-6 | `pytest -m qg16` / `make harness` |
-| **QG17** | Pipeline filtrado C vs Python | MAE < 0,01 / cosine > 0,99 | `pytest -m qg17` / `make harness` |
-| **QG18** | Detector R-peak C vs AMPT | Sens ≥ 90%; PPV ≥ 90% | `pytest -m qg18` / `make harness` |
+| **QG16** | Filtros DSP vs Python | correlação > 0,99 / RMSE < 1e-6 | `pytest -m qg16` / `cd firmware && make harness` |
+| **QG17** | Pipeline filtrado C vs Python | MAE < 0,01 / cosine > 0,99 | `pytest -m qg17` / `cd firmware && make harness` |
+| **QG18** | Detector R-peak C vs AMPT | Sens ≥ 90%; PPV ≥ 90% | `pytest -m qg18` / `cd firmware && make harness` |
 | **QG19** | Consumo energético | < 50 mA e < 165 mJ/batimento @ 3,3 V | `reports/firmware_simulation_report.json` |
 
 ### Camada C11 — Knowledge Layer
@@ -648,7 +667,7 @@ Nenhum artefato avança para a próxima camada sem passar no gate correspondente
 | **QG-C11-07** | Tamanho do banco | < 500 MB | `pytest tests/test_knowledge/test_indexer.py` |
 | **QG-C11-08** | CLI funcional | `reindex`, `query`, `status` | `pytest tests/test_knowledge/test_integration.py` |
 | **QG-C11-09** | Deps compliance | Sem LangChain/Chroma/typer | `pytest tests/test_knowledge/test_deps_compliance.py` |
-| **QG-C11-10** | Hybrid search | MRR/recall nos thresholds do golden dataset | `make hybrid-eval` |
+| **QG-C11-10** | Hybrid search | MRR/recall nos thresholds do golden dataset | `make rag-eval-hybrid` |
 | **QG-C11-11** | RLS/Audit | `owner_id` isolado; audit log presente e consistente | `pytest tests/test_knowledge/test_structured_query.py tests/test_security/test_rls.py` |
 | **QG-C11-12** | Adversarial fuzzing | Corpus adversarial rejeitado/retornado sem vazamento | `pytest -m stress` |
 
@@ -670,6 +689,10 @@ Consulte [`docs/SIMULATION_LIMITS.md`](docs/SIMULATION_LIMITS.md) para detalhes 
 ## 📌 Versão Atual
 
 `v3.1.0` — release consolidando a Fase 2 (observabilidade Prometheus/Grafana, RLS/audit, hybrid search BM25 + vector + RRF, timeline materializada) e o Data-Centric AI cleanup (clipping ±5mV, Z-score global train-only, StandardScaler para MLP, cache invalidation, redução de duplicação no SonarCloud). O pipeline de classificação em duas etapas (Stage 1: N vs Anormal; Stage 2: S vs V vs F) e o firmware STM32F4 validado via Renode permanecem como base; o fallback MLP-features está documentado em `reports/stage1_v2_training_analysis.md`.
+
+**Estado E07R-PD (2026-07-26):** remediação patient-disjoint concluída — MIT-BIH 201/202 unificados por evidência oficial PhysioNet, splits `v4.0-patient-disjoint` congelados, freeze de 101 pins com preflight fail-closed 9/9, E06.5-PD 100/100 células com `NO_VALID_CANDIDATE` (H6 não supera baseline: ΔF1(F) = −0,1601; IC95 [−0,398; +0,153]) e E07-PD não executado (0/150) por pré-registro. Publicação: `HOLD`; `models/` congelado por hash. Evidência: [`docs/e07r_evidence_report.md`](docs/e07r_evidence_report.md).
+
+**Makefile (FASE 7, 2026-07-26):** padronizado em 60 alvos públicos por seção (`make help`), domínios `data-*`, `mlp-*`, `e07r-*`, `fw-*`, `gates-*`, `kb-*`, `rag-*`, `obs-*`, com flags `DRY_RUN=1`, `FORCE=1`, `RUN_ID=...`, `STAGE=...`, `JSON=1`. Alvos antigos funcionam como aliases `DEPRECATED`. Guia: [`docs/make_commands.md`](docs/make_commands.md).
 
 ---
 

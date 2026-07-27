@@ -7,7 +7,7 @@ make env
 
 ## Download dos datasets
 ```bash
-make download-all
+make data-download-all
 ```
 
 ## Testes de Quality Gate
@@ -41,18 +41,18 @@ make firmware-deps
 
 ### Build nativo (iteracao rapida)
 ```bash
-make firmware-native
+make fw-native
 ./firmware/build/native/lewis
 ```
 
 ### Build para STM32F4
 ```bash
-make firmware-build
+make fw-build
 ```
 
 ### Rodar simulacao no Renode
 ```bash
-make firmware-test
+make fw-test
 ```
 
 O comando acima delega para `make -C firmware LEWIS_USE_TFLM=1 firmware-test`,
@@ -61,3 +61,21 @@ captura a saida UART4 e gera o relatório em
 `firmware/build/stm32f4/firmware_simulation_report.json`.
 Uma cópia pode ser mantida em `reports/firmware_simulation_report.json` para
 referência; os testes de QG7/QG8/QG9 procuram o artefato em ambos os caminhos.
+
+## E07R — pipeline patient-disjoint (2026-07-26)
+
+```bash
+make e07r-check            # preflight de integridade (9 checks, fail-closed)
+make e07r-status           # painel: freeze, células DONE, seleção H*-PD
+make e07r-e065             # E06.5-PD (100 células; resume write-once)
+make e07r-e065 DRY_RUN=1   # apenas planejamento
+make e07r-e065 FORCE=1     # arquiva evidência e re-treina com run-id novo
+make e07r-e07              # E07-PD (bloqueado por pré-registro: sem H*-PD válido)
+make e07r-watch            # dashboard TUI dos treinamentos (STAGE=e065|e07)
+```
+
+Estado atual: splits `v4.0-patient-disjoint` congelados, E06.5-PD completo com
+`NO_VALID_CANDIDATE` (H6 não supera baseline sob avaliação patient-disjoint) e
+E07-PD bloqueado (0/150). `models/` congelado por 101 pins de hash — não editar
+artefatos de modelos manualmente. Guia completo: `docs/make_commands.md` e
+`docs/e07r_evidence_report.md`.

@@ -104,6 +104,24 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 
 > **Nota:** A arquitetura atual não inclui autenticação. Esta regra é condicional e só se aplica se uma camada de auth for introduzida no futuro.
 
+> **Nota E07R-PD (2026-07-26):** remediação patient-disjoint concluída. MIT-BIH 201/202 unificados por
+> evidência oficial PhysioNet; splits `v4.0-patient-disjoint` congelados em
+> `data/splits/stage2_multiclass_patient_disjoint_v4.0/`; Stage 2 r5 `data/features/v3.1.0-r5-stage2-pd/`;
+> freeze de 101 pins (`experiments/stage2_v2.4_research/integrity/e07r_freeze_manifest.json`) com
+> preflight fail-closed 9/9. E06.5-PD 100/100 células: **H6 não supera baseline** (ΔF1(F) = −0,1601,
+> IC95 [−0,398; +0,153]) → `NO_VALID_CANDIDATE`; **E07-PD não executado (0/150)** por pré-registro.
+> `models/` restaurado ao estado aprovado em gate e congelado por hash — qualquer escrita em `models/`
+> derruba o preflight. Publicação: `HOLD`. Evidência: `integrity/e07r_evidence_package.json` e
+> `docs/e07r_evidence_report.md`.
+
+> **Nota Makefile (FASE 7, 2026-07-26):** o Makefile foi padronizado — 60 alvos públicos por seção
+> (`make help`), domínios `data-*`, `mlp-*`, `e07r-*`, `fw-*`, `gates-*`, `kb-*`, `rag-*`, `obs-*`;
+> flags `DRY_RUN=1`, `FORCE=1`, `RUN_ID=...`, `STAGE=...`, `JSON=1`. Alvos antigos seguem válidos como
+> aliases `DEPRECATED` (ex.: `download-all` → `data-download-all`, `mlp-pipeline` → `mlp-run`,
+> `firmware-build` → `fw-build`, `hard-gates` → `gates-firmware`, `knowledge-*` → `kb-*`).
+> Referência: `docs/make_commands.md`. Treinos E07R: `make e07r-e065` (resume), `make e07r-e065
+> FORCE=1` (re-treino com arquivamento), `make e07r-e07`, dashboard `make e07r-watch`.
+
 ## Comando de Verificação
 ```bash
 make lint && make test && make test-e2e
