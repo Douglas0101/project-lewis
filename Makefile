@@ -1,20 +1,37 @@
-.PHONY: help env setup doctor dev download-all download-chapman download-mitbih mirror mirror-restore \
-        catalog qg0 dlq-replay test clean clean-raw clean-mirrors \
-        process pretrain finetune quantize export provenance all \
-        docker-build docker-run docker-shell pre-commit-install lint format type-check \
-        firmware-deps firmware-tflm firmware-tflm-lib firmware-build firmware-native firmware-native-tflm firmware-native-stub \
-        firmware-run firmware-test hard-gates hard-gates-ci check-strict-markers check-no-stub \
-        verify-renode \
-        knowledge-index knowledge-query knowledge-status knowledge-test knowledge-clean knowledge-validate \
-        knowledge-reindex-if-docs-changed \
-        hybrid-eval \
-        ragas-eval \
-        memory-commit \
-        observability-up observability-down \
-        test-e2e \
-        mlp-logs-dir mlp-prepare-features mlp-train-stage1 mlp-train-stage2 mlp-train \
-        mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 \
-        mlp-features mlp-pipeline mlp-pipeline-with-features mlp-clean
+# Project-Lewis Makefile — camada de orquestração padronizada (FASE 7)
+#
+# Convenções:
+# - Alvos públicos possuem descrição `##` e aparecem em `make help` por seção (##@).
+# - Alvos internos/auxiliares não possuem `##` e ficam ocultos do help.
+# - Aliases legados executam o alvo canônico via sub-make com aviso DEPRECATED.
+# - Flags padronizadas: DRY_RUN=1 FORCE=1 RUN_ID=... STAGE=e065|e07 JSON=1
+#   (domínio-específicas: FEATURES=1 TFLM=1 STUB=1).
+
+.PHONY: help setup doctor check lint format type-check test test-e2e clean status watch \
+        env pre-commit-install dev docker-build docker-run docker-shell \
+        data-download-all data-download-chapman data-download-mitbih data-catalog \
+        data-process data-features data-audit-train data-qg0 data-provenance \
+        data-mirror-create data-mirror-restore data-dlq-replay \
+        mlp-run mlp-train mlp-train-stage1 mlp-train-stage2 mlp-select-best \
+        mlp-quantize mlp-validate-quant mlp-qg5 mlp-clean mlp-logs-dir mlp-prepare-features \
+        e07r e07r-check e07r-status e07r-freeze e07r-e065 e07r-e07 e07r-report e07r-watch \
+        fw-build fw-test fw-native fw-run fw-verify-renode fw-check-markers fw-check-no-stub \
+        gates-firmware gates-ci \
+        kb-index kb-query kb-status kb-test kb-validate kb-clean kb-reindex-changed \
+        rag-eval-hybrid rag-eval-ragas \
+        obs-up obs-down memory-commit \
+        all clean-raw clean-mirrors quality-report stress-test stress-test-p1 stress-test-p2 stress-test-p3 \
+        pretrain finetune quantize export \
+        download-all download-chapman download-mitbih catalog process features \
+        audit-training-data qg0 provenance mirror mirror-restore dlq-replay \
+        mlp-pipeline mlp-pipeline-with-features mlp-features mlp-test-qg5 mlp-validate-quantized \
+        e07r-preflight e07r-all e07r-e065-dry e07r-e065-fresh e07r-e07-dry \
+        firmware-deps firmware-tflm firmware-tflm-lib firmware-build firmware-native \
+        firmware-native-tflm firmware-native-stub firmware-run firmware-test verify-renode \
+        check-strict-markers check-no-stub hard-gates hard-gates-ci \
+        knowledge-index knowledge-query knowledge-status knowledge-test knowledge-validate \
+        knowledge-clean knowledge-reindex-if-docs-changed \
+        hybrid-eval ragas-eval observability-up observability-down
 
 # Detecta ambiente virtual se existente; caso contrario usa python3/pytest do sistema.
 ifeq ($(wildcard .venv/bin/python),)
@@ -45,71 +62,77 @@ MLP_STAGE1_EXP         ?= experiments/stage1_mlp_features_v2.3
 MLP_STAGE2_EXP         ?= experiments/stage2_mlp_features_v2.3
 
 # ---------------------------------------------------------------------------
-# Help
+# E07R — variáveis (RUN_ID sobrescrevível por alvo; defaults via `or`)
 # ---------------------------------------------------------------------------
-help: ## Show this help message
-	@echo "Project-Lewis Makefile targets:"
-	@grep -E '^[a-zA-Z0-9_-]+:.*##.*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "} {printf "  %-24s %s\n", $$1, $$2}'
+E07R_EXP          := experiments/stage2_v2.4_research
+E07R_PD_CLI       := scripts/run_stage2_e07r_pd.py
+E07R_FRESH_SUFFIX := $(shell date +%Y%m%d_%H%M%S)
+STAGE             ?= e065
+EXTRA             ?=
 
-# ---------------------------------------------------------------------------
-# Onboarding
-# ---------------------------------------------------------------------------
+##@ Geral
+
+help: ## Mostra esta ajuda por seção
+	@echo "Uso: make <alvo> [DRY_RUN=1] [FORCE=1] [RUN_ID=...] [STAGE=e065|e07] [JSON=1]"
+	@echo "     [FEATURES=1] [TFLM=1] [STUB=1]"
+	@awk 'BEGIN {FS = ":.*?## "} \
+		/^##@/ {printf "\n== %s ==\n", substr($$0, 5); next} \
+		/^[a-zA-Z0-9_-]+:.*?## / {printf "  %-26s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
 setup: env pre-commit-install ## Setup completo para novo contribuinte
 
-doctor: ## Verifica se o ambiente local atende aos pre-requisitos
+doctor: ## Verifica se o ambiente local atende aos pré-requisitos
 	$(PYTHON) scripts/check_environment.py
 
-dev: ## Abre shell no container Docker de desenvolvimento
-	docker compose up -d app && docker compose exec app bash
+check: lint fw-check-markers e07r-check ## Verificação rápida: lint + markers + integridade E07R
 
-# ---------------------------------------------------------------------------
-# Ambiente reprodutivel (uv)
-# ---------------------------------------------------------------------------
-env: ## Create/sync the reproducible Python environment with uv
-	$(UV) sync --frozen
-
-# ---------------------------------------------------------------------------
-# Docker
-# ---------------------------------------------------------------------------
-docker-build: ## Build the project Docker image
-	docker build -t project-lewis:latest .
-
-docker-run: docker-build ## Build and run the project in a Docker container
-	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest
-
-docker-shell: docker-build ## Build and open a bash shell in the Docker container
-	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest bash
-
-# ---------------------------------------------------------------------------
-# Git hooks e qualidade de codigo
-# ---------------------------------------------------------------------------
-pre-commit-install: ## Install pre-commit Git hooks
-	$(UV) run pre-commit install
-
-lint: ## Run flake8, mypy and bandit checks
+lint: ## Roda flake8, mypy e bandit
 	$(UV) run flake8 src tests --max-line-length=100
 	$(UV) run mypy src --ignore-missing-imports
 	$(UV) run bandit -c pyproject.toml -r src
 
-format: ## Format Python code with black and isort
-	$(UV) run black src tests
-	$(UV) run isort src tests
+test: ## Roda a suíte pytest completa
+	$(PYTEST) tests/ -q --tb=short
 
-type-check: ## Run static type checks with mypy
-	$(UV) run mypy src --ignore-missing-imports
+test-e2e: ## Roda testes slow e de integração
+	$(PYTEST) tests/ -m "slow or integration" -v --tb=short
 
-# ---------------------------------------------------------------------------
-# Pipeline de dados (Fase 1)
-# ---------------------------------------------------------------------------
-download-chapman: ## Download the Chapman ECG dataset
+clean: ## Remove dados processados, features e artefatos de modelos
+	rm -rf $(DATA)/processed/* $(DATA)/features/* models/*.h5 models/*.keras models/*.tflite
+
+status: e07r-status ## Atalho: painel de status do projeto (E07R)
+
+watch: e07r-watch ## Atalho: dashboard TUI dos treinamentos
+
+##@ Dados
+
+data-download-all: data-download-chapman data-download-mitbih ## Baixa todos os datasets ECG
+
+data-download-chapman: ## Baixa o dataset Chapman ECG
 	$(PYTHON) -m src.data.download_chapman
 
-download-mitbih: ## Download MIT-BIH, SVDB, AFDB and INCART datasets
+data-download-mitbih: ## Baixa MIT-BIH, SVDB, AFDB e INCART
 	$(PYTHON) -m src.data.download_mitbih
 
-download-all: download-chapman download-mitbih ## Download all ECG datasets
+data-catalog: ## Constrói o catálogo de datasets
+	$(PYTHON) -c "from src.data._catalog import build_catalog; build_catalog()"
 
-mirror: ## Create compressed mirrors of raw datasets
+data-process: ## Roda pipeline de resample e pré-processamento
+	$(PYTHON) -m src.data.aggregator
+
+data-features: ## Roda o pipeline de feature engineering
+	$(PYTHON) -m src.features.pipeline
+
+data-audit-train: ## Auditoria de qualidade dos dados de treino
+	$(PYTHON) scripts/audit_training_data.py
+
+data-qg0: ## Testes de integridade de download (QG0)
+	$(PYTEST) tests/test_download.py -v
+
+data-provenance: ## Escreve o manifesto de proveniência dos dados
+	$(PYTHON) -c "from src.data._compliance import write_provenance; import json; from pathlib import Path; m = json.loads(Path('src/data/checksums.json').read_text()); write_provenance(m)"
+
+data-mirror-create: ## Cria mirrors compactados dos datasets brutos
 	mkdir -p $(DATA)/mirrors
 	tar czf $(DATA)/mirrors/chapman_mirror.tar.gz        -C $(DATA)/raw_chapman .
 	tar czf $(DATA)/mirrors/mitbih_family_mirror.tar.gz  -C $(DATA)/raw_mitbih . \
@@ -117,40 +140,25 @@ mirror: ## Create compressed mirrors of raw datasets
 	                                                        -C $(DATA)/raw_afdb   . \
 	                                                        -C $(DATA)/raw_incart .
 
-mirror-restore: ## Restore raw datasets from compressed mirrors
+data-mirror-restore: ## Restaura datasets brutos a partir dos mirrors
 	mkdir -p $(DATA)/raw_chapman $(DATA)/raw_mitbih $(DATA)/raw_svdb \
 	         $(DATA)/raw_afdb $(DATA)/raw_incart
 	tar xzf $(DATA)/mirrors/chapman_mirror.tar.gz        -C $(DATA)/raw_chapman/
 	tar xzf $(DATA)/mirrors/mitbih_family_mirror.tar.gz  -C $(DATA)/raw_mitbih/
 
-catalog: ## Build the dataset catalog
-	$(PYTHON) -c "from src.data._catalog import build_catalog; build_catalog()"
-
-qg0: ## Run QG0 download integrity tests
-	$(PYTEST) tests/test_download.py -v
-
-dlq-replay: ## Replay dead-letter queue failed downloads
+data-dlq-replay: ## Reprocessa downloads falhos da dead-letter queue
 	$(PYTHON) -m src.data._downloader_replay
 
-provenance: ## Write data provenance manifest
-	$(PYTHON) -c "from src.data._compliance import write_provenance; import json; from pathlib import Path; m = json.loads(Path('src/data/checksums.json').read_text()); write_provenance(m)"
+##@ MLP v2.3
 
-process: ## Run resample and preprocessing pipeline
-	$(PYTHON) -m src.data.aggregator
+mlp-run: ## Pipeline v2.3 completo (FEATURES=1 regenera features)
+ifeq ($(FEATURES),1)
+mlp-run: data-features
+endif
+mlp-run: mlp-prepare-features mlp-train mlp-select-best mlp-quantize mlp-validate-quant mlp-qg5
+	@true
 
-features: ## Run feature engineering pipeline
-	$(PYTHON) -m src.features.pipeline
-
-# ---------------------------------------------------------------------------
-# MLP v2.3 — pipeline de treinamento, seleção, quantização e QG5'
-# ---------------------------------------------------------------------------
-
-mlp-logs-dir:
-	@mkdir -p logs
-
-mlp-prepare-features: mlp-logs-dir ## Prepara NPZs de features para treino MLP v2.3
-	$(PYTHON) scripts/prepare_stage1_features.py 2>&1 | tee -a $(MLP_LOG)
-	$(PYTHON) scripts/prepare_stage2_features.py 2>&1 | tee -a $(MLP_LOG)
+mlp-train: mlp-train-stage1 mlp-train-stage2 ## Treina ambos os estágios
 
 mlp-train-stage1: mlp-logs-dir ## Treina Estágio 1 MLP v2.3 (N vs Anormal)
 	$(PYTHON) scripts/train_stage1_mlp.py \
@@ -165,8 +173,6 @@ mlp-train-stage2: mlp-logs-dir ## Treina Estágio 2 MLP v2.3 (S vs V vs F)
 		--max-weight $(MLP_STAGE2_MAX_WEIGHT) \
 		--output-dir $(MLP_STAGE2_EXP) 2>&1 | tee -a $(MLP_LOG)
 
-mlp-train: mlp-train-stage1 mlp-train-stage2 ## Treina ambos os estágios
-
 mlp-select-best: mlp-logs-dir ## Seleciona melhor fold e publica em models/
 	$(PYTHON) scripts/select_best_mlp_fold.py \
 		--stage1-exp $(MLP_STAGE1_EXP) \
@@ -175,17 +181,11 @@ mlp-select-best: mlp-logs-dir ## Seleciona melhor fold e publica em models/
 mlp-quantize: mlp-logs-dir ## Quantiza modelos v2.3 para INT8
 	$(PYTHON) scripts/quantize_mlp_features.py --n-cal $(MLP_N_CAL) 2>&1 | tee -a $(MLP_LOG)
 
-mlp-validate-quantized: mlp-logs-dir ## Valida ΔF1-macro < 2% entre float32 e INT8
+mlp-validate-quant: mlp-logs-dir ## Valida ΔF1-macro < 2% entre float32 e INT8
 	$(PYTHON) scripts/validate_quantized_mlp.py 2>&1 | tee -a $(MLP_LOG)
 
-mlp-test-qg5: mlp-logs-dir ## Roda testes QG5' do pipeline MLP v2.3
+mlp-qg5: mlp-logs-dir ## Roda testes QG5' do pipeline MLP v2.3
 	$(PYTEST) tests/test_two_stage_mlp_qg5.py tests/test_morphological_features.py -v 2>&1 | tee -a $(MLP_LOG)
-
-mlp-features: features mlp-prepare-features ## Feature engineering completa + preparação de NPZs
-
-mlp-pipeline: mlp-prepare-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline padrão MLP v2.3 (usa features já geradas)
-
-mlp-pipeline-with-features: mlp-features mlp-train mlp-select-best mlp-quantize mlp-validate-quantized mlp-test-qg5 ## Pipeline MLP v2.3 com regeneração de features
 
 mlp-clean: ## Remove artefatos v2.3 de experiments e models
 	rm -rf $(MLP_STAGE1_EXP) $(MLP_STAGE2_EXP)
@@ -193,49 +193,82 @@ mlp-clean: ## Remove artefatos v2.3 de experiments e models
 	rm -f models/quantized/*_v2.3*
 	rm -f $(MLP_LOG)
 
-audit-training-data: ## Audit training data quality
-	$(PYTHON) scripts/audit_training_data.py
+##@ E07R — pipeline patient-disjoint
 
-pretrain: ## Pre-train model on Chapman dataset
-	$(PYTHON) -m src.models.pretrain_chapman
+e07r: e07r-check e07r-e065 e07r-status ## Fluxo completo: preflight → E06.5-PD → status
 
-finetune: ## Fine-tune model on MIT-BIH family datasets
-	$(PYTHON) -m src.models.finetune_mitbih
+e07r-check: ## Valida freeze/integridade (9 checks, read-only)
+	@$(PYTHON) scripts/check_e07r_status.py || { \
+		echo "E07R INTEGRITY BLOCKED — fail-closed; veja o check BLOCKED no painel acima (não é erro do Makefile)"; \
+		exit 1; \
+	}
 
-quantize: ## Run INT8 post-training quantization
-	$(PYTHON) -m src.quantization.ptq
+e07r-status: ## Painel — preflight, células DONE, seleção H*-PD (JSON=1 aceito)
+	@$(PYTHON) scripts/check_e07r_status.py || { \
+		echo "E07R INTEGRITY BLOCKED — fail-closed; veja o check BLOCKED no painel acima (não é erro do Makefile)"; \
+		exit 1; \
+	}
 
-export: ## Export quantized model to TFLite FlatBuffer
-	$(PYTHON) -m src.quantization.export_tflite
+e07r-freeze: ## Publica o freeze (write-once; no-op se já publicado)
+	@if [ -f $(E07R_EXP)/integrity/e07r_freeze_manifest.json ]; then \
+		echo "E07R freeze já publicado (write-once) — nada a fazer"; \
+	else \
+		$(PYTHON) scripts/freeze_e07r_integrity_v4.py; \
+	fi
 
-test: ## Run the Python test suite
-	$(PYTEST) tests/ -q --tb=short
+e07r-e065: ## Executa/resume E06.5-PD 4×5×5 (DRY_RUN=1, FORCE=1, RUN_ID=...)
+ifeq ($(DRY_RUN),1)
+	$(PYTHON) $(E07R_PD_CLI) e065-pd --run-id $(or $(RUN_ID),e065pd-audit-v2) --dry-run
+else ifeq ($(FORCE),1)
+	@for d in E06_5_PD cache_pd; do \
+		if [ -d $(E07R_EXP)/$$d ]; then \
+			mv $(E07R_EXP)/$$d $(E07R_EXP)/$${d}_archive_$(E07R_FRESH_SUFFIX); \
+		fi; \
+	done
+	$(PYTHON) $(E07R_PD_CLI) e065-pd --run-id $(or $(RUN_ID),e065pd-fresh-$(E07R_FRESH_SUFFIX))
+else
+	$(PYTHON) $(E07R_PD_CLI) e065-pd --run-id $(or $(RUN_ID),e065pd-audit-v2)
+endif
 
-test-e2e: ## Run slow and integration tests
-	$(PYTEST) tests/ -m "slow or integration" -v --tb=short
+e07r-e07: ## Executa E07-PD 6×5×5 (DRY_RUN=1, RUN_ID=...; BLOCKED pré-registrado não é falha)
+	@status=0; \
+	$(PYTHON) $(E07R_PD_CLI) e07-pd --run-id $(or $(RUN_ID),e07pd-audit-v1) \
+		$(if $(filter 1,$(DRY_RUN)),--dry-run) || status=$$?; \
+	if [ $$status -eq 10 ]; then \
+		echo "E07-PD BLOCKED (pré-registro: sem H*-PD válido) — comportamento esperado"; \
+	elif [ $$status -ne 0 ]; then \
+		exit $$status; \
+	fi
 
-stress-test: ## Run stress tests (RAG, SQL, Timeline)
-	$(PYTEST) tests/stress/ -v -m stress --timeout=120 -x
+e07r-report: ## Mostra checkpoint final e caminhos do pacote de evidência
+	@echo "pacote de evidência: $(E07R_EXP)/integrity/e07r_evidence_package.json"
+	@echo "relatório consolidado: docs/e07r_evidence_report.md"
+	@$(PYTHON) -m json.tool $(E07R_EXP)/E07R_final_checkpoint_20260726.json
 
-stress-test-p1: ## Run stress tests for Ponte 1 (RAG)
-	$(PYTEST) tests/stress/test_ponte1_rag.py -v -m stress --timeout=120 -x
+e07r-watch: ## Dashboard TUI dos treinamentos (STAGE=e065|e07, EXTRA="--once")
+	$(PYTHON) scripts/e07r_watch.py --stage $(STAGE) $(EXTRA)
 
-stress-test-p2: ## Run stress tests for Ponte 2 (NL -> SQL)
-	$(PYTEST) tests/stress/test_ponte2_sql.py -v -m stress --timeout=120 -x
+##@ Firmware & Gates
 
-stress-test-p3: ## Run stress tests for Ponte 3 (Timeline)
-	$(PYTEST) tests/stress/test_ponte3_timeline.py -v -m stress --timeout=120 -x
+fw-build: firmware-tflm-lib ## Compila o binário do firmware STM32F4
+	$(MAKE) -C firmware stm32f4
 
-quality-report: ## Generate project quality report
-	$(UV) run python scripts/generate_quality_report.py
+fw-test: firmware-tflm-lib ## Roda testes do firmware sob Renode
+	$(MAKE) -C firmware LEWIS_USE_TFLM=1 RENODE_SIMULATION=1 firmware-test
 
-# ---------------------------------------------------------------------------
-# Firmware / Simulacao (Fase 2)
-# ---------------------------------------------------------------------------
-RENOD_DIR := firmware/tools/renode-1.15.3
-RENODE_BIN := $(RENOD_DIR)/renode
+fw-native: ## Simulador nativo do firmware (TFLM=1 com TFLM; STUB=1 com stub)
+ifeq ($(STUB),1)
+	$(MAKE) -C firmware ALLOW_STUB=1 native
+else ifeq ($(TFLM),1)
+	$(MAKE) -C firmware native-tflm
+else
+	$(MAKE) -C firmware native
+endif
 
-verify-renode: ## Verify Renode 1.15.3 installation
+fw-run: ## Executa o firmware na emulação Renode
+	$(MAKE) -C firmware firmware-run
+
+fw-verify-renode: ## Verifica instalação do Renode 1.15.3
 	@if [ ! -x "$(RENODE_BIN)" ]; then \
 	    echo "ERROR: Renode nao encontrado em $(RENODE_BIN)"; \
 	    exit 1; \
@@ -249,41 +282,11 @@ verify-renode: ## Verify Renode 1.15.3 installation
 	fi; \
 	echo "Renode 1.15.3 confirmed"
 
-firmware-deps: ## Install firmware build dependencies
-	$(MAKE) -C firmware firmware-deps
-
-firmware-tflm: ## Install/cache TensorFlow Lite Micro
-	$(FIRMWARE_DIR)/scripts/install_tflm.sh
-
-firmware-tflm-lib: ## Build TensorFlow Lite Micro library
-	$(MAKE) -C firmware tflm-lib
-
-firmware-build: firmware-tflm-lib ## Build STM32F4 firmware binary
-	$(MAKE) -C firmware stm32f4
-
-firmware-native: ## Build firmware native simulator
-	$(MAKE) -C firmware native
-
-firmware-native-tflm: ## Build native simulator with TFLM
-	$(MAKE) -C firmware native-tflm
-
-firmware-native-stub: ## Build native simulator with TFLM stub
-	$(MAKE) -C firmware ALLOW_STUB=1 native
-
-firmware-run: ## Run firmware in Renode emulation
-	$(MAKE) -C firmware firmware-run
-
-firmware-test: firmware-tflm-lib ## Run firmware tests under Renode
-	$(MAKE) -C firmware LEWIS_USE_TFLM=1 RENODE_SIMULATION=1 firmware-test
-
-# ---------------------------------------------------------------------------
-# Hard Gates (HG-01..HG-06)
-# ---------------------------------------------------------------------------
-check-strict-markers: ## Verify --strict-markers is enabled in pytest
+fw-check-markers: ## Verifica --strict-markers habilitado no pytest
 	@echo "Verificando --strict-markers em pyproject.toml..."
 	@$(PYTHON) -c "import tomllib, pathlib, sys; cfg = tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8')); addopts = cfg.get('tool', {}).get('pytest', {}).get('ini_options', {}).get('addopts', ''); sys.exit(0 if '--strict-markers' in addopts.split() else (print('ERROR: --strict-markers nao encontrado em pyproject.toml') or 1))" && echo "OK: --strict-markers configurado"
 
-check-no-stub: ## Verify TFLM stub is not present in firmware ELF
+fw-check-no-stub: ## Verifica ausência de TFLM stub no ELF do firmware
 	@if [ ! -f firmware/build/stm32f4/lewis.elf ]; then \
 	    echo "SKIP: firmware/build/stm32f4/lewis.elf ainda nao existe"; \
 	    exit 0; \
@@ -298,37 +301,36 @@ check-no-stub: ## Verify TFLM stub is not present in firmware ELF
 	    echo "SKIP: binario strings nao disponivel"; \
 	fi
 
-hard-gates: verify-renode ## Run hard quality gates (HG-01..HG-06)
+gates-firmware: fw-verify-renode ## Hard gates HG-01..HG-06 do firmware
 	PYTEST=$(PYTEST) ALLOW_STUB=0 CI=1 $(PYTHON) scripts/run_hard_gates.py
 
-hard-gates-ci: check-strict-markers hard-gates check-no-stub ## Run CI hard gates including marker/stub checks
+gates-ci: fw-check-markers gates-firmware fw-check-no-stub ## Hard gates de CI (markers + stub)
 
-# ---------------------------------------------------------------------------
-# Camada C11 — Knowledge Layer (RAG + sqlite-vec + MCP)
-# ---------------------------------------------------------------------------
-knowledge-index:
+##@ Knowledge & RAG
+
+kb-index: ## Reindexa a knowledge base (C11)
 	@echo "[C11] Reindexando knowledge base..."
 	$(UV) run python -m src.knowledge.cli reindex
 
-knowledge-query:
+kb-query: ## Consulta interativa na knowledge base
 	@read -p "Query: " q; $(UV) run python -m src.knowledge.cli query "$$q"
 
-knowledge-status:
+kb-status: ## Status da knowledge base
 	$(UV) run python -m src.knowledge.cli status
 
-knowledge-test:
+kb-test: ## Testes da camada knowledge
 	$(UV) run pytest tests/test_knowledge/ -v --tb=short
 
-knowledge-clean:
+kb-validate: ## Valida o índice knowledge
+	$(UV) run python scripts/validate_knowledge_index.py
+
+kb-clean: ## Remove índice e dados da knowledge base
 	rm -f data/knowledge.db
 	rm -rf data/lineage/knowledge/
 	rm -f logs/knowledge_queries.jsonl
 	rm -f data/.dlq/knowledge_rejected.jsonl
 
-knowledge-validate:
-	$(UV) run python scripts/validate_knowledge_index.py
-
-knowledge-reindex-if-docs-changed:
+kb-reindex-changed: ## Reindexa somente se docs/fontes mudaram
 	@mkdir -p data/lineage
 	@CURRENT=$$(find docs src/knowledge -type f \( -name '*.md' -o -name '*.py' \) | sort | xargs sha256sum | sha256sum | awk '{print $$1}'); \
 	if [ -f data/lineage/.knowledge_checksum ] && [ "$$(cat data/lineage/.knowledge_checksum)" = "$$CURRENT" ]; then \
@@ -339,34 +341,279 @@ knowledge-reindex-if-docs-changed:
 		echo "$$CURRENT" > data/lineage/.knowledge_checksum; \
 	fi
 
-hybrid-eval: ## Avalia hybrid search no golden dataset
+rag-eval-hybrid: ## Avalia hybrid search no golden dataset
 	$(UV) run python scripts/eval_hybrid.py
 
-ragas-eval: ## Avalia qualidade do RAG com golden dataset
+rag-eval-ragas: ## Avalia qualidade do RAG com golden dataset
 	$(UV) run python -m src.observability.ragas_eval_cli data/eval/golden_dataset.json
 
-# ---------------------------------------------------------------------------
-# Memory / ArtifactRegistry
-# ---------------------------------------------------------------------------
-memory-commit:
-	$(UV) run python scripts/memory_commit.py --run-id $(RUN_ID) --path $(ARTIFACT_PATH) --type $(ARTIFACT_TYPE)
+##@ Observabilidade & Memória
 
-# ---------------------------------------------------------------------------
-# Observabilidade (Prometheus + Grafana)
-# ---------------------------------------------------------------------------
-observability-up: ## Sobe Prometheus + Grafana + app de métricas
+obs-up: ## Sobe Prometheus + Grafana + app de métricas
 	docker compose up -d observability prometheus grafana
 
-observability-down: ## Derruba stack de observabilidade
+obs-down: ## Derruba stack de observabilidade
 	docker compose down observability prometheus grafana
 
-all: env download-all catalog test quality-report ## Run full pipeline: env, download, catalog, test and report
+memory-commit: ## Registra artefato no ArtifactRegistry (RUN_ID=... ARTIFACT_PATH=... ARTIFACT_TYPE=...)
+	$(UV) run python scripts/memory_commit.py --run-id $(RUN_ID) --path $(ARTIFACT_PATH) --type $(ARTIFACT_TYPE)
 
-clean: ## Remove processed data, features and model artifacts
-	rm -rf $(DATA)/processed/* $(DATA)/features/* models/*.h5 models/*.keras models/*.tflite
+# ===========================================================================
+# Alvos internos/auxiliares (funcionais, ocultos do help)
+# ===========================================================================
 
-clean-raw: ## Remove all raw downloaded datasets
+env:
+	$(UV) sync --frozen
+
+pre-commit-install:
+	$(UV) run pre-commit install
+
+format:
+	$(UV) run black src tests
+	$(UV) run isort src tests
+
+type-check:
+	$(UV) run mypy src --ignore-missing-imports
+
+dev:
+	docker compose up -d app && docker compose exec app bash
+
+docker-build:
+	docker build -t project-lewis:latest .
+
+docker-run: docker-build
+	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest
+
+docker-shell: docker-build
+	docker run --rm -it -v $(PWD):/app -v lewis-data:/app/data project-lewis:latest bash
+
+mlp-logs-dir:
+	@mkdir -p logs
+
+mlp-prepare-features: mlp-logs-dir
+	$(PYTHON) scripts/prepare_stage1_features.py 2>&1 | tee -a $(MLP_LOG)
+	$(PYTHON) scripts/prepare_stage2_features.py 2>&1 | tee -a $(MLP_LOG)
+
+firmware-deps:
+	$(MAKE) -C firmware firmware-deps
+
+firmware-tflm:
+	$(FIRMWARE_DIR)/scripts/install_tflm.sh
+
+firmware-tflm-lib:
+	$(MAKE) -C firmware tflm-lib
+
+all: env data-download-all data-catalog test quality-report
+
+quality-report:
+	$(UV) run python scripts/generate_quality_report.py
+
+stress-test:
+	$(PYTEST) tests/stress/ -v -m stress --timeout=120 -x
+
+stress-test-p1:
+	$(PYTEST) tests/stress/test_ponte1_rag.py -v -m stress --timeout=120 -x
+
+stress-test-p2:
+	$(PYTEST) tests/stress/test_ponte2_sql.py -v -m stress --timeout=120 -x
+
+stress-test-p3:
+	$(PYTEST) tests/stress/test_ponte3_timeline.py -v -m stress --timeout=120 -x
+
+clean-raw:
 	rm -rf $(DATA)/raw_*
 
-clean-mirrors: ## Remove dataset mirror archives
+clean-mirrors:
 	rm -rf $(DATA)/mirrors/*
+
+pretrain:
+	$(PYTHON) -m src.models.pretrain_chapman
+
+finetune:
+	$(PYTHON) -m src.models.finetune_mitbih
+
+quantize:
+	$(PYTHON) -m src.quantization.ptq
+
+export:
+	$(PYTHON) -m src.quantization.export_tflite
+
+# ===========================================================================
+# Aliases legados (DEPRECATED) — compatibilidade total via sub-make
+# ===========================================================================
+
+download-all:
+	@echo "DEPRECATED: 'make download-all' → 'make data-download-all'" >&2
+	@$(MAKE) --no-print-directory data-download-all
+
+download-chapman:
+	@echo "DEPRECATED: 'make download-chapman' → 'make data-download-chapman'" >&2
+	@$(MAKE) --no-print-directory data-download-chapman
+
+download-mitbih:
+	@echo "DEPRECATED: 'make download-mitbih' → 'make data-download-mitbih'" >&2
+	@$(MAKE) --no-print-directory data-download-mitbih
+
+catalog:
+	@echo "DEPRECATED: 'make catalog' → 'make data-catalog'" >&2
+	@$(MAKE) --no-print-directory data-catalog
+
+process:
+	@echo "DEPRECATED: 'make process' → 'make data-process'" >&2
+	@$(MAKE) --no-print-directory data-process
+
+features:
+	@echo "DEPRECATED: 'make features' → 'make data-features'" >&2
+	@$(MAKE) --no-print-directory data-features
+
+audit-training-data:
+	@echo "DEPRECATED: 'make audit-training-data' → 'make data-audit-train'" >&2
+	@$(MAKE) --no-print-directory data-audit-train
+
+qg0:
+	@echo "DEPRECATED: 'make qg0' → 'make data-qg0'" >&2
+	@$(MAKE) --no-print-directory data-qg0
+
+provenance:
+	@echo "DEPRECATED: 'make provenance' → 'make data-provenance'" >&2
+	@$(MAKE) --no-print-directory data-provenance
+
+mirror:
+	@echo "DEPRECATED: 'make mirror' → 'make data-mirror-create'" >&2
+	@$(MAKE) --no-print-directory data-mirror-create
+
+mirror-restore:
+	@echo "DEPRECATED: 'make mirror-restore' → 'make data-mirror-restore'" >&2
+	@$(MAKE) --no-print-directory data-mirror-restore
+
+dlq-replay:
+	@echo "DEPRECATED: 'make dlq-replay' → 'make data-dlq-replay'" >&2
+	@$(MAKE) --no-print-directory data-dlq-replay
+
+mlp-pipeline:
+	@echo "DEPRECATED: 'make mlp-pipeline' → 'make mlp-run'" >&2
+	@$(MAKE) --no-print-directory mlp-run
+
+mlp-pipeline-with-features:
+	@echo "DEPRECATED: 'make mlp-pipeline-with-features' → 'make mlp-run FEATURES=1'" >&2
+	@$(MAKE) --no-print-directory mlp-run FEATURES=1
+
+mlp-features:
+	@echo "DEPRECATED: 'make mlp-features' → 'make mlp-run FEATURES=1'" >&2
+	@$(MAKE) --no-print-directory mlp-run FEATURES=1
+
+mlp-test-qg5:
+	@echo "DEPRECATED: 'make mlp-test-qg5' → 'make mlp-qg5'" >&2
+	@$(MAKE) --no-print-directory mlp-qg5
+
+mlp-validate-quantized:
+	@echo "DEPRECATED: 'make mlp-validate-quantized' → 'make mlp-validate-quant'" >&2
+	@$(MAKE) --no-print-directory mlp-validate-quant
+
+e07r-preflight:
+	@echo "DEPRECATED: 'make e07r-preflight' → 'make e07r-check'" >&2
+	@$(MAKE) --no-print-directory e07r-check
+
+e07r-all:
+	@echo "DEPRECATED: 'make e07r-all' → 'make e07r'" >&2
+	@$(MAKE) --no-print-directory e07r
+
+e07r-e065-dry:
+	@echo "DEPRECATED: 'make e07r-e065-dry' → 'make e07r-e065 DRY_RUN=1'" >&2
+	@$(MAKE) --no-print-directory e07r-e065 DRY_RUN=1
+
+e07r-e065-fresh:
+	@echo "DEPRECATED: 'make e07r-e065-fresh' → 'make e07r-e065 FORCE=1'" >&2
+	@$(MAKE) --no-print-directory e07r-e065 FORCE=1
+
+e07r-e07-dry:
+	@echo "DEPRECATED: 'make e07r-e07-dry' → 'make e07r-e07 DRY_RUN=1'" >&2
+	@$(MAKE) --no-print-directory e07r-e07 DRY_RUN=1
+
+firmware-build:
+	@echo "DEPRECATED: 'make firmware-build' → 'make fw-build'" >&2
+	@$(MAKE) --no-print-directory fw-build
+
+firmware-test:
+	@echo "DEPRECATED: 'make firmware-test' → 'make fw-test'" >&2
+	@$(MAKE) --no-print-directory fw-test
+
+firmware-native:
+	@echo "DEPRECATED: 'make firmware-native' → 'make fw-native'" >&2
+	@$(MAKE) --no-print-directory fw-native
+
+firmware-native-tflm:
+	@echo "DEPRECATED: 'make firmware-native-tflm' → 'make fw-native TFLM=1'" >&2
+	@$(MAKE) --no-print-directory fw-native TFLM=1
+
+firmware-native-stub:
+	@echo "DEPRECATED: 'make firmware-native-stub' → 'make fw-native STUB=1'" >&2
+	@$(MAKE) --no-print-directory fw-native STUB=1
+
+firmware-run:
+	@echo "DEPRECATED: 'make firmware-run' → 'make fw-run'" >&2
+	@$(MAKE) --no-print-directory fw-run
+
+verify-renode:
+	@echo "DEPRECATED: 'make verify-renode' → 'make fw-verify-renode'" >&2
+	@$(MAKE) --no-print-directory fw-verify-renode
+
+check-strict-markers:
+	@echo "DEPRECATED: 'make check-strict-markers' → 'make fw-check-markers'" >&2
+	@$(MAKE) --no-print-directory fw-check-markers
+
+check-no-stub:
+	@echo "DEPRECATED: 'make check-no-stub' → 'make fw-check-no-stub'" >&2
+	@$(MAKE) --no-print-directory fw-check-no-stub
+
+hard-gates:
+	@echo "DEPRECATED: 'make hard-gates' → 'make gates-firmware'" >&2
+	@$(MAKE) --no-print-directory gates-firmware
+
+hard-gates-ci:
+	@echo "DEPRECATED: 'make hard-gates-ci' → 'make gates-ci'" >&2
+	@$(MAKE) --no-print-directory gates-ci
+
+knowledge-index:
+	@echo "DEPRECATED: 'make knowledge-index' → 'make kb-index'" >&2
+	@$(MAKE) --no-print-directory kb-index
+
+knowledge-query:
+	@echo "DEPRECATED: 'make knowledge-query' → 'make kb-query'" >&2
+	@$(MAKE) --no-print-directory kb-query
+
+knowledge-status:
+	@echo "DEPRECATED: 'make knowledge-status' → 'make kb-status'" >&2
+	@$(MAKE) --no-print-directory kb-status
+
+knowledge-test:
+	@echo "DEPRECATED: 'make knowledge-test' → 'make kb-test'" >&2
+	@$(MAKE) --no-print-directory kb-test
+
+knowledge-validate:
+	@echo "DEPRECATED: 'make knowledge-validate' → 'make kb-validate'" >&2
+	@$(MAKE) --no-print-directory kb-validate
+
+knowledge-clean:
+	@echo "DEPRECATED: 'make knowledge-clean' → 'make kb-clean'" >&2
+	@$(MAKE) --no-print-directory kb-clean
+
+knowledge-reindex-if-docs-changed:
+	@echo "DEPRECATED: 'make knowledge-reindex-if-docs-changed' → 'make kb-reindex-changed'" >&2
+	@$(MAKE) --no-print-directory kb-reindex-changed
+
+hybrid-eval:
+	@echo "DEPRECATED: 'make hybrid-eval' → 'make rag-eval-hybrid'" >&2
+	@$(MAKE) --no-print-directory rag-eval-hybrid
+
+ragas-eval:
+	@echo "DEPRECATED: 'make ragas-eval' → 'make rag-eval-ragas'" >&2
+	@$(MAKE) --no-print-directory rag-eval-ragas
+
+observability-up:
+	@echo "DEPRECATED: 'make observability-up' → 'make obs-up'" >&2
+	@$(MAKE) --no-print-directory obs-up
+
+observability-down:
+	@echo "DEPRECATED: 'make observability-down' → 'make obs-down'" >&2
+	@$(MAKE) --no-print-directory obs-down
