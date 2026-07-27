@@ -60,12 +60,16 @@ def test_each_beat_has_single_stage2_class():
 
 def test_aami_mapping_traceability():
     trace = pd.read_csv(E01_DIR / "aami_traceability.csv")
-    # v3.0.0 (relógio corrigido, DQ-01/02): V perdeu exatamente 1 beat — anotação
-    # de borda fora do alcance do sinal, descartada pelo contrato de relógio
-    # (build_beat_records). S e F inalterados. Valores anteriores: V=37183.
+    # Linhagem v2.4 (research branch E06.5): dataset congelado pré-DQ-01/02,
+    # pinado por SHA-256 no preflight (stage2_multiclass.parquet = 870b386e...).
+    # Totais do build v2.x congelado (backup_v2.3/training_manifest.json):
+    # S=16934, V=37183, F=1044.
+    # Na linhagem v3.0.0+ (relógio corrigido, DQ-01/02), V=37182 (1 beat de borda
+    # descartado); se o dataset raiz for substituído por um build v3.x, este
+    # teste deve ser revisitado para refletir a nova linhagem.
     expected = {
         ("S", "S", "Anormal", 0): 16934,
-        ("V", "V", "Anormal", 1): 37182,
+        ("V", "V", "Anormal", 1): 37183,
         ("F", "F", "Anormal", 2): 1044,
     }
     for (orig, mapped, stage1, stage2), count in expected.items():

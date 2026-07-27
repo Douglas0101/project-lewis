@@ -238,7 +238,11 @@ def load_full_template_dataset(config: ResearchConfig) -> FullTemplateDataset:
     )
     frame = _read_parquet(paths.full_parquet.path)
     signals = _load_npz_array(paths.full_npz.path, "X", np.dtype(np.float32))
-    if signals.ndim != 2 or signals.shape[1] != 500 or len(frame) != signals.shape[0]:
+    if signals.ndim == 3 and signals.shape[-1] == 1:
+        accepted_layout = signals.shape[1] == 500
+    else:
+        accepted_layout = signals.ndim == 2 and signals.shape[1] == 500
+    if not accepted_layout or len(frame) != signals.shape[0]:
         raise ResearchError(
             f"full template source shape/length mismatch: {signals.shape}",
             ExitCode.DATA_INTEGRITY,

@@ -288,7 +288,12 @@ def build_feature_bundle(
         inner_manifest,
         fold,
     )
-    cache_dir = config.output_root / "manifests" / "features" / candidate.name / f"fold_{fold}"
+    cache_root = (
+        config.output_root / "cache_pd" / "features"
+        if dataset.manifest.get("generation_namespace") == "E07R_PD"
+        else config.output_root / "manifests" / "features"
+    )
+    cache_dir = cache_root / candidate.name / f"fold_{fold}"
     expected_identity = {
         "dataset_manifest_hash": dataset.manifest_hash,
         "outer_split_manifest_hash": outer_manifest.manifest_hash,

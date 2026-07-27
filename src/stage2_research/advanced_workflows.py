@@ -450,13 +450,13 @@ def run_fold_audit(config: ResearchConfig, args: argparse.Namespace) -> dict[str
         partition_rows.append(
             {
                 "partition": partition_name,
-                "S": np.sum(labels == 0),
-                "V": np.sum(labels == 1),
-                "F": np.sum(labels == 2),
+                "S": int(np.sum(labels == 0)),
+                "V": int(np.sum(labels == 1)),
+                "F": int(np.sum(labels == 2)),
                 "F_patients": len(set(records[labels == 2].tolist())),
-                "F_208": np.sum((labels == 2) & (records == "208")),
-                "F_213": np.sum((labels == 2) & (records == "213")),
-                "F_outside_208_213": np.sum((labels == 2) & ~np.isin(records, ["208", "213"])),
+                "F_208": int(np.sum((labels == 2) & (records == "208"))),
+                "F_213": int(np.sum((labels == 2) & (records == "213"))),
+                "F_outside_208_213": int(np.sum((labels == 2) & ~np.isin(records, ["208", "213"]))),
             }
         )
         for record in sorted(set(records.tolist())):
@@ -465,9 +465,9 @@ def run_fold_audit(config: ResearchConfig, args: argparse.Namespace) -> dict[str
                 {
                     "partition": partition_name,
                     "record_id": record,
-                    "S": np.sum(labels[mask] == 0),
-                    "V": np.sum(labels[mask] == 1),
-                    "F": np.sum(labels[mask] == 2),
+                    "S": int(np.sum(labels[mask] == 0)),
+                    "V": int(np.sum(labels[mask] == 1)),
+                    "F": int(np.sum(labels[mask] == 2)),
                 }
             )
     class_counts = pd.DataFrame(partition_rows)
@@ -1432,7 +1432,7 @@ def _load_selection(config: ResearchConfig, filename: str) -> dict[str, Any]:
         raise ResearchError("selection feature hash mismatch", ExitCode.INCOMPATIBLE_ARTIFACT)
     metrics = _load_cell_metrics(
         config,
-        stage_dir=final_stage,
+        stage_dir={"E06.5": "E06_5", "E07": "E07", "E08": "E08"}[final_stage],
         experiment_id=final_experiment_id,
         names=final_names,
     )

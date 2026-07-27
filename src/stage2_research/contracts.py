@@ -53,6 +53,12 @@ SamplerName = Literal[
     "patient_uniform",
     "patient_sqrt",
     "smote",
+    "pd_s0_natural",
+    "pd_s1_f_target",
+    "pd_s2_patient_uniform_capped",
+    "pd_s3_patient_sqrt_capped",
+    "pd_s4_focal_gentle",
+    "pd_s5_smote_feature",
 ]
 REQUIRED_RUN_ARTIFACTS = (
     "environment.json",

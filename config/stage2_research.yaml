@@ -131,8 +131,8 @@ split_contract:
   random_seed: 42
 
 default_experiment_ids:
-  e065_smoke: e065-smoke-v5
-  e065_audit: e065-audit-v1
+  e065_smoke: e065-smoke-v8
+  e065_audit: e065-audit-v3
   e07_screening: e07-screening-v1
   e07_audit: e07-audit-v1
   e08_screening: e08-screening-v1

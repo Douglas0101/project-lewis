@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pandas as pd
@@ -317,3 +319,183 @@ def test_selection_manifest_tampering_is_rejected(tmp_path: Path) -> None:
         advanced_workflows._load_selection(config, "representation_selection.json")
 
     assert captured.value.exit_code == ExitCode.INCOMPATIBLE_ARTIFACT
+
+
+def test_load_selection_resolves_e065_stage_dir(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: final-selection validation must read cells from E06_5, not E06.5."""
+    config = load_research_config(CONFIG_PATH, output_root_override=tmp_path)
+    metrics: dict[str, object] = {"candidate_summaries": {}}
+    selection = advanced_workflows._selection_manifest(
+        stage="E06.5",
+        selected_name="H6",
+        selected_feature_manifest_hash="4" * 64,
+        selection_policy_hash=advanced_workflows._selection_policy_hash("E06.5"),
+        source_experiment_id=config.default_experiment_ids["e065_audit"],
+        metrics=metrics,
+    ).model_dump(mode="json")
+    atomic_write_json(
+        tmp_path / "selections" / "representation_selection.json", selection
+    )
+    atomic_write_json(
+        tmp_path / "manifests" / "feature_manifests.json",
+        {"candidates": {"H6": {"manifest_hash": "4" * 64}}},
+    )
+    monkeypatch.setattr(
+        advanced_workflows, "_validate_fold_audit_report", lambda _config: {}
+    )
+    captured: dict[str, str] = {}
+
+    def fake_load_cell_metrics(
+        _config: object,
+        *,
+        stage_dir: str,
+        experiment_id: str,
+        names: object,
+    ) -> pd.DataFrame:
+        captured["stage_dir"] = stage_dir
+        return pd.DataFrame()
+
+    monkeypatch.setattr(
+        advanced_workflows, "_load_cell_metrics", fake_load_cell_metrics
+    )
+    monkeypatch.setattr(
+        advanced_workflows,
+        "_require_complete_metrics_matrix",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        advanced_workflows,
+        "aggregate_experiment",
+        lambda *args, **kwargs: {"candidates": {}},
+    )
+    monkeypatch.setattr(
+        advanced_workflows,
+        "_derive_representation_decision",
+        lambda *args, **kwargs: ("H6", metrics),
+    )
+
+    advanced_workflows._load_selection(config, "representation_selection.json")
+
+    assert captured["stage_dir"] == "E06_5"
+
+
+def test_fold5_report_partition_counts_are_json_native(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: np.sum values must not leak into the fold5 JSON report.
+
+    The validator compares partition_counts against native ints; np.int64
+    serialized via default=str became strings, and plain json.dumps crashed.
+    """
+    config = load_research_config(CONFIG_PATH, output_root_override=tmp_path)
+    monkeypatch.setattr(
+        advanced_workflows,
+        "require_preflight",
+        lambda _config: {
+            "preflight_hash": "p" * 64,
+            "source_manifest_hash": "s" * 64,
+            "runtime_identity_hash": "r" * 64,
+        },
+    )
+    labels = np.array([0, 0, 0, 1, 1, 1, 2, 2, 2, 0, 1, 2], dtype=np.int64)
+    groups = np.array(
+        ["208", "208", "213", "213", "999", "999", "208", "213", "999", "998", "998", "998"],
+        dtype=str,
+    )
+    prepared = SimpleNamespace(
+        dataset=SimpleNamespace(labels=labels, groups=groups),
+        outer_splits={"fold_5": np.arange(12)},
+        inner_splits={"fold_5": np.arange(12)},
+    )
+    monkeypatch.setattr(advanced_workflows, "prepare_research", lambda _config: prepared)
+    monkeypatch.setattr(
+        advanced_workflows,
+        "split_indices",
+        lambda *_args, **_kwargs: (
+            np.arange(8),
+            np.arange(8, 12),
+            np.arange(6),
+            np.arange(6, 12),
+        ),
+    )
+    metric_rows = [
+        {
+            "candidate": candidate,
+            "seed": seed,
+            "F1_F": 0.25,
+            "precision_F": 0.25,
+            "recall_F": 0.25,
+            "AP_F": 0.25,
+            "macro_F1": 0.5,
+        }
+        for candidate in EXPECTED_CANDIDATES
+        for seed in EXPECTED_SEEDS
+    ]
+    monkeypatch.setattr(
+        advanced_workflows,
+        "_load_cell_metrics",
+        lambda *args, **kwargs: pd.DataFrame(metric_rows),
+    )
+    monkeypatch.setattr(
+        advanced_workflows,
+        "_require_complete_metrics_matrix",
+        lambda *args, **kwargs: None,
+    )
+    monkeypatch.setattr(
+        advanced_workflows, "validate_done_marker", lambda *_args, **_kwargs: None
+    )
+    monkeypatch.setattr(advanced_workflows, "sha256_file", lambda _path: "h" * 64)
+
+    predictions = pd.DataFrame(
+        {
+            "y_true": np.array([2, 2, 2], dtype=np.int64),
+            "y_pred": np.array([1, 2, 0], dtype=np.int64),
+            "margin_F": np.array([-0.1, 0.2, -0.3], dtype=np.float64),
+        }
+    )
+    monkeypatch.setattr(
+        advanced_workflows, "_read_predictions", lambda _run_dir: predictions.copy()
+    )
+    monkeypatch.setattr(advanced_workflows, "_atomic_csv", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        advanced_workflows, "_atomic_parquet", lambda *_args, **_kwargs: None
+    )
+
+    args = argparse.Namespace(
+        fold=5,
+        candidates=EXPECTED_CANDIDATES,
+        seeds=EXPECTED_SEEDS,
+        experiment_id=None,
+    )
+    report = advanced_workflows.run_fold_audit(config, args)
+
+    # dispatch print path (json.dumps without default) must not raise.
+    json.dumps(report, sort_keys=True)
+
+    numeric = {
+        key: value
+        for row in report["partition_counts"]
+        for key, value in row.items()
+        if key != "partition"
+    }
+    assert numeric, "partition_counts vazio"
+    assert all(type(value) is int for value in numeric.values())
+
+    written = json.loads(
+        (
+            tmp_path
+            / "fold_audits"
+            / config.default_experiment_ids["e065_audit"]
+            / "fold5_report.json"
+        ).read_text(encoding="utf-8")
+    )
+    assert all(
+        type(value) is int
+        for row in written["partition_counts"]
+        for key, value in row.items()
+        if key != "partition"
+    )

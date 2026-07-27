@@ -22,6 +22,14 @@ SAMPLERS: tuple[SamplerName, ...] = (
     "patient_sqrt",
     "smote",
 )
+PD_SAMPLERS: tuple[SamplerName, ...] = (
+    "pd_s0_natural",
+    "pd_s1_f_target",
+    "pd_s2_patient_uniform_capped",
+    "pd_s3_patient_sqrt_capped",
+    "pd_s4_focal_gentle",
+    "pd_s5_smote_feature",
+)
 
 
 def _fixture() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
@@ -86,6 +94,64 @@ def test_patient_samplers_balance_classes_without_cross_partition_rows() -> None
         counts = np.unique(result.labels, return_counts=True)[1]
         assert np.unique(counts).size == 1
         assert np.all(result.source_indices >= 0)
+
+
+@pytest.mark.parametrize("sampler", PD_SAMPLERS)
+def test_pd_sampler_is_deterministic_and_train_only(sampler: SamplerName) -> None:
+    rng = np.random.default_rng(7)
+    labels = np.asarray([0] * 40 + [1] * 30 + [2] * 3, dtype=np.int64)
+    values = rng.normal(size=(labels.size, 5)).astype(np.float32)
+    groups = np.asarray(
+        [f"p{index % 8}" for index in range(40)]
+        + [f"p{index % 6 + 8}" for index in range(30)]
+        + ["f1", "f2", "f3"]
+    )
+    indices = np.arange(1000, 1000 + labels.size, dtype=np.int64)
+
+    first = sample_training_values(
+        values,
+        labels,
+        groups,
+        indices,
+        sampler=sampler,
+        seed=17,
+        smote_k_neighbors=2,
+    )
+    second = sample_training_values(
+        values,
+        labels,
+        groups,
+        indices,
+        sampler=sampler,
+        seed=17,
+        smote_k_neighbors=2,
+    )
+
+    assert np.array_equal(first.values, second.values)
+    assert np.array_equal(first.labels, second.labels)
+    assert np.array_equal(first.source_indices, second.source_indices)
+    assert first.manifest == second.manifest
+    assert first.manifest["sampler_scope"] == "TRAIN_ONLY_FEATURE_SPACE"
+    assert first.manifest["validation_or_test_sampled"] is False
+    assert first.manifest["source_outside_partition_count"] == 0
+    assert set(first.source_indices[first.source_indices >= 0]) <= set(indices)
+    if sampler in {
+        "pd_s1_f_target",
+        "pd_s2_patient_uniform_capped",
+        "pd_s3_patient_sqrt_capped",
+        "pd_s5_smote_feature",
+    }:
+        assert first.manifest["realized_f_fraction"] == pytest.approx(0.125)
+    if sampler in {
+        "pd_s2_patient_uniform_capped",
+        "pd_s3_patient_sqrt_capped",
+    }:
+        cap = first.manifest["patient_cap"]
+        assert cap is not None
+        assert max(first.manifest["patient_f_contributions"].values()) <= cap
+    if sampler == "pd_s5_smote_feature":
+        assert first.manifest["synthetic_count"] == 7
+        assert np.sum(first.source_indices < 0) == 7
 
 
 def test_e07_execution_contract_rejects_wrong_profile_or_seeds() -> None:

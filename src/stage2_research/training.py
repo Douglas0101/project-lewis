@@ -374,6 +374,67 @@ def _patient_sample_indices(
     return combined[rng.permutation(combined.size)]
 
 
+def _target_f_count(labels: np.ndarray, target_fraction: float = 0.125) -> int:
+    if not 0.0 < target_fraction < 1.0:
+        raise ResearchError("F target fraction is invalid", ExitCode.INVALID_EXPERIMENT)
+    current_f = _safe_int(np.sum(labels == 2), "current F support")
+    non_f = _safe_int(np.sum(labels != 2), "non-F support")
+    target = _safe_int(
+        np.ceil(target_fraction * non_f / (1.0 - target_fraction)),
+        "target F support",
+    )
+    return max(current_f, target)
+
+
+def _patient_targeted_f_indices(
+    labels: np.ndarray,
+    groups: np.ndarray,
+    *,
+    seed: int,
+    sqrt_weighted: bool,
+    target_fraction: float = 0.125,
+    cap_multiplier: float = 2.0,
+) -> tuple[np.ndarray, int, dict[str, int]]:
+    rng = np.random.default_rng(seed)
+    f_indices = np.flatnonzero(labels == 2)
+    non_f_indices = np.flatnonzero(labels != 2)
+    if f_indices.size == 0:
+        raise ResearchError("patient F sampler found no F class", ExitCode.INVALID_EXPERIMENT)
+    f_groups = groups[f_indices].astype(str)
+    unique_groups, group_counts = np.unique(f_groups, return_counts=True)
+    target_f = _target_f_count(labels, target_fraction)
+    cap = _safe_int(
+        np.ceil(cap_multiplier * target_f / unique_groups.size),
+        "patient F sample cap",
+    )
+    used = np.zeros(unique_groups.size, dtype=np.int64)
+    selected = np.empty(target_f, dtype=np.int64)
+    base_weights = (
+        np.sqrt(group_counts.astype(np.float64))
+        if sqrt_weighted
+        else np.ones(unique_groups.size, dtype=np.float64)
+    )
+    for position in range(target_f):
+        eligible = used < cap
+        if not np.any(eligible):
+            raise ResearchError("patient F sample cap exhausted", ExitCode.INVALID_EXPERIMENT)
+        probabilities = np.where(eligible, base_weights, 0.0)
+        probabilities /= np.sum(probabilities)
+        group_index = _safe_int(
+            rng.choice(unique_groups.size, p=probabilities),
+            "sampled patient index",
+        )
+        candidates = f_indices[f_groups == unique_groups[group_index]]
+        selected[position] = rng.choice(candidates)
+        used[group_index] += 1
+    combined = np.concatenate((non_f_indices, selected))
+    contributions = {
+        str(group): _safe_int(count, "patient F contribution")
+        for group, count in zip(unique_groups, used, strict=True)
+    }
+    return combined[rng.permutation(combined.size)], cap, contributions
+
+
 def sample_training_values(
     values: np.ndarray,
     labels: np.ndarray,
@@ -388,7 +449,10 @@ def sample_training_values(
     source = np.asarray(source_indices, dtype=np.int64)
     before_counts = _class_counts(labels)
     synthetic_count = 0
-    if sampler == "natural":
+    patient_cap: int | None = None
+    patient_contributions: dict[str, int] = {}
+    target_f_fraction: float | None = None
+    if sampler in {"natural", "pd_s0_natural", "pd_s4_focal_gentle"}:
         sampled_values = values
         sampled_labels = labels
         sampled_source = source
@@ -403,6 +467,27 @@ def sample_training_values(
         sampled_labels = np.asarray(sampled_labels_raw, dtype=np.int64)
         sample_indices = np.asarray(oversampler.sample_indices_, dtype=np.int64)
         sampled_source = source[sample_indices]
+    elif sampler == "pd_s1_f_target":
+        target_f_fraction = 0.125
+        target_f = _target_f_count(labels, target_f_fraction)
+        current_f = _safe_int(np.sum(labels == 2), "current F support")
+        if target_f == current_f:
+            sampled_values, sampled_labels, sampled_source = values, labels, source
+        else:
+            oversampler_type: Any = RandomOverSampler
+            oversampler = oversampler_type(
+                sampling_strategy={2: target_f},
+                random_state=seed,
+            )
+            oversample_untyped = oversampler.fit_resample
+            sampled_values_raw, sampled_labels_raw = cast(
+                tuple[Any, Any],
+                oversample_untyped(values, labels),
+            )
+            sampled_values = np.asarray(sampled_values_raw, dtype=np.float32)
+            sampled_labels = np.asarray(sampled_labels_raw, dtype=np.int64)
+            sample_indices = np.asarray(oversampler.sample_indices_, dtype=np.int64)
+            sampled_source = source[sample_indices]
     elif sampler in {"patient_uniform", "patient_sqrt"}:
         local_indices = _patient_sample_indices(
             labels,
@@ -413,13 +498,43 @@ def sample_training_values(
         sampled_values = values[local_indices]
         sampled_labels = labels[local_indices]
         sampled_source = source[local_indices]
-    elif sampler == "smote":
-        counts = np.unique(labels, return_counts=True)[1]
-        minimum_support = _safe_int(np.min(counts), "SMOTE minimum support")
+    elif sampler in {
+        "pd_s2_patient_uniform_capped",
+        "pd_s3_patient_sqrt_capped",
+    }:
+        target_f_fraction = 0.125
+        local_indices, patient_cap, patient_contributions = _patient_targeted_f_indices(
+            labels,
+            groups,
+            seed=seed,
+            sqrt_weighted=sampler == "pd_s3_patient_sqrt_capped",
+            target_fraction=target_f_fraction,
+            cap_multiplier=2.0,
+        )
+        sampled_values = values[local_indices]
+        sampled_labels = labels[local_indices]
+        sampled_source = source[local_indices]
+    elif sampler in {"smote", "pd_s5_smote_feature"}:
+        if sampler == "pd_s5_smote_feature":
+            target_f_fraction = 0.125
+            target_f = _target_f_count(labels, target_f_fraction)
+            strategy: str | dict[int, int] = {2: target_f}
+            minimum_support = _safe_int(np.sum(labels == 2), "SMOTE F support")
+        else:
+            strategy = "auto"
+            minimum_support = _safe_int(
+                np.min(np.unique(labels, return_counts=True)[1]),
+                "SMOTE minimum support",
+            )
         neighbors = min(smote_k_neighbors, minimum_support - 1)
         if neighbors < 1:
             raise ResearchError("SMOTE class support is insufficient", ExitCode.INVALID_EXPERIMENT)
-        smote = SMOTE(random_state=seed, k_neighbors=neighbors)
+        smote_type: Any = SMOTE
+        smote = smote_type(
+            sampling_strategy=strategy,
+            random_state=seed,
+            k_neighbors=neighbors,
+        )
         smote_untyped: Any = smote.fit_resample
         sampled_values_raw, sampled_labels_raw = cast(
             tuple[Any, Any],
@@ -438,6 +553,10 @@ def sample_training_values(
     source_outside_partition_count = len(observed_sources - allowed_sources)
     if source_outside_partition_count:
         raise ResearchError("sampler crossed the train partition", ExitCode.LEAKAGE)
+    f_fraction = _safe_float(
+        np.mean(sampled_labels == 2),
+        "sampled F fraction",
+    )
     manifest = {
         "sampler": sampler,
         "random_state": seed,
@@ -447,6 +566,11 @@ def sample_training_values(
         "output_count": _safe_int(sampled_labels.size, "sampler output count"),
         "synthetic_count": _safe_int(synthetic_count, "synthetic sample count"),
         "validation_or_test_sampled": False,
+        "sampler_scope": "TRAIN_ONLY_FEATURE_SPACE",
+        "target_f_fraction": target_f_fraction,
+        "realized_f_fraction": f_fraction,
+        "patient_cap": patient_cap,
+        "patient_f_contributions": patient_contributions,
         "input_partition_index_hash": hash_canonical(source.tolist()),
         "source_outside_partition_count": source_outside_partition_count,
         "source_index_hash": hash_canonical(sampled_source.tolist()),
@@ -597,7 +721,15 @@ def _predictions_frame(
     predictions: np.ndarray,
     feature_bundle: FeatureBundle,
 ) -> pd.DataFrame:
-    columns = ["dataset", "record_id", "beat_idx", "r_peak_sample"]
+    columns = [
+        "sample_id",
+        "waveform_sha256",
+        "dataset",
+        "record_id",
+        "patient_id",
+        "beat_idx",
+        "r_peak_sample",
+    ]
     available = [name for name in columns if name in dataset.frame]
     frame = dataset.frame.iloc[outer_test].loc[:, available].copy()
     frame["y_true"] = dataset.labels[outer_test]
@@ -683,7 +815,9 @@ def stage_run_dir(
     """Resolve one cell directory without touching production artifacts."""
     stage_dir = {
         "e06.5": "E06_5",
+        "e06.5-pd": "E06_5_PD",
         "e07": "E07",
+        "e07-pd": "E07_PD",
         "e08": "E08",
     }.get(stage)
     if stage_dir is None:
@@ -754,7 +888,7 @@ def train_e06_cell(
             "training cell requires complete preflight/source/runtime identity",
             ExitCode.BLOCKED_PRECONDITION,
         )
-    if stage == "e06.5" and sampler != "natural":
+    if stage in {"e06.5", "e06.5-pd"} and sampler != "natural":
         raise ResearchError("E06.5 sampling must remain natural", ExitCode.INVALID_EXPERIMENT)
     profile = config.profiles[profile_name]
     if profile_name == "audit" and (not deterministic or profile.max_parallel != 1):
@@ -840,10 +974,13 @@ def train_e06_cell(
         atomic_write_json(run_dir / "environment.json", environment.model_dump(mode="json"))
         head, dirty = git_identity(config.project_root)
         started_at = utc_now()
-        stage_label = {"e06.5": "E06.5", "e07": "E07", "e08": "E08"}.get(
-            stage,
-            stage,
-        )
+        stage_label = {
+            "e06.5": "E06.5",
+            "e06.5-pd": "E06.5-PD",
+            "e07": "E07",
+            "e07-pd": "E07-PD",
+            "e08": "E08",
+        }.get(stage, stage)
         manifest = RunManifest(
             experiment_stage=stage_label,
             experiment_id=experiment_id,
