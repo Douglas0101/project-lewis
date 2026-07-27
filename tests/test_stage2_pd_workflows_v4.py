@@ -15,6 +15,7 @@ from src.stage2_research.pd_workflows import (
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.requires_artifacts
 def test_pd_protocol_freezes_exact_matrix_and_gates() -> None:
     protocol = build_pd_protocol_manifest(PROJECT_ROOT)
 

@@ -250,6 +250,9 @@ e07r-watch: ## Dashboard TUI dos treinamentos (STAGE=e065|e07, EXTRA="--once")
 
 ##@ Firmware & Gates
 
+RENOD_DIR := firmware/tools/renode-1.15.3
+RENODE_BIN := $(RENOD_DIR)/renode
+
 fw-build: firmware-tflm-lib ## Compila o binário do firmware STM32F4
 	$(MAKE) -C firmware stm32f4
 
