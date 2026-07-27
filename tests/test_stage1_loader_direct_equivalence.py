@@ -17,7 +17,7 @@ from src.models.keras_loader import inspect_loader_selection
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 MODEL_PATH = PROJECT_ROOT / "models" / "stage1_float32_v2.0.keras"
-EXPECTED_MODEL_SHA256 = "cd5e2474f294d965d52662f80e12a21024d551749f8b9d787b9c80bd34dbc347"
+EXPECTED_MODEL_SHA256 = "cb9e12225c3b69c51c064ae9901245d941a915bf724ba4e5d4b005aee69a4c5a"
 
 
 def _run(command: list[str]) -> None:
