@@ -9,7 +9,7 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 |--------|-----------|------------|
 | Python | 3.12.x | System Python Zorin OS; veto 3.13+ |
 | Gerenciador | uv (Astral) | Lockfile nativo; nunca requirements.txt cru |
-| Dados | numpy, scipy, pandas, wfdb | Base numérica + sinais |
+| Dados | numpy <2.0 (pinado; TF/Keras compat — `__array__` copy kwarg), scipy, pandas, wfdb | Base numérica + sinais |
 | ML | TensorFlow 2.21, scikit-learn, imbalanced-learn | Treinamento + utilidades |
 | Tracking | SQLite, SQLAlchemy 2.0 | Banco local de experimentos, métricas e alertas |
 | Testes | pytest (>=8.0), pytest-cov, pytest-xdist | Pirâmide 70/20/10 |
