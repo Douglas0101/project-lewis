@@ -215,7 +215,7 @@ def finetune_mitbih(
     learning_rate: float = 1e-4,
     seed: int = 42,
     experiment_dir: Optional[Path] = None,
-    monitor: str = "val_loss",
+    monitor: str = "loss",
     freeze_backbone: bool = True,
     class_names: Optional[List[str]] = None,
     thresholds: Optional[Dict[str, Any]] = None,
@@ -256,7 +256,9 @@ def finetune_mitbih(
     experiment_dir : Path, optional
         Diretório do experimento.
     monitor : str
-        Métrica para early stopping.
+        Métrica monitorada pelo ReduceLROnPlateau. Default ``"loss"``: este
+        módulo treina sem ``validation_data`` por design (a validação é feita
+        pelo F1MacroCheckpoint), portanto ``"val_loss"`` não existe nos logs.
     freeze_backbone : bool
         Se True, congela camadas convolucionais antes do treino.
     class_names : list[str], optional
