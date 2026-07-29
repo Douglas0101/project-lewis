@@ -19,6 +19,9 @@ from typing import Dict, List, Optional, Tuple, cast
 import numpy as np
 from scipy import signal
 
+# numpy 2.0 renomeou np.trapz -> np.trapezoid; o projeto está pinado em numpy <2.0
+_trapezoid = getattr(np, "trapezoid", np.trapz)
+
 LOGGER = logging.getLogger("lewis.camada03.morphological")
 
 
@@ -192,7 +195,7 @@ class MorphologicalFeatures:
                 else:
                     j_point = offset
                     # 12. QRS area
-                    qrs_area = float(np.trapezoid(np.abs(seg[onset:offset]), dx=1.0 / fs))
+                    qrs_area = float(_trapezoid(np.abs(seg[onset:offset]), dx=1.0 / fs))
             else:
                 qrs_width_ms = np.nan
                 j_point = actual_r_idx

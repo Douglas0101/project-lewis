@@ -10,6 +10,9 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from scipy.signal import welch
 
+# numpy 2.0 renomeou np.trapz -> np.trapezoid; o projeto está pinado em numpy <2.0
+_trapezoid = getattr(np, "trapezoid", np.trapz)
+
 
 class SpectralQRSConfig(BaseModel):
     """Immutable spectral-QRS configuration."""
@@ -145,7 +148,7 @@ def _band_power(
     mask = (freqs >= low) & (freqs <= high)
     if not np.any(mask):
         return np.zeros(psd.shape[0], dtype=np.float64)
-    return np.trapezoid(psd[:, mask], freqs[mask], axis=1)
+    return _trapezoid(psd[:, mask], freqs[mask], axis=1)
 
 
 def extract_spectral_qrs_features(
