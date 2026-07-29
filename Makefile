@@ -10,6 +10,7 @@
 .PHONY: help setup doctor check lint format type-check test test-e2e clean status watch \
         env pre-commit-install dev docker-build docker-run docker-shell \
         data-download-all data-download-chapman data-download-mitbih data-catalog \
+        data-verify-chapman \
         data-process data-features data-audit-train data-qg0 data-provenance \
         data-mirror-create data-mirror-restore data-dlq-replay \
         mlp-run mlp-train mlp-train-stage1 mlp-train-stage2 mlp-select-best \
@@ -21,7 +22,8 @@
         rag-eval-hybrid rag-eval-ragas \
         obs-up obs-down memory-commit \
         all clean-raw clean-mirrors quality-report stress-test stress-test-p1 stress-test-p2 stress-test-p3 \
-        pretrain finetune quantize export \
+        pretrain pretrain-smoke pretrain-check pretrain-validate pretrain-export-smoke pretrain-qg \
+        finetune quantize export \
         download-all download-chapman download-mitbih catalog process features \
         audit-training-data qg0 provenance mirror mirror-restore dlq-replay \
         mlp-pipeline mlp-pipeline-with-features mlp-features mlp-test-qg5 mlp-validate-quantized \
@@ -102,37 +104,40 @@ clean: ## Remove dados processados, features e artefatos de modelos
 
 status: e07r-status ## Atalho: painel de status do projeto (E07R)
 
-watch: e07r-watch ## Atalho: dashboard TUI dos treinamentos
+watch: e07r-watch
 
 ##@ Dados
 
 data-download-all: data-download-chapman data-download-mitbih ## Baixa todos os datasets ECG
 
-data-download-chapman: ## Baixa o dataset Chapman ECG
-	$(PYTHON) -m src.data.download_chapman
+data-download-chapman: ## Baixa o dataset Chapman ECG (idempotente; FORCE=1 re-baixa)
+	$(PYTHON) -m src.data.download_chapman $(if $(FORCE),--force,)
+
+data-verify-chapman: ## Verifica integridade local do Chapman (offline, sem rede)
+	$(PYTHON) -m src.data.download_chapman --verify
 
 data-download-mitbih: ## Baixa MIT-BIH, SVDB, AFDB e INCART
 	$(PYTHON) -m src.data.download_mitbih
 
-data-catalog: ## Constrói o catálogo de datasets
+data-catalog:
 	$(PYTHON) -c "from src.data._catalog import build_catalog; build_catalog()"
 
-data-process: ## Roda pipeline de resample e pré-processamento
+data-process:
 	$(PYTHON) -m src.data.aggregator
 
-data-features: ## Roda o pipeline de feature engineering
+data-features:
 	$(PYTHON) -m src.features.pipeline
 
-data-audit-train: ## Auditoria de qualidade dos dados de treino
+data-audit-train:
 	$(PYTHON) scripts/audit_training_data.py
 
-data-qg0: ## Testes de integridade de download (QG0)
+data-qg0:
 	$(PYTEST) tests/test_download.py -v
 
-data-provenance: ## Escreve o manifesto de proveniência dos dados
+data-provenance:
 	$(PYTHON) -c "from src.data._compliance import write_provenance; import json; from pathlib import Path; m = json.loads(Path('src/data/checksums.json').read_text()); write_provenance(m)"
 
-data-mirror-create: ## Cria mirrors compactados dos datasets brutos
+data-mirror-create:
 	mkdir -p $(DATA)/mirrors
 	tar czf $(DATA)/mirrors/chapman_mirror.tar.gz        -C $(DATA)/raw_chapman .
 	tar czf $(DATA)/mirrors/mitbih_family_mirror.tar.gz  -C $(DATA)/raw_mitbih . \
@@ -140,13 +145,13 @@ data-mirror-create: ## Cria mirrors compactados dos datasets brutos
 	                                                        -C $(DATA)/raw_afdb   . \
 	                                                        -C $(DATA)/raw_incart .
 
-data-mirror-restore: ## Restaura datasets brutos a partir dos mirrors
+data-mirror-restore:
 	mkdir -p $(DATA)/raw_chapman $(DATA)/raw_mitbih $(DATA)/raw_svdb \
 	         $(DATA)/raw_afdb $(DATA)/raw_incart
 	tar xzf $(DATA)/mirrors/chapman_mirror.tar.gz        -C $(DATA)/raw_chapman/
 	tar xzf $(DATA)/mirrors/mitbih_family_mirror.tar.gz  -C $(DATA)/raw_mitbih/
 
-data-dlq-replay: ## Reprocessa downloads falhos da dead-letter queue
+data-dlq-replay:
 	$(PYTHON) -m src.data._downloader_replay
 
 ##@ MLP v2.3
@@ -158,36 +163,36 @@ endif
 mlp-run: mlp-prepare-features mlp-train mlp-select-best mlp-quantize mlp-validate-quant mlp-qg5
 	@true
 
-mlp-train: mlp-train-stage1 mlp-train-stage2 ## Treina ambos os estágios
+mlp-train: mlp-train-stage1 mlp-train-stage2
 
-mlp-train-stage1: mlp-logs-dir ## Treina Estágio 1 MLP v2.3 (N vs Anormal)
+mlp-train-stage1: mlp-logs-dir
 	$(PYTHON) scripts/train_stage1_mlp.py \
 		--hidden-units $(MLP_HIDDEN_UNITS) \
 		--max-weight $(MLP_STAGE1_MAX_WEIGHT) \
 		--output-dir $(MLP_STAGE1_EXP) 2>&1 | tee -a $(MLP_LOG)
 
-mlp-train-stage2: mlp-logs-dir ## Treina Estágio 2 MLP v2.3 (S vs V vs F)
+mlp-train-stage2: mlp-logs-dir
 	$(PYTHON) scripts/train_stage2_mlp.py \
 		--hidden-units $(MLP_HIDDEN_UNITS) \
 		--f-oversample-ratio $(MLP_F_OVERSAMPLE_RATIO) \
 		--max-weight $(MLP_STAGE2_MAX_WEIGHT) \
 		--output-dir $(MLP_STAGE2_EXP) 2>&1 | tee -a $(MLP_LOG)
 
-mlp-select-best: mlp-logs-dir ## Seleciona melhor fold e publica em models/
+mlp-select-best: mlp-logs-dir
 	$(PYTHON) scripts/select_best_mlp_fold.py \
 		--stage1-exp $(MLP_STAGE1_EXP) \
 		--stage2-exp $(MLP_STAGE2_EXP) 2>&1 | tee -a $(MLP_LOG)
 
-mlp-quantize: mlp-logs-dir ## Quantiza modelos v2.3 para INT8
+mlp-quantize: mlp-logs-dir
 	$(PYTHON) scripts/quantize_mlp_features.py --n-cal $(MLP_N_CAL) 2>&1 | tee -a $(MLP_LOG)
 
-mlp-validate-quant: mlp-logs-dir ## Valida ΔF1-macro < 2% entre float32 e INT8
+mlp-validate-quant: mlp-logs-dir
 	$(PYTHON) scripts/validate_quantized_mlp.py 2>&1 | tee -a $(MLP_LOG)
 
 mlp-qg5: mlp-logs-dir ## Roda testes QG5' do pipeline MLP v2.3
 	$(PYTEST) tests/test_two_stage_mlp_qg5.py tests/test_morphological_features.py -v 2>&1 | tee -a $(MLP_LOG)
 
-mlp-clean: ## Remove artefatos v2.3 de experiments e models
+mlp-clean:
 	rm -rf $(MLP_STAGE1_EXP) $(MLP_STAGE2_EXP)
 	rm -f models/*_v2.3*
 	rm -f models/quantized/*_v2.3*
@@ -197,19 +202,19 @@ mlp-clean: ## Remove artefatos v2.3 de experiments e models
 
 e07r: e07r-check e07r-e065 e07r-status ## Fluxo completo: preflight → E06.5-PD → status
 
-e07r-check: ## Valida freeze/integridade (9 checks, read-only)
+e07r-check:
 	@$(PYTHON) scripts/check_e07r_status.py || { \
 		echo "E07R INTEGRITY BLOCKED — fail-closed; veja o check BLOCKED no painel acima (não é erro do Makefile)"; \
 		exit 1; \
 	}
 
-e07r-status: ## Painel — preflight, células DONE, seleção H*-PD (JSON=1 aceito)
+e07r-status:
 	@$(PYTHON) scripts/check_e07r_status.py || { \
 		echo "E07R INTEGRITY BLOCKED — fail-closed; veja o check BLOCKED no painel acima (não é erro do Makefile)"; \
 		exit 1; \
 	}
 
-e07r-freeze: ## Publica o freeze (write-once; no-op se já publicado)
+e07r-freeze:
 	@if [ -f $(E07R_EXP)/integrity/e07r_freeze_manifest.json ]; then \
 		echo "E07R freeze já publicado (write-once) — nada a fazer"; \
 	else \
@@ -240,7 +245,7 @@ e07r-e07: ## Executa E07-PD 6×5×5 (DRY_RUN=1, RUN_ID=...; BLOCKED pré-registr
 		exit $$status; \
 	fi
 
-e07r-report: ## Mostra checkpoint final e caminhos do pacote de evidência
+e07r-report:
 	@echo "pacote de evidência: $(E07R_EXP)/integrity/e07r_evidence_package.json"
 	@echo "relatório consolidado: docs/e07r_evidence_report.md"
 	@$(PYTHON) -m json.tool $(E07R_EXP)/E07R_final_checkpoint_20260726.json
@@ -259,7 +264,7 @@ fw-build: firmware-tflm-lib ## Compila o binário do firmware STM32F4
 fw-test: firmware-tflm-lib ## Roda testes do firmware sob Renode
 	$(MAKE) -C firmware LEWIS_USE_TFLM=1 RENODE_SIMULATION=1 firmware-test
 
-fw-native: ## Simulador nativo do firmware (TFLM=1 com TFLM; STUB=1 com stub)
+fw-native:
 ifeq ($(STUB),1)
 	$(MAKE) -C firmware ALLOW_STUB=1 native
 else ifeq ($(TFLM),1)
@@ -268,10 +273,10 @@ else
 	$(MAKE) -C firmware native
 endif
 
-fw-run: ## Executa o firmware na emulação Renode
+fw-run:
 	$(MAKE) -C firmware firmware-run
 
-fw-verify-renode: ## Verifica instalação do Renode 1.15.3
+fw-verify-renode:
 	@if [ ! -x "$(RENODE_BIN)" ]; then \
 	    echo "ERROR: Renode nao encontrado em $(RENODE_BIN)"; \
 	    exit 1; \
@@ -285,11 +290,11 @@ fw-verify-renode: ## Verifica instalação do Renode 1.15.3
 	fi; \
 	echo "Renode 1.15.3 confirmed"
 
-fw-check-markers: ## Verifica --strict-markers habilitado no pytest
+fw-check-markers:
 	@echo "Verificando --strict-markers em pyproject.toml..."
 	@$(PYTHON) -c "import tomllib, pathlib, sys; cfg = tomllib.loads(pathlib.Path('pyproject.toml').read_text(encoding='utf-8')); addopts = cfg.get('tool', {}).get('pytest', {}).get('ini_options', {}).get('addopts', ''); sys.exit(0 if '--strict-markers' in addopts.split() else (print('ERROR: --strict-markers nao encontrado em pyproject.toml') or 1))" && echo "OK: --strict-markers configurado"
 
-fw-check-no-stub: ## Verifica ausência de TFLM stub no ELF do firmware
+fw-check-no-stub:
 	@if [ ! -f firmware/build/stm32f4/lewis.elf ]; then \
 	    echo "SKIP: firmware/build/stm32f4/lewis.elf ainda nao existe"; \
 	    exit 0; \
@@ -321,19 +326,19 @@ kb-query: ## Consulta interativa na knowledge base
 kb-status: ## Status da knowledge base
 	$(UV) run python -m src.knowledge.cli status
 
-kb-test: ## Testes da camada knowledge
+kb-test:
 	$(UV) run pytest tests/test_knowledge/ -v --tb=short
 
-kb-validate: ## Valida o índice knowledge
+kb-validate:
 	$(UV) run python scripts/validate_knowledge_index.py
 
-kb-clean: ## Remove índice e dados da knowledge base
+kb-clean:
 	rm -f data/knowledge.db
 	rm -rf data/lineage/knowledge/
 	rm -f logs/knowledge_queries.jsonl
 	rm -f data/.dlq/knowledge_rejected.jsonl
 
-kb-reindex-changed: ## Reindexa somente se docs/fontes mudaram
+kb-reindex-changed:
 	@mkdir -p data/lineage
 	@CURRENT=$$(find docs src/knowledge -type f \( -name '*.md' -o -name '*.py' \) | sort | xargs sha256sum | sha256sum | awk '{print $$1}'); \
 	if [ -f data/lineage/.knowledge_checksum ] && [ "$$(cat data/lineage/.knowledge_checksum)" = "$$CURRENT" ]; then \
@@ -344,10 +349,10 @@ kb-reindex-changed: ## Reindexa somente se docs/fontes mudaram
 		echo "$$CURRENT" > data/lineage/.knowledge_checksum; \
 	fi
 
-rag-eval-hybrid: ## Avalia hybrid search no golden dataset
+rag-eval-hybrid:
 	$(UV) run python scripts/eval_hybrid.py
 
-rag-eval-ragas: ## Avalia qualidade do RAG com golden dataset
+rag-eval-ragas:
 	$(UV) run python -m src.observability.ragas_eval_cli data/eval/golden_dataset.json
 
 ##@ Observabilidade & Memória
@@ -429,8 +434,26 @@ clean-raw:
 clean-mirrors:
 	rm -rf $(DATA)/mirrors/*
 
-pretrain:
-	$(PYTHON) -m src.models.pretrain_chapman
+##@ Pré-treino
+
+pretrain: ## Pré-treino Chapman via wrapper (30 épocas; exit 0 se execução OK)
+	$(PYTHON) scripts/pretrain_wrapper.py
+
+pretrain-qg: ## Pré-treino com gate QG4 bloqueante (exit 10 se QG4 falhar)
+	$(PYTHON) scripts/pretrain_wrapper.py --enforce-qg4
+
+pretrain-smoke: ## Smoke de engenharia do pré-treino (1 época; QG4 informativo)
+	$(PYTHON) scripts/pretrain_wrapper.py --smoke
+
+pretrain-check: ## Lint + testes rápidos do pipeline de pré-treino
+	$(UV) run flake8 src/models/pretrain_chapman.py src/models/chapman_dataset.py src/models/pretrain_provenance.py src/models/pretrain_losses.py src/models/pretrain_evaluation.py src/models/backbones/ scripts/pretrain_wrapper.py scripts/validate_pretrain_artifacts.py --max-line-length=100
+	$(PYTEST) tests/test_chapman_dataset.py tests/test_pretrain.py tests/test_pretrain_pipeline.py tests/test_pretrain_artifacts.py tests/test_backbone_budget.py tests/test_pretrain_evaluation.py tests/test_qg4.py -q -m "not slow"
+
+pretrain-validate: ## Valida artefatos do último run de pré-treino
+	$(PYTHON) scripts/validate_pretrain_artifacts.py
+
+pretrain-export-smoke: ## Exporta TFLite float32/INT8 e valida FlatBuffer < 64KB
+	$(PYTHON) scripts/export_tflite_smoke.py
 
 finetune:
 	$(PYTHON) -m src.models.finetune_mitbih
