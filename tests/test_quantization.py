@@ -108,7 +108,8 @@ class TestTFLMExport:
     """Valida exportação para TFLM."""
 
     @pytest.fixture(scope="class")
-    def trained_model(self):
+    @classmethod
+    def trained_model(cls):
         """Cria e treina modelo deterministicamente com dados sintéticos."""
         _set_global_seeds(42)
         model = build_backbone_1d(input_len=500, num_classes=5)

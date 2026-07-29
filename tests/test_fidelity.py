@@ -198,7 +198,8 @@ def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 @pytest.mark.slow
 class TestFidelity:
     @pytest.fixture(scope="class", autouse=True)
-    def _build_renode_firmware(self) -> None:
+    @classmethod
+    def _build_renode_firmware(cls) -> None:
         """QG10 exige binario compilado com RENODE_SIMULATION=1."""
         subprocess.run(
             [
@@ -216,8 +217,9 @@ class TestFidelity:
         )
 
     @pytest.fixture(scope="class")
+    @classmethod
     def quant_params(
-        self,
+        cls,
     ) -> tuple[TensorQuantizationParams, TensorQuantizationParams]:
         """Fornece escalas e zero-points de quantizacao (lazy load)."""
         return _load_quant_params()

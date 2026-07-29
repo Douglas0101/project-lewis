@@ -161,7 +161,8 @@ def _dequantize(out_int8: np.ndarray, scale: float, zero_point: int) -> np.ndarr
 @pytest.mark.slow
 class TestNativeTflm:
     @pytest.fixture(scope="class", autouse=True)
-    def _build(self) -> None:
+    @classmethod
+    def _build(cls) -> None:
         _build_native_tflm()
 
     def test_binary_does_not_contain_stub_marker(self) -> None:
