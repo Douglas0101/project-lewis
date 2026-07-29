@@ -1,0 +1,41 @@
+# DEPRECATIONS — supressões escopadas de warnings third-party
+
+Data: 2026-07-29 | Origem: SDD_Otimizacoes_Warnings (OPT-006, fallback documentado)
+
+Este arquivo registra as supressões de warnings em `pyproject.toml
+[tool.pytest.ini_options] filterwarnings` que **não** são corrigíveis no nosso
+código — a fonte está em dependências de terceiros sem correção upstream
+disponível na versão compatível com o projeto. Cada supressão é escopada por
+mensagem **e** módulo (nunca global).
+
+## 1. `tensorflow_model_optimization` — distutils.version
+
+- **Warning**: `DeprecationWarning: distutils Version classes are deprecated. Use packaging.version instead.`
+- **Origem**: `tensorflow_model_optimization/__init__.py:65-66` (tfmot 0.8.1).
+- **Por que suprimir**: o uso de `distutils.version.LooseVersion` é interno do
+  tfmot; a versão 0.8.1 é a compatível com TF 2.21 + QAT/pruning do projeto.
+  Upgrade de tfmot não disponível no canal estável para esta combinação.
+- **Revisão pendente**: remover a supressão quando tfmot publicar release com
+  `packaging.version`.
+
+## 2. `starlette` TestClient — httpx
+
+- **Warning**: `StarletteDeprecationWarning: Using httpx with starlette.testclient is deprecated; install httpx2 instead.`
+- **Origem**: `fastapi/testclient.py:1` (fastapi 0.138.2 + starlette 1.3.1 + httpx 0.28.1).
+- **Por que suprimir**: já estamos nas versões mais recentes disponíveis; o
+  pacote `httpx2` sugerido pela mensagem **não existe no PyPI** (a deprecação é
+  futurista/antecipatória do upstream). Uso restrito a testes.
+- **Revisão pendente**: reavaliar quando `httpx2` for publicado ou quando
+  fastapi/starlette ajustarem o TestClient.
+
+## 3. Supressões já existentes (mantidas, mesma política)
+
+- `gast` AST kwarg (TF 2.21 + Python 3.13) — upstream TF.
+- `Statistics for quantized inputs` (TFLite converter) — benigno no pipeline PTQ.
+- `tf.lite.Interpreter is deprecated` — migração LiteRT rastreada separadamente.
+
+## Regra
+
+Nenhuma supressão nova entra sem: (1) origem identificada em código
+third-party, (2) escopo por mensagem+módulo, (3) registro neste arquivo,
+(4) condição de remoção.
