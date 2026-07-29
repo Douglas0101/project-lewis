@@ -121,6 +121,27 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 > `firmware-build` → `fw-build`, `hard-gates` → `gates-firmware`, `knowledge-*` → `kb-*`).
 > Referência: `docs/make_commands.md`. Treinos E07R: `make e07r-e065` (resume), `make e07r-e065
 > FORCE=1` (re-treino com arquivamento), `make e07r-e07`, dashboard `make e07r-watch`.
+> `data-download-chapman` é idempotente: com o dataset completo em `data/raw_chapman/` (≥45k
+> registros) sai 0 sem rede; `FORCE=1` re-baixa; `data-verify-chapman` valida a integridade
+> local offline. Ponto de entrada pós-ingestão: `make pretrain`.
+>
+> **Nota Pré-treino (2026-07-28):** pipeline C04 corrigido (branch `fix/pretrain-engineering` +
+> `feat/pretrain-architecture-v2`): validação completa sem warning `ran out of data` (Keras 3
+> false positive em generator exhaustion), wrapper `scripts/pretrain_wrapper.py` mapeia exit
+> code (perdoa só o teardown GeneratorDataset; nunca mascara QG4), proveniência por run
+> (`provenance.json` + SHA-256 + `history.json` + `metrics_per_class.json`), baseline A0
+> congelada (19.933 params, pinada em `tests/test_backbone_budget.py`) e variantes A1/A2 em
+> `src/models/backbones/`. Alvos: `pretrain`, `pretrain-smoke`, `pretrain-check`,
+> `pretrain-validate`, `pretrain-export-smoke`. QG4 inalterado; promoção para `models/`
+> só via `--promote` explícito. Referência: `docs/pretrain_usage.md`.
+>
+> **Nota SDD Mestre (2026-07-29):** política de exit code separa execução de gate — `make pretrain`
+> retorna **0** quando a execução conclui (QG4 fail é resultado científico em `run_status.json`/
+> `qg4_result.json`, não falha de processo); `make pretrain-qg` falha com **exit 10** quando QG4
+> reprova. Modo strict desativa oneDNN antes do TF (`TF_ENABLE_ONEDNN_OPTS=0` no wrapper).
+> Makefile com **35 alvos públicos** (antes 66); auxiliares internalizados seguem executáveis
+> (`docs/makefile_refactor_plan.md`). Pins E07R (101) em modo 0444 (`tests/test_integrity.py`);
+> splits legados record-disjoint quarantinados (`data/splits/groupkfold_5_stratified/QUARANTINED.json`).
 
 ## Comando de Verificação
 ```bash

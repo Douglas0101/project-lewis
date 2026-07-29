@@ -10,8 +10,18 @@ make doctor               # pré-requisitos do ambiente
 make check                # lint + markers + integridade E07R
 
 make data-download-all    # baixa todos os datasets
+make data-download-chapman        # idempotente: com dados presentes, sai 0 sem rede
+make data-download-chapman FORCE=1  # re-baixa do zero (ignora o gate)
+make data-verify-chapman          # integridade local do Chapman (offline)
 make data-process         # resample + pré-processamento
 make data-features        # feature engineering
+
+make pretrain-smoke       # smoke de engenharia do pré-treino (1 época)
+make pretrain             # pré-treino Chapman (30 épocas; exit 0 se execução OK)
+make pretrain-qg          # idem com QG4 bloqueante (exit 10 se QG4 falhar)
+make pretrain-check       # lint + testes do pipeline de pré-treino
+make pretrain-validate    # valida artefatos do último run
+make pretrain-export-smoke  # TFLite float32/INT8 + FlatBuffer < 64KB
 
 make e07r-check           # preflight E07R (9 checks)
 make e07r-status          # painel: preflight + células + seleção
