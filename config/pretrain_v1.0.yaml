@@ -27,7 +27,10 @@ training:
   loss: binary_crossentropy
   seed: 42
   steps_per_epoch: 1000
-  validation_steps: 100
+  validation_steps: null  # null = validação completa por época (sem viés de prefixo)
+
+deterministic:
+  mode: strict  # strict = op determinism + seeds (experimentos); fast = oneDNN perf
 
 callbacks:
   early_stopping:
