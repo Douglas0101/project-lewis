@@ -4,7 +4,7 @@ Autor: Douglas Souza
 Data: 2026-06-27
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -110,7 +110,7 @@ class QueryResult(_BaseConfig):
 class IndexLineage(_BaseConfig):
     """Registro de linhagem de uma indexação."""
 
-    timestamp: datetime = Field(default_factory=datetime.utcnow)
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     total_files: int
     total_chunks: int
     layers_found: List[str]
