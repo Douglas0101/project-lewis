@@ -19,7 +19,8 @@ def dummy_mlp_artifacts(tmp_path: Path):
     feature_names = ["feat_a", "feat_b"]
     model = keras.Sequential(
         [
-            keras.layers.Dense(4, activation="relu", input_shape=(2,)),
+            keras.Input(shape=(2,)),
+            keras.layers.Dense(4, activation="relu"),
             keras.layers.Dense(2, activation="softmax"),
         ]
     )
