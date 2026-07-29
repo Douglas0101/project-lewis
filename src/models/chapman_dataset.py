@@ -8,11 +8,12 @@ multi-label target.
 
 from __future__ import annotations
 
+import itertools
 import json
 import logging
 import random
 from pathlib import Path
-from typing import Callable, Dict, Iterator, List, Optional, Tuple
+from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -153,6 +154,65 @@ def create_chapman_dataset(
     return ds
 
 
+def chapman_split_record_sets(
+    val_ratio: float = 0.1,
+    seed: int = 42,
+    catalog_path: Optional[Path] = None,
+) -> Tuple[Set[str], Set[str]]:
+    """Return ``(train_record_names, val_record_names)`` split by record.
+
+    Splitting by record avoids leaking segments of the same patient into both
+    train and validation. Deterministic given ``seed``.
+    """
+    records = _load_catalog(catalog_path or CATALOG_PATH)
+    chapman_records = [r for r in records if r.get("dataset") == "chapman"]
+    rng = random.Random(seed)
+    rng.shuffle(chapman_records)
+
+    n_val = max(1, int(len(chapman_records) * val_ratio))
+    val_records = {str(r["record_name"]) for r in chapman_records[:n_val]}
+    train_records = {str(r["record_name"]) for r in chapman_records[n_val:]}
+    return train_records, val_records
+
+
+def estimate_n_segments(
+    record_names: Set[str],
+    catalog_path: Optional[Path] = None,
+    processed_dir: Optional[Path] = None,
+    segment_len: int = 500,
+) -> int:
+    """Estimate total segments for a record set without full iteration.
+
+    Counts catalog records with a mapped diagnosis and an existing processed
+    signal, multiplying by the number of non-overlapping ``segment_len``
+    windows. Signal length is read once from the first record via a
+    memory-mapped header (records are uniform-length per C02).
+    """
+    catalog_path = catalog_path or CATALOG_PATH
+    processed_dir = processed_dir or PROCESSED_DIR
+    records = _load_catalog(catalog_path)
+
+    total = 0
+    segments_per_record: Optional[int] = None
+    for rec in records:
+        if rec.get("dataset") != "chapman":
+            continue
+        name = str(rec["record_name"])
+        if name not in record_names:
+            continue
+        diagnosis = str(rec.get("diagnosis", ""))
+        if not diagnosis or sum(diagnosis_string_to_multihot(diagnosis)) == 0:
+            continue
+        npy_path = processed_dir / f"{name}_II.npy"
+        if not npy_path.exists():
+            continue
+        if segments_per_record is None:
+            sig_len = int(np.load(npy_path, mmap_mode="r").shape[0])
+            segments_per_record = sig_len // segment_len
+        total += segments_per_record
+    return total
+
+
 def chapman_train_val_split(
     val_ratio: float = 0.1,
     batch_size: int = 64,
@@ -163,20 +223,18 @@ def chapman_train_val_split(
 ) -> Tuple[tf.data.Dataset, tf.data.Dataset]:
     """Create training and validation datasets by splitting records (not segments).
 
-    Splitting by record avoids leaking segments of the same patient into both
-    train and validation.
+    The train stream reshuffles record order on every iteration (epoch),
+    deterministically derived from ``seed`` — without this, each epoch's
+    ``steps_per_epoch`` window slices a catalog ordered by record_name and
+    sees a wildly different class mixture (QG4 instability). The val stream
+    is deterministic.
     """
     catalog_path = catalog_path or CATALOG_PATH
     processed_dir = processed_dir or PROCESSED_DIR
 
-    records = _load_catalog(catalog_path)
-    chapman_records = [r for r in records if r.get("dataset") == "chapman"]
-    rng = random.Random(seed)
-    rng.shuffle(chapman_records)
-
-    n_val = max(1, int(len(chapman_records) * val_ratio))
-    val_records = {r["record_name"] for r in chapman_records[:n_val]}
-    train_records = {r["record_name"] for r in chapman_records[n_val:]}
+    train_records, val_records = chapman_split_record_sets(
+        val_ratio=val_ratio, seed=seed, catalog_path=catalog_path
+    )
 
     LOGGER.info(
         "Chapman split | train_records=%d | val_records=%d",
@@ -184,13 +242,16 @@ def chapman_train_val_split(
         len(val_records),
     )
 
-    def make_dataset(record_set: set) -> tf.data.Dataset:
+    def make_dataset(record_set: set, *, shuffle: bool) -> tf.data.Dataset:
+        iteration = itertools.count()
+
         def gen():
+            gen_seed = (seed + next(iteration)) if shuffle else None
             for seg, y, record_name in _record_generator(
                 catalog_path=catalog_path,
                 processed_dir=processed_dir,
                 segment_len=segment_len,
-                seed=None,
+                seed=gen_seed,
             ):
                 if record_name in record_set:
                     yield seg, y
@@ -204,7 +265,7 @@ def chapman_train_val_split(
         ds = ds.prefetch(tf.data.AUTOTUNE)
         return ds
 
-    return make_dataset(train_records), make_dataset(val_records)
+    return make_dataset(train_records, shuffle=True), make_dataset(val_records, shuffle=False)
 
 
 def get_dataset_statistics(
