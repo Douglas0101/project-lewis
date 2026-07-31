@@ -43,7 +43,7 @@ def git_info() -> dict:
 
     def _git(*args: str) -> str:
         try:
-            out = subprocess.run(  # nosec B603
+            out = subprocess.run(  # nosec B603 B607
                 ["git", *args],
                 cwd=PROJECT_ROOT,
                 capture_output=True,

@@ -16,7 +16,8 @@ from scipy.signal import welch
 if hasattr(np, "trapezoid"):
     _trapezoid = np.trapezoid
 else:
-    _trapezoid = np.trapz
+    # getattr evita erro mypy attr-defined nos stubs do numpy 2.x
+    _trapezoid = getattr(np, "trapz")
 
 
 class SpectralQRSConfig(BaseModel):

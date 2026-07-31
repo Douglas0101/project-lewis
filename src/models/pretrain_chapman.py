@@ -331,7 +331,7 @@ def pretrain_chapman(
     )
 
     # Salvar metrics
-    metrics = {
+    metrics_summary = {
         "final_loss": float(history.history["loss"][-1]),
         "final_val_loss": float(history.history.get("val_loss", [np.nan])[-1]),
         "final_auc_roc": float(history.history.get("auc_roc", [np.nan])[-1]),
@@ -339,12 +339,12 @@ def pretrain_chapman(
         "stopped_epoch": len(history.history["loss"]),
     }
     with (experiment_dir / "metrics.json").open("w", encoding="utf-8") as fh:
-        json.dump(metrics, fh, indent=2, ensure_ascii=False)
+        json.dump(metrics_summary, fh, indent=2, ensure_ascii=False)
 
     LOGGER.info(
         "Pré-treino concluído | loss=%.4f | val_loss=%.4f",
-        metrics["final_loss"],
-        metrics["final_val_loss"],
+        metrics_summary["final_loss"],
+        metrics_summary["final_val_loss"],
     )
     return model, history.history
 

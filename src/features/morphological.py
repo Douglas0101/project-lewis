@@ -25,7 +25,8 @@ from scipy import signal
 if hasattr(np, "trapezoid"):
     _trapezoid = np.trapezoid
 else:
-    _trapezoid = np.trapz
+    # getattr evita erro mypy attr-defined nos stubs do numpy 2.x
+    _trapezoid = getattr(np, "trapz")
 
 LOGGER = logging.getLogger("lewis.camada03.morphological")
 
