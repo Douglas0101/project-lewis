@@ -10,8 +10,13 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from scipy.signal import welch
 
-# numpy 2.0 renomeou np.trapz -> np.trapezoid; o projeto está pinado em numpy <2.0
-_trapezoid = getattr(np, "trapezoid", np.trapz)
+# numpy 2.0 renomeou np.trapz -> np.trapezoid (e removeu np.trapz); shim lazy —
+# a forma getattr(np, "trapezoid", np.trapz) é inválida porque o default é
+# avaliado eager e quebra no numpy 2.x.
+if hasattr(np, "trapezoid"):
+    _trapezoid = np.trapezoid
+else:
+    _trapezoid = np.trapz
 
 
 class SpectralQRSConfig(BaseModel):
