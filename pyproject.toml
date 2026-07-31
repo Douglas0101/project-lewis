@@ -22,7 +22,7 @@ classifiers = [
 dependencies = [
   "absl-py>=2.0.0",
   "wfdb>=4.1.2",
-  "numpy>=1.26.4,<2.0",
+  "numpy>=1.26.4",
   "scipy>=1.11.4",
   "pandas>=2.1.4",
   "pyarrow>=14.0.1",
@@ -137,6 +137,9 @@ filterwarnings = [
   # starlette 1.3.1 depreca httpx no TestClient (httpx2 inexistente no PyPI) —
   # ver docs/DEPRECATIONS.md.
   "ignore:Using `httpx` with `starlette.testclient` is deprecated.*:Warning:fastapi.testclient",
+  # Keras 3.14 interno: np.array(x) sem kwarg copy sob numpy 2.x — warning
+  # third-party sem fix na versão pinada do lock — ver docs/DEPRECATIONS.md.
+  "ignore:__array__ implementation doesn't accept a copy keyword.*:DeprecationWarning:keras.*",
 ]
 markers = [
   "qg0: Quality Gate 0 — ingestão e catalogação",
