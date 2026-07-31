@@ -3,6 +3,12 @@
 Validates: freeze manifest hashes, read-only protection of pins, patient
 mapping presence, splits v4.0 leakage report status, and that models/ is
 untouched relative to the freeze manifest.
+
+These tests depend on on-disk governance artifacts that are gitignored
+(`/experiments/`, `/data/*`) and therefore absent from CI checkouts — the
+module is marked ``requires_artifacts`` (excluded from the CI unit-tests job
+by convention, see quality-gates.yml). On machines without the artifacts the
+tests skip; set LEWIS_REQUIRE_GOVERNANCE=1 to turn absence into a failure.
 """
 
 from __future__ import annotations
@@ -14,17 +20,32 @@ from pathlib import Path
 
 import pytest
 
+pytestmark = pytest.mark.requires_artifacts
+
 FREEZE_MANIFEST = Path("experiments/stage2_v2.4_research/integrity/e07r_freeze_manifest.json")
 LEAKAGE_REPORT = Path("experiments/stage2_v2.4_research/integrity/e07r_split_leakage_report.json")
 PATIENT_MAPPING = Path("data/metadata/physionet_mitdb_patient_mapping.json")
+
+GOVERNANCE_FILES = (FREEZE_MANIFEST, LEAKAGE_REPORT, PATIENT_MAPPING)
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def _require_governance() -> None:
+    """Skip unless all governance artifacts exist (fail if enforcement is on)."""
+    missing = [str(p) for p in GOVERNANCE_FILES if not p.exists()]
+    if not missing:
+        return
+    if os.environ.get("LEWIS_REQUIRE_GOVERNANCE") == "1":
+        pytest.fail(f"governance artifacts missing: {missing}")
+    pytest.skip(f"governance artifacts absent (gitignored paths): {missing[0]} …")
+
+
 @pytest.fixture(scope="module")
 def pins() -> list[dict]:
+    _require_governance()
     manifest = json.loads(FREEZE_MANIFEST.read_text(encoding="utf-8"))
     return manifest["pins"]
 
@@ -49,6 +70,8 @@ def test_pins_are_read_only(pins):
 
 def test_pin_overwrite_is_blocked(pins, tmp_path):
     """Writing over a read-only pin must fail (permission denied)."""
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("root ignores 0444 permission bits")
     sample = Path(pins[0]["artifact_path"])
     with pytest.raises(PermissionError):
         sample.write_text("corrupt", encoding="utf-8")
@@ -62,6 +85,7 @@ def test_models_dir_pins_frozen(pins):
 
 
 def test_patient_mapping_official_source():
+    _require_governance()
     mapping = json.loads(PATIENT_MAPPING.read_text(encoding="utf-8"))
     assert mapping["mapping_policy"] == "official_evidence_required"
     groups = {tuple(g["record_ids"]) for g in mapping["patient_groups"]}
@@ -69,6 +93,7 @@ def test_patient_mapping_official_source():
 
 
 def test_leakage_report_v4_pass():
+    _require_governance()
     report = json.loads(LEAKAGE_REPORT.read_text(encoding="utf-8"))
     assert report["status"] == "PASS"
     assert report["patient_disjoint"] is True
