@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
@@ -11,9 +13,11 @@ from src.models.pretrain_evaluation import (
     calibration_summary,
     confusion_per_class,
     ece_mce,
+    evaluate_predictions,
     fit_temperature,
     nll_multilabel,
     sigmoid_to_logits,
+    write_evaluation_reports,
 )
 
 
@@ -86,3 +90,64 @@ def test_reliability_bins_cover_all_samples():
             if row["count"]:
                 assert 0.0 <= row["mean_obs"] <= 1.0
                 assert 0.0 <= row["mean_pred"] <= 1.0
+
+
+def test_evaluate_predictions_propagates_n_bins():
+    rng = np.random.default_rng(21)
+    y_prob = rng.uniform(size=(400, 5))
+    y_true = (rng.uniform(size=(400, 5)) < 0.3).astype(int)
+    report = evaluate_predictions(y_true, y_prob, n_bins=15)
+    assert report["calibration_before"]["n_bins"] == 15
+    assert report["temperature_scaling"]["calibration_after"]["n_bins"] == 15
+    for rows in report["calibration_before"]["reliability"]["per_class"].values():
+        assert len(rows) == 15
+
+
+def test_temperature_scaling_preserves_macro_auc_roc():
+    rng = np.random.default_rng(33)
+    n = 3000
+    logits = rng.normal(0, 1.5, size=(n, 5))
+    y_prob = 1.0 / (1.0 + np.exp(-logits))
+    y_true = (rng.uniform(size=(n, 5)) < y_prob).astype(int)
+    report = evaluate_predictions(y_true, y_prob)
+    ts = report["temperature_scaling"]
+    assert ts["auc_roc_macro_before"] is not None
+    assert ts["auc_roc_macro_after"] == pytest.approx(ts["auc_roc_macro_before"], abs=1e-6)
+
+
+def test_write_evaluation_reports_merges_contract_metadata(tmp_path):
+    rng = np.random.default_rng(8)
+    y_prob = rng.uniform(size=(300, 5))
+    y_true = (rng.uniform(size=(300, 5)) < 0.3).astype(int)
+    report = evaluate_predictions(y_true, y_prob, n_bins=15)
+    contract = {
+        "run_id": "test_run",
+        "model_id": "a2_focal",
+        "n_params": 32005,
+        "val_samples": 300,
+        "split_version": "chapman-record-disjoint-val0.1-seed13",
+        "seed": 13,
+        "created_at": "2026-07-31T00:00:00+00:00",
+        "sha256_model": "ab" * 32,
+    }
+    write_evaluation_reports(tmp_path, report, contract=contract)
+    cal = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
+    for key, value in contract.items():
+        assert cal[key] == value, key
+    assert cal["n_bins"] == 15
+    assert cal["temperature"] == pytest.approx(report["temperature_scaling"]["temperature"])
+    assert cal["ece_before"] == pytest.approx(report["calibration_before"]["macro"]["ece"])
+    assert cal["ece_after"] == pytest.approx(
+        report["temperature_scaling"]["calibration_after"]["macro"]["ece"]
+    )
+    assert "before" in cal and "temperature_scaling" in cal
+
+
+def test_write_evaluation_reports_without_contract_keeps_legacy_schema(tmp_path):
+    rng = np.random.default_rng(9)
+    y_prob = rng.uniform(size=(200, 5))
+    y_true = (rng.uniform(size=(200, 5)) < 0.3).astype(int)
+    report = evaluate_predictions(y_true, y_prob)
+    write_evaluation_reports(tmp_path, report)
+    cal = json.loads((tmp_path / "calibration.json").read_text(encoding="utf-8"))
+    assert set(cal) == {"before", "temperature_scaling"}

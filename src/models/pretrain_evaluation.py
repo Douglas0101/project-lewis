@@ -142,20 +142,35 @@ def calibration_summary(y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10
     }
 
 
-def evaluate_predictions(y_true: np.ndarray, y_prob: np.ndarray) -> dict:
+def _macro_auc_roc(metrics_per_class: dict) -> float | None:
+    """Mean of non-None per-class AUC-ROC; None if unavailable for all classes."""
+    aucs = [
+        m["auc_roc"]
+        for m in metrics_per_class["per_class"].values()
+        if m["auc_roc"] is not None
+    ]
+    return float(np.mean(aucs)) if aucs else None
+
+
+def evaluate_predictions(
+    y_true: np.ndarray, y_prob: np.ndarray, n_bins: int = 10
+) -> dict:
     """Full advanced evaluation bundle for a (y_true, y_prob) validation pair."""
     report: dict = {
         "metrics_per_class": compute_per_class_metrics(y_true, y_prob),
         "confusion_threshold_0_5": confusion_per_class(y_true, y_prob, 0.5),
-        "calibration_before": calibration_summary(y_true, y_prob),
+        "calibration_before": calibration_summary(y_true, y_prob, n_bins=n_bins),
     }
     temperature = fit_temperature(y_true, y_prob)
     y_cal = apply_temperature(y_prob, temperature)
+    metrics_cal = compute_per_class_metrics(y_true, y_cal)
     report["temperature_scaling"] = {
         "temperature": temperature,
         "nll_before": nll_multilabel(y_true, sigmoid_to_logits(y_prob)),
         "nll_after": nll_multilabel(y_true, sigmoid_to_logits(y_cal)),
-        "calibration_after": calibration_summary(y_true, y_cal),
+        "auc_roc_macro_before": _macro_auc_roc(report["metrics_per_class"]),
+        "auc_roc_macro_after": _macro_auc_roc(metrics_cal),
+        "calibration_after": calibration_summary(y_true, y_cal, n_bins=n_bins),
     }
     report["best_f1_thresholds_analysis_only"] = best_f1_thresholds(y_true, y_prob)
     pr_auc = {
@@ -206,21 +221,39 @@ def write_reliability_diagram(run_dir: Path, reliability: dict, ece: float) -> b
     return True
 
 
-def write_evaluation_reports(run_dir: Path, report: dict) -> None:
-    """Persist evaluation_report.json/.md and calibration.json in the run dir."""
+def write_evaluation_reports(
+    run_dir: Path, report: dict, contract: dict | None = None
+) -> None:
+    """Persist evaluation_report.json/.md and calibration.json in the run dir.
+
+    When ``contract`` is given, calibration.json also carries the flat T1
+    contract metadata (run/model identity, split, seed, sha256) plus flat
+    ``temperature``/``ece_before``/``ece_after``/``n_bins`` summary fields.
+    """
     run_dir = Path(run_dir)
     (run_dir / "evaluation_report.json").write_text(
         json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8"
     )
-    (run_dir / "calibration.json").write_text(
-        json.dumps(
+    ts = report["temperature_scaling"]
+    calibration: dict = {}
+    if contract:
+        calibration.update(contract)
+        calibration.update(
             {
-                "before": report["calibration_before"],
-                "temperature_scaling": report["temperature_scaling"],
-            },
-            indent=2,
-            ensure_ascii=False,
-        ),
+                "temperature": ts["temperature"],
+                "ece_before": report["calibration_before"]["macro"]["ece"],
+                "ece_after": ts["calibration_after"]["macro"]["ece"],
+                "n_bins": report["calibration_before"]["n_bins"],
+            }
+        )
+    calibration.update(
+        {
+            "before": report["calibration_before"],
+            "temperature_scaling": ts,
+        }
+    )
+    (run_dir / "calibration.json").write_text(
+        json.dumps(calibration, indent=2, ensure_ascii=False),
         encoding="utf-8",
     )
     if write_reliability_diagram(
@@ -229,7 +262,6 @@ def write_evaluation_reports(run_dir: Path, report: dict) -> None:
         report["calibration_before"]["macro"]["ece"],
     ):
         LOGGER.info("reliability_diagram.png salvo em %s", run_dir)
-    ts = report["temperature_scaling"]
     lines = [
         f"# Avaliação avançada — {run_dir.name}",
         "",
