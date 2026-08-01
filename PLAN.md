@@ -8,9 +8,10 @@ Plano de execução de tasks decompostas. Atualizado a cada sessão.
 
 **DECISÃO (owner, 2026-08-01):** novos pré-treinos oficiais (T11) **BLOQUEADOS** até T10.1 + T9.2.
 Pilotos (T10.3) só após T9.2 + configs v2, status `PILOT` (nunca benchmark/promoção/publicação).
-Fila reordenada (uma task por sessão): T10.1 auditoria → T9.2 avaliador canônico → T10.2 matriz de
-hipóteses/ablações → T9.4 configs v2 → T10.3 pilotos → T9.3 reavaliação → T9.5 RFC QG4-BCE →
-T11 pré-treinos oficiais. T6/T7/T8 seguem ao final.
+**REORDENAÇÃO (owner, 2026-08-01):** T9.3 antes de T10.2 — a matriz de hipóteses precisa dos dados
+reais da reavaliação (BCE pós-T exato, ICs, ECE×NORM, comparabilidade).
+Fila (uma task por sessão): T10.1 ✅ → T9.2 ✅ → T9.3 ✅ → T10.2 → T9.4 → T10.3 → T9.5 → T11.
+T6/T7/T8 seguem ao final.
 
 - [x] T9.1 `docs/ml_protocol_v2.md` — documento normativo (métricas equalizadas, calibração,
   thresholds, comparação, treino, promoção). Sem alteração de código de QG.
@@ -23,10 +24,14 @@ T11 pré-treinos oficiais. T6/T7/T8 seguem ao final.
   thresholding,schema,canonical_evaluator}.py` + 9 testes em `tests/test_canonical_evaluator.py`;
   CLI `python -m src.evaluation.canonical_evaluator`; schema `metrics.json` 2.0; protocolo
   PROSPECTIVE/RETROSPECTIVE/FROZEN_PARAMS; legado `pretrain_evaluation.py` intacto)
-- [ ] T10.2 Matriz de hipóteses/ablações detalhada (a partir da seção 13 da auditoria)
+- [x] T9.3 Reavaliação dos 3 runs (swarm de 3 agentes): `experiments/<run>/evaluation_v2/` com 7
+  artefatos/run + `reports/ml_protocol_v2/pretrain_reconciliation.md`. Reconciliação perfeita
+  (A2-full Δ=0.0; A0 novo Δ=1,3e-9); **BCE pós-T exato: 0,3417/0,3869/0,3905**; A0hist×A0novo
+  COMPARABLE (strict = ruído); A0×A2 NON_COMPARABLE por split; ECE×NORM no estrato NORM=0 até
+  0,217 → suporte a C2/H5; gap G6 registrado (reconcile não lê schema aninhado legado).
+- [ ] T10.2 Matriz de hipóteses/ablações detalhada (a partir da seção 13 da auditoria + T9.3)
 - [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar; split manifest fixo + estratificado)
 - [ ] T10.3 Pilotos pequenos `PILOT` (células H7 primeiro: `A1+BCE`, `A0+focal`, mesma seed/split)
-- [ ] T9.3 Reavaliação dos 3 runs de pré-treino com `evaluation_v2/` + reconciliação
 - [ ] T9.5 RFC `docs/rfc_qg4_bce_threshold.md` (sem alterar QG em código; incluir baseline
   teórico de BCE e divergência época-17 vs checkpoint-28)
 - [ ] T11 Pré-treinos oficiais v2 (somente com governança)
