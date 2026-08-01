@@ -41,6 +41,17 @@ robot_output.xml
 !/experiments/20260728_053011_pretrain_chapman/evaluation_report.json
 !/experiments/20260728_053011_pretrain_chapman/evaluation_report.md
 !/experiments/20260728_053011_pretrain_chapman/quantized/
+# Exceções (T9.3): artefatos evaluation_v2/ dos 3 runs de pré-treino reavaliados
+# com o avaliador canônico v2 são versionados; demais runs seguem ignorados.
+!/experiments/20260728_033533_pretrain_chapman/
+/experiments/20260728_033533_pretrain_chapman/*
+!/experiments/20260728_033533_pretrain_chapman/evaluation_v2/
+!/experiments/20260729_042301_pretrain_chapman/
+/experiments/20260729_042301_pretrain_chapman/*
+!/experiments/20260729_042301_pretrain_chapman/evaluation_v2/
+!/experiments/20260728_053011_pretrain_chapman/evaluation_v2/
+# Predições regeneradas (npz/meta) são derivadas dos checkpoints — não versionadas.
+/experiments/*/evaluation_v2/predictions/
 /reports/*.html
 /reports/*.json
 /reports/*.log

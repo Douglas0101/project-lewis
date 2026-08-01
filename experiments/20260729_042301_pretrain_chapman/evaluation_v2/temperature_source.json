@@ -1,0 +1,5 @@
+{
+  "temperature": 0.9130257150830182,
+  "source": "calibration.json/temperature_scaling.temperature",
+  "note": "adapter p/ canonical_evaluator (espera chave top-level); T congelada, sem re-fit"
+}
