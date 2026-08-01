@@ -29,9 +29,16 @@ T6/T7/T8 seguem ao final.
   (A2-full Δ=0.0; A0 novo Δ=1,3e-9); **BCE pós-T exato: 0,3417/0,3869/0,3905**; A0hist×A0novo
   COMPARABLE (strict = ruído); A0×A2 NON_COMPARABLE por split; ECE×NORM no estrato NORM=0 até
   0,217 → suporte a C2/H5; gap G6 registrado (reconcile não lê schema aninhado legado).
-- [ ] T10.2 Matriz de hipóteses/ablações detalhada (a partir da seção 13 da auditoria + T9.3)
-- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar; split manifest fixo + estratificado)
-- [ ] T10.3 Pilotos pequenos `PILOT` (células H7 primeiro: `A1+BCE`, `A0+focal`, mesma seed/split)
+- [x] T10.2 `docs/ablation_matrix_v2.md` — matriz normativa: 7 hipóteses (P0×3/P1×3/P2×1) com
+  critério de refutação e mapa de IDs ↔ auditoria; 29 células em 7 trilhas (C×4 controle H7,
+  F×6 focal-γ, K×4 calibração c/ métrica NORM=0, R×5 RF c/ restrições TinyML, T×4 thresholds
+  PROSPECTIVE, B×3 orçamento, P×3 formulação); split pareado v2 definido (normativo); 10
+  critérios piloto→candidato; orçamento ≈ 14–17 CPU-h; execução C→F→{K,T}→R→B→P.
+- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar; split manifest fixo + estratificado;
+  incluir extensão do avaliador: IC por classe em artefato + métrica `ece_norm0`)
+- [ ] G6 hotfix `reconcile_with_legacy` (schema aninhado legado) — pré-requisito de T9.5
+- [ ] T10.3 Pilotos pequenos `PILOT` (BLOQUEADO até T9.4 + G6; ordem C→F→{K,T}→R→B→P; células
+  H7 primeiro: `A1+BCE`, `A0+focal`, split pareado v2)
 - [ ] T9.5 RFC `docs/rfc_qg4_bce_threshold.md` (sem alterar QG em código; incluir baseline
   teórico de BCE e divergência época-17 vs checkpoint-28)
 - [ ] T11 Pré-treinos oficiais v2 (somente com governança)
