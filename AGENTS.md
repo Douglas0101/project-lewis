@@ -142,6 +142,24 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 > Makefile com **35 alvos públicos** (antes 66); auxiliares internalizados seguem executáveis
 > (`docs/makefile_refactor_plan.md`). Pins E07R (101) em modo 0444 (`tests/test_integrity.py`);
 > splits legados record-disjoint quarantinados (`data/splits/groupkfold_5_stratified/QUARANTINED.json`).
+>
+> **Nota A2-full INT8 (2026-07-31):** pipeline T3→T5 do backbone pré-treinado A2-full
+> (run `20260728_053011_pretrain_chapman`, a1_stable+focal, 32.005 params, AUC offline 0.8639)
+> concluído: `calibration.json` (T=0.3741, underconfidence — ECE 0.151→0.0152, n_bins=15) →
+> PTQ INT8 com cabeça de **logits** (`scripts/quantize_pretrain_a2_full.py`; 54,77 KB; ΔAUC
+> 0,0027; ECE pós-PTQ 0,0207) → headers C não-destrutivos (`scripts/export_pretrain_a2_full_headers.py`;
+> estágio id 3 em `firmware/src/ml/inference.cpp`, `/T` em float32 em `pretrain_calibrate.c`) →
+> harness `PRETRAIN_A2` 5/5 native e Renode (bitexact QG8 atol 1 LSB, cosine 1.000000 QG10,
+> latência 73 ms QG9, arena 22.820/49.152 B; relatório `reports/firmware_simulation_report_a2_full.json`).
+> Inferência: `logits int8 → dequant → /T → sigmoid` (float32). Artefatos do run A2-full são
+> git-tracked via exceções cirúrgicas em `.gitignore`. Advertências operacionais: (i) `make fw-build`
+> (stub) sobrescreve `build/stm32f4/lewis.bin` — antes de `make test`, rebuildar com
+> `make -C firmware RENODE_SIMULATION=1 LEWIS_USE_TFLM=1 stm32f4` (exigido por `test_fidelity`);
+> (ii) harness Renode depende de stdin aberto (fix `tail -f` em `firmware/scripts/run_harness.py` —
+> antes o log era truncado por EOF); (iii) `DSP filter_chain_vs_python` FAIL no Renode é
+> **pré-existente** (fixture byte-idêntica ao HEAD; divergência FMA/ARM ≈ 1e-4; revisão de
+> tolerância QG16 pendente via governança); (iv) benchmark SysTick (`lewis_hal_benchmark_*`)
+> não é confiável no Renode — medir latência via `lewis_hal_millis` (TIM2).
 
 ## Comando de Verificação
 ```bash
