@@ -1,0 +1,22 @@
+{
+  "input": {
+    "scale": 0.0784313753247261,
+    "zero_point": -1,
+    "dtype": "int8"
+  },
+  "output": {
+    "scale": 0.033894360065460205,
+    "zero_point": -15,
+    "dtype": "int8"
+  },
+  "temperature": 0.3741036858061345,
+  "temperature_source": "calibration.json (T1)",
+  "temperature_applied_in": "float32_after_dequant",
+  "inference_order": "logits -> /T -> sigmoid",
+  "split_version": "chapman-record-disjoint-val0.1-seed13",
+  "seed": 13,
+  "n_calibration": 512,
+  "sha256_keras": "6127ec228583a04657e84a3e2cf3682fe25f47e8d26c83ba338f6bb9a484dbef",
+  "sha256_tflite": "7d27dc402ba9b2c7b73f90f7016a68b2bfc09e2d0b27f2a20bbb3e76b8a362be",
+  "output_semantics": "int8 logits (sigmoid removido na conversão)"
+}
