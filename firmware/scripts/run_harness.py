@@ -122,14 +122,16 @@ def run_renode(renode: Path) -> dict:
     RENODE_UART_LOG.unlink(missing_ok=True)
 
     # Usa o utilitario `timeout` do sistema para limitar a execucao do Renode.
+    # O `tail -f /dev/null |` mantem o stdin do Renode aberto: em --console,
+    # EOF no stdin (subprocess DEVNULL) pausa a maquina em ponto nao
+    # deterministico e trunca o harness. O `quit` ao final do harness.resc
+    # encerra o Renode assim que o firmware chama SYS_EXIT (sem esperar o
+    # timeout inteiro).
     cmd = [
-        "timeout",
-        "--signal=KILL",
-        str(RENODE_TIMEOUT_S),
-        str(renode),
-        "--disable-xwt",
-        "--console",
-        str(RENODE_SCRIPT),
+        "sh",
+        "-c",
+        f"tail -f /dev/null | timeout --signal=KILL {RENODE_TIMEOUT_S} "
+        f"{renode} --disable-xwt --console {RENODE_SCRIPT}",
     ]
     print("Running Renode harness (timeout %ds)..." % RENODE_TIMEOUT_S, flush=True)
     r = run(cmd, cwd=FIRMWARE_ROOT, timeout=RENODE_TIMEOUT_S + 10)
@@ -205,11 +207,14 @@ def main() -> int:
     HARNESS_REPORT.write_text(json.dumps(existing, indent=2))
     print(f"Report written to {HARNESS_REPORT}")
 
+    # Exit code reflete o(s) modo(s) executados NESTA invocacao. A secao do
+    # outro ambiente e preservada no relatorio (merge acima), mas resultados
+    # antigos de um modo nao executado nao devem derrubar o rc desta execucao.
     failures = 0
-    if existing.get("native"):
-        failures += existing["native"]["summary"]["fail"]
-    if existing.get("renode"):
-        failures += existing["renode"]["summary"]["fail"]
+    if args.mode in ("native", "both") and report.get("native"):
+        failures += report["native"]["summary"]["fail"]
+    if args.mode in ("renode", "both") and report.get("renode"):
+        failures += report["renode"]["summary"]["fail"]
 
     return 0 if failures == 0 else 1
 

@@ -38,6 +38,7 @@ void suite_inference_register(void);
 void suite_adaptive_skipping_register(void);
 #if LEWIS_USE_TFLM
 void suite_pipeline_register(void);
+void suite_pretrain_a2_full_register(void);
 #endif
 
 #ifdef __cplusplus

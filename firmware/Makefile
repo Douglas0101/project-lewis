@@ -239,7 +239,8 @@ ifeq ($(LEWIS_USE_TFLM),1)
 HARNESS_C_SOURCES += $(HARNESS_DIR)/test_pipeline.c
 endif
 HARNESS_CXX_SOURCES := \
-	$(HARNESS_DIR)/test_inference.cpp
+	$(HARNESS_DIR)/test_inference.cpp \
+	$(HARNESS_DIR)/test_pretrain_a2_full.cpp
 
 HARNESS_OBJECTS_NAT := \
 	$(patsubst $(HARNESS_DIR)/%.c,$(BUILD_NAT)/harness/%.o,$(HARNESS_C_SOURCES)) \

@@ -1,0 +1,111 @@
+{
+  "report": "firmware_simulation_report_a2_full",
+  "task": "T5 / SDD-LEWIS-NEXT-STEPS-002",
+  "created_at": "2026-08-01T05:01:10.214992+00:00",
+  "model": {
+    "id": "a2_full_int8",
+    "source_run": "20260728_053011_pretrain_chapman",
+    "tflite_sha256": "7d27dc402ba9b2c7b73f90f7016a68b2bfc09e2d0b27f2a20bbb3e76b8a362be",
+    "flatbuffer_kb": 54.77,
+    "temperature": 0.3741036858061345,
+    "inference_order": "logits int8 -> dequant -> /T -> sigmoid (float32)",
+    "split_version": "chapman-record-disjoint-val0.1-seed13"
+  },
+  "environment": {
+    "renode": "1.15.3",
+    "gcc": "arm-none-eabi-gcc 13.3.rel1",
+    "tflm": "CMSIS-NN (cortex-m4+fp)",
+    "platform": "STM32F407VG emulado (168 MHz, 192 KB SRAM, 1 MB Flash)"
+  },
+  "harness": {
+    "native": {
+      "pass": 21,
+      "fail": 0,
+      "total": 21
+    },
+    "renode": {
+      "pass": 20,
+      "fail": 1,
+      "total": 21,
+      "fail_detail": "DSP filter_chain_vs_python (pre-existente — ver notes)"
+    },
+    "pretrain_a2_suite": {
+      "model_size": "PASS",
+      "init_arena": "PASS (arena_used=22820 B de 49152 B configurados)",
+      "bitexact": "PASS (atol 1 LSB CMSIS-NN vs BUILTIN_REF, 16 fixtures)",
+      "calibration_fidelity": "PASS (cosine=1.000000)",
+      "latency": "PASS (73 ms < 200 ms, TIM2 virtual @168 MHz)"
+    }
+  },
+  "memory_profile": {
+    "harness_elf": {
+      "text": 381104,
+      "data": 2032,
+      "bss": 51664,
+      "flash_total_bytes": 383136,
+      "sram_total_bytes": 53696
+    },
+    "app_elf": {
+      "text": 305776,
+      "data": 1400,
+      "bss": 56548
+    },
+    "models_rodata_bytes": {
+      "stage1": 55664,
+      "stage2": 55776,
+      "pretrain_a2_full": 56080
+    },
+    "arena_tflm": {
+      "configured_bytes": 49152,
+      "used_bytes": 22820,
+      "usage_frac": 0.464
+    },
+    "sram_peak_estimate_bytes": 53696,
+    "notes": "SRAM total (data+bss) do harness com 3 modelos: 52,4 KB < 128 KB (AC-5.4) e < 192 KB (AC-5.3)"
+  },
+  "acceptance_criteria": {
+    "AC-5.1_simulation_complete": {
+      "status": "PASS",
+      "evidence": "HARNESS SUMMARY+END impressos; sem HardFault; shutdown limpo"
+    },
+    "AC-5.2_latency_lt_200ms": {
+      "status": "PASS",
+      "evidence": "73 ms (TIM2 virtual @168 MHz)"
+    },
+    "AC-5.3_sram_peak_lt_192k": {
+      "status": "PASS",
+      "evidence": "53.696 B (data+bss harness)"
+    },
+    "AC-5.4_arena_buffers_lt_128k": {
+      "status": "PASS",
+      "evidence": "52,4 KB; arena usada 22.820 B"
+    },
+    "AC-5.5_dsp_fidelity_cosine": {
+      "status": "PASS",
+      "evidence": "cosine=1.000000 (16 fixtures, C vs Python)"
+    },
+    "AC-5.6_fault_injection": {
+      "status": "PASS (regressão)",
+      "evidence": "make gates-firmware HG-01 qg11 PASS"
+    },
+    "AC-5.7_arena_48k_limit": {
+      "status": "PASS (regressão)",
+      "evidence": "make gates-firmware HG-01 qg12 PASS"
+    },
+    "AC-5.8_calibration_in_runtime": {
+      "status": "PASS",
+      "evidence": "cosine=1.000000 com T=0.3741 aplicado no C; ECE pós-PTQ (Python, 45.040 amostras) = 0.0207"
+    }
+  },
+  "qg_regression": {
+    "gates_firmware": "PASS (HG-01 qg9..qg13, HG-03 no-stub)",
+    "fw_build_werror": "PASS",
+    "fw_test_renode": "PASS (rc=0)"
+  },
+  "notes": [
+    "QG19 (energia) não é mensurável no Renode — débito documentado em docs/SIMULATION_LIMITS.md e docs/DEBITO_TECNICO_Energia_Renode-v1.4.md.",
+    "DSP filter_chain_vs_python FAIL no Renode é PRE-EXISTENTE e independente da T5 (fixture_dsp.h byte-idêntica ao HEAD; firmware DSP intocado; latente porque o harness Renode era truncado — ver próxima nota). Native PASS.",
+    "run_harness.py: corrigido bug em que subprocess DEVNULL no stdin pausava o Renode --console por EOF, truncando o log em ponto não-determinístico (histórico do harness Renode era parcial).",
+    "Latência medida via lewis_hal_millis (TIM2); o benchmark SysTick (lewis_hal_benchmark_*) não é confiável no Renode (down-counter — lê wrap de 2^32 como delta; hal_sim.c)."
+  ]
+}

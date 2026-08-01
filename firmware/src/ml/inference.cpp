@@ -47,6 +47,8 @@ static void ensure_resolver_initialized(void)
     s_resolver.AddExpandDims();
     s_resolver.AddQuantize();
     s_resolver.AddDequantize();
+    /* ADD: necessario para os blocos residuais do backbone A2-full (T5). */
+    s_resolver.AddAdd();
     s_resolver_initialized = true;
 }
 
