@@ -19,7 +19,10 @@ T11 pré-treinos oficiais. T6/T7/T8 seguem ao final.
   L/S/A/O/C). Achados-chave: célula `A1+BCE` inexistente (ganho A2 não atribuível); focal γ=2
   fixo nunca tunado; early stopping por `val_loss`; thresholds tunados no próprio val; splits
   não pareados entre runs; QG4 julgou época ≠ checkpoint embarcado; CD = classe-sentinela.
-- [ ] T9.2 Avaliador canônico (`src/evaluation/canonical_evaluator.py` + testes)
+- [x] T9.2 Avaliador canônico (`src/evaluation/{metric_definitions,calibration_metrics,
+  thresholding,schema,canonical_evaluator}.py` + 9 testes em `tests/test_canonical_evaluator.py`;
+  CLI `python -m src.evaluation.canonical_evaluator`; schema `metrics.json` 2.0; protocolo
+  PROSPECTIVE/RETROSPECTIVE/FROZEN_PARAMS; legado `pretrain_evaluation.py` intacto)
 - [ ] T10.2 Matriz de hipóteses/ablações detalhada (a partir da seção 13 da auditoria)
 - [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar; split manifest fixo + estratificado)
 - [ ] T10.3 Pilotos pequenos `PILOT` (células H7 primeiro: `A1+BCE`, `A0+focal`, mesma seed/split)
