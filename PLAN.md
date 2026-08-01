@@ -4,7 +4,22 @@ Plano de execução de tasks decompostas. Atualizado a cada sessão.
 
 ## Status atual
 
-### Sessão atual — identidade de paciente e preflight v3.1
+### Sessão 2026-08-01 — ML Protocol v2 (prompt SDD-LEWIS-CLI-ML-PROTOCOL-V2-001)
+
+Fila T9 (uma task por sessão): T9.1 doc normativo → T9.2 avaliador canônico → T9.3 reavaliação
+dos runs A0/A0-novo/A2-full → T9.4 configs de treino v2 → T9.5 RFC QG4-BCE → T6 comparativo
+externo → T7 draft de publicação → T8 pendências deste PLAN.
+
+- [x] T9.1 `docs/ml_protocol_v2.md` — documento normativo (métricas equalizadas, calibração,
+  thresholds, comparação, treino, promoção). Sem alteração de código de QG.
+- [ ] T9.2 Avaliador canônico (`src/evaluation/canonical_evaluator.py` + testes)
+- [ ] T9.3 Reavaliação dos 3 runs de pré-treino com `evaluation_v2/` + reconciliação
+- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar)
+- [ ] T9.5 RFC `docs/rfc_qg4_bce_threshold.md` (sem alterar QG em código)
+- [ ] T6 Tabela quantitativa por superclasse em `docs/pretrain_benchmark_comparison.md`
+- [ ] T7 Draft `docs/publication_decision_v3.2.md` (HOLD permanece)
+
+### Sessão anterior — identidade de paciente e preflight v3.1
 
 **Autorização:** A01 registra a declaração do project owner na sessão atual para continuar a
 implementação e a pesquisa controlada com todos os dados existentes. Nome/assinatura não foram
