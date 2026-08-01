@@ -1,0 +1,70 @@
+{
+  "run_id": "20260728_053011_pretrain_chapman",
+  "stage": "pretrain_chapman",
+  "timestamp_utc": "2026-07-28T06:04:24+00:00",
+  "git_commit": "48931a7e1814fafa1037ac287bf2f59e208ebea7",
+  "git_branch": "feat/pretrain-architecture-v2",
+  "python_version": "3.12.3",
+  "tensorflow_version": "2.21.0",
+  "gpu_available": false,
+  "onednn_enabled": true,
+  "deterministic_mode": "strict",
+  "seed": 13,
+  "dataset": {
+    "name": "Chapman",
+    "train_records": 40637,
+    "val_records": 4515,
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)",
+    "patient_disjoint": null,
+    "reference": "Zheng et al., Scientific Data, 2020"
+  },
+  "model": {
+    "name": "a1_stable",
+    "params": 32005,
+    "estimated_flatbuffer_kb": 40,
+    "input_shape": [
+      null,
+      500,
+      1
+    ],
+    "num_classes": 5
+  },
+  "training": {
+    "epochs": 30,
+    "batch_size": 64,
+    "steps_per_epoch": 1000,
+    "validation_steps": 704,
+    "lr_initial": 0.001,
+    "optimizer": "adam",
+    "loss": "focal",
+    "architecture": "a2"
+  },
+  "metrics": {
+    "best_epoch": 18,
+    "val_loss": 0.42256972193717957,
+    "val_auc_roc": 0.8596203923225403,
+    "val_auc_pr": 0.7007931470870972
+  },
+  "qg4": {
+    "pass": false,
+    "reason": "val_auc_roc > 0.85 and val_loss < 0.15 at best epoch"
+  },
+  "artifacts": {
+    "model": "backbone_pretrained.keras",
+    "config": "config.json",
+    "history": "history.json"
+  },
+  "hashes": {
+    "model_sha256": "6127ec228583a04657e84a3e2cf3682fe25f47e8d26c83ba338f6bb9a484dbef",
+    "config_sha256": "c13b61f37c532e03fddc41d15cf6c4352a1a6d6b7c26d13bbeb5f5252e8af2f4",
+    "history_sha256": "1a532f2e560293827e1bc1eca499d75c4db7202cd4317bced2cf579acc870b38",
+    "metrics_per_class_sha256": "49872f020f9cf70cae7cdf8ef1a4d72a997a2bf0ffc2eeb37a8af5fa6be689d1"
+  },
+  "paper_alignment": {
+    "transfer_learning": true,
+    "pr_auc_for_imbalance": true,
+    "calibration": false,
+    "patient_disjoint": null,
+    "tinyml_constraint": true
+  }
+}

@@ -30,7 +30,17 @@ log.html
 report.html
 robot_output.xml
 /logs/
-/experiments/
+/experiments/*
+# Exceções (T1/T1.5/T3): artefatos de avaliação/quantização do run A2-full
+# (20260728_053011_pretrain_chapman) são versionados; demais runs seguem ignorados.
+!/experiments/20260728_053011_pretrain_chapman/
+/experiments/20260728_053011_pretrain_chapman/*
+!/experiments/20260728_053011_pretrain_chapman/calibration.json
+!/experiments/20260728_053011_pretrain_chapman/provenance.json
+!/experiments/20260728_053011_pretrain_chapman/metrics_per_class.json
+!/experiments/20260728_053011_pretrain_chapman/evaluation_report.json
+!/experiments/20260728_053011_pretrain_chapman/evaluation_report.md
+!/experiments/20260728_053011_pretrain_chapman/quantized/
 /reports/*.html
 /reports/*.json
 /reports/*.log
