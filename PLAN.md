@@ -4,18 +4,29 @@ Plano de execução de tasks decompostas. Atualizado a cada sessão.
 
 ## Status atual
 
-### Sessão 2026-08-01 — ML Protocol v2 (prompt SDD-LEWIS-CLI-ML-PROTOCOL-V2-001)
+### Sessão 2026-08-01 — ML Protocol v2 + Algorithm Audit (SDD-LEWIS-CLI-ML-PROTOCOL-V2-001)
 
-Fila T9 (uma task por sessão): T9.1 doc normativo → T9.2 avaliador canônico → T9.3 reavaliação
-dos runs A0/A0-novo/A2-full → T9.4 configs de treino v2 → T9.5 RFC QG4-BCE → T6 comparativo
-externo → T7 draft de publicação → T8 pendências deste PLAN.
+**DECISÃO (owner, 2026-08-01):** novos pré-treinos oficiais (T11) **BLOQUEADOS** até T10.1 + T9.2.
+Pilotos (T10.3) só após T9.2 + configs v2, status `PILOT` (nunca benchmark/promoção/publicação).
+Fila reordenada (uma task por sessão): T10.1 auditoria → T9.2 avaliador canônico → T10.2 matriz de
+hipóteses/ablações → T9.4 configs v2 → T10.3 pilotos → T9.3 reavaliação → T9.5 RFC QG4-BCE →
+T11 pré-treinos oficiais. T6/T7/T8 seguem ao final.
 
 - [x] T9.1 `docs/ml_protocol_v2.md` — documento normativo (métricas equalizadas, calibração,
   thresholds, comparação, treino, promoção). Sem alteração de código de QG.
+- [x] T10.1 `docs/algorithm_engineering_audit_v1.md` — auditoria algorítmica dos 3 runs
+  (inventário, 7 camadas, diagnóstico por classe, 8 perguntas, matriz H1–H10, ablações
+  L/S/A/O/C). Achados-chave: célula `A1+BCE` inexistente (ganho A2 não atribuível); focal γ=2
+  fixo nunca tunado; early stopping por `val_loss`; thresholds tunados no próprio val; splits
+  não pareados entre runs; QG4 julgou época ≠ checkpoint embarcado; CD = classe-sentinela.
 - [ ] T9.2 Avaliador canônico (`src/evaluation/canonical_evaluator.py` + testes)
+- [ ] T10.2 Matriz de hipóteses/ablações detalhada (a partir da seção 13 da auditoria)
+- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar; split manifest fixo + estratificado)
+- [ ] T10.3 Pilotos pequenos `PILOT` (células H7 primeiro: `A1+BCE`, `A0+focal`, mesma seed/split)
 - [ ] T9.3 Reavaliação dos 3 runs de pré-treino com `evaluation_v2/` + reconciliação
-- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar)
-- [ ] T9.5 RFC `docs/rfc_qg4_bce_threshold.md` (sem alterar QG em código)
+- [ ] T9.5 RFC `docs/rfc_qg4_bce_threshold.md` (sem alterar QG em código; incluir baseline
+  teórico de BCE e divergência época-17 vs checkpoint-28)
+- [ ] T11 Pré-treinos oficiais v2 (somente com governança)
 - [ ] T6 Tabela quantitativa por superclasse em `docs/pretrain_benchmark_comparison.md`
 - [ ] T7 Draft `docs/publication_decision_v3.2.md` (HOLD permanece)
 
