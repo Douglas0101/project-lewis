@@ -13,6 +13,9 @@ extern "C" {
 
 #include "ml/stage1_int8_v2.0.h"
 #include "ml/stage2_int8_v2.0.h"
+/* Modelo adicional A2-full (T4/C08): logits multi-label SCP-ECG, T=0.3741.
+ * Nao substitui os estagios 1/2 — ver lewis_pretrain_* em ml/inference.h. */
+#include "ml/pretrain_a2_full_int8.h"
 
 #ifdef __cplusplus
 }

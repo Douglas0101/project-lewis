@@ -253,6 +253,46 @@ size_t lewis_stage2_model_size(void)
 #endif
 }
 
+bool lewis_pretrain_init(void)
+{
+#if LEWIS_USE_TFLM
+    return init_stage(pretrain_a2_full_int8_tflite,
+                      pretrain_a2_full_int8_len,
+                      LEWIS_INPUT_LEN,
+                      LEWIS_PRETRAIN_OUTPUT_LEN,
+                      3);
+#else
+    lewis_debug_print("[inference] STUB: pretrain init ok (TFLM nao vinculado)\n");
+    return true;
+#endif
+}
+
+bool lewis_pretrain_run(const int8_t input[LEWIS_INPUT_LEN],
+                        int8_t output[LEWIS_PRETRAIN_OUTPUT_LEN])
+{
+#if LEWIS_USE_TFLM
+    if (s_current_stage != 3 && !lewis_pretrain_init()) {
+        return false;
+    }
+    return run_stage(3, input, output, LEWIS_PRETRAIN_OUTPUT_LEN);
+#else
+    if (!input || !output) {
+        return false;
+    }
+    memcpy(output, input, LEWIS_PRETRAIN_OUTPUT_LEN);
+    return true;
+#endif
+}
+
+size_t lewis_pretrain_model_size(void)
+{
+#if LEWIS_USE_TFLM
+    return (size_t)pretrain_a2_full_int8_len;
+#else
+    return 0;
+#endif
+}
+
 size_t lewis_inference_arena_used(void)
 {
 #if LEWIS_USE_TFLM

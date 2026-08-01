@@ -86,6 +86,37 @@ size_t lewis_stage1_model_size(void);
 size_t lewis_stage2_model_size(void);
 
 /**
+ * @brief Dimensão de saída do modelo pré-treinado A2-full (5 superclasses SCP-ECG).
+ */
+#define LEWIS_PRETRAIN_OUTPUT_LEN  5
+
+/**
+ * @brief Inicializa o modelo pré-treinado A2-full (logits multi-label).
+ *
+ * Modelo adicional (T4/C08): não substitui os estágios 1/2. Compartilha a
+ * mesma arena TFLM (pipeline sequencial — init destrói o estágio ativo).
+ *
+ * @return true se sucesso, false em caso de erro.
+ */
+bool lewis_pretrain_init(void);
+
+/**
+ * @brief Executa inferência do A2-full em uma janela de 500 amostras int8.
+ *
+ * @param input  Array de 500 amostras int8.
+ * @param output Array de 5 logits int8 de saída (sigmoid removido na conversão;
+ *               aplicar /T + sigmoid via lewis_pretrain_apply_temperature_sigmoid).
+ * @return true se sucesso, false em caso de erro.
+ */
+bool lewis_pretrain_run(const int8_t input[LEWIS_INPUT_LEN],
+                        int8_t output[LEWIS_PRETRAIN_OUTPUT_LEN]);
+
+/**
+ * @brief Tamanho do FlatBuffer do A2-full em bytes.
+ */
+size_t lewis_pretrain_model_size(void);
+
+/**
  * @brief Retorna a arena TFLM utilizada em bytes (após init).
  */
 size_t lewis_inference_arena_used(void);

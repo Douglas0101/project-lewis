@@ -39,7 +39,8 @@ C_SOURCES_COMMON := \
 	$(SRC_DIR)/dsp/adaptive_skipping.c \
 	$(SRC_DIR)/dsp/filter.c \
 	$(SRC_DIR)/dsp/normalizer.c \
-	$(SRC_DIR)/dsp/r_peak_detector.c
+	$(SRC_DIR)/dsp/r_peak_detector.c \
+	$(SRC_DIR)/ml/pretrain_calibrate.c
 
 CXX_SOURCES_COMMON := \
 	$(SRC_DIR)/ml/inference.cpp
