@@ -64,7 +64,20 @@ T6/T7/T8 seguem ao final.
   alvos `make pilot-{split,smoke,c0,c1,c2,c3}`; `make pilot-smoke` end-to-end PASS
   (PROSPECTIVE, PILOT); runbook `docs/t10_3_manual_execution_runbook.md`.
   **Pilotos C0–C3 NÃO executados por mim — execução manual do owner.**
+- [x] **Pilotos C0–C3 executados pelo owner (2026-08-02)** e congelados (Fase 0):
+  C1 A1+BCE 0,6749 · C2 A1+focal 0,6748 · C0 0,6458 · C3 0,6507 ⇒ **H7 resolvida: ganho =
+  arquitetura A1; focal neutro** (PRD: A1+BCE = baseline qualificado). Relatório:
+  `reports/fase0_freeze/fase0_freeze_report.md`.
+- [x] **Adequação PRD CPU-First (Fase 1/P0)**: `src/runtime/cpu_policy.py` +
+  `configs/runtime/{strict,fast}.yaml` (CUDA off, oneDNN por perfil); repeat no builder
+  pareado (causa-raiz do esgotamento época 6); comparação de células em **validation**
+  (teste **bloqueado** até `model_freeze.json` — `src/governance/freeze_manager.py`); gates
+  com exit 3 (RF-QG-003); IDs record/segment/patient nas predições; partição `test`
+  classificada **DEVELOPMENT-CONSULTED** (`GOVERNANCE_NOTE.md`) — qualificação oficial
+  exigirá novo teste bloqueado (P1-02).
 - [ ] ⏳ KD trainer (D0/trilha D) — task de implementação separada
+- [ ] ⏳ PRD Fases 2–5: inventário/exclusões, cache canônico/shards, multiseed [13,29,47,71,101],
+  bootstrap agrupado, benchmarks threads/batch, LiteRT/OpenVINO, release imutável
 - [ ] ⏳ APROVAÇÕES PENDENTES (bloqueiam T10.3): split pareado v2 (geração + freeze) · compute
   ~11,6 CPU-h · D4 separado · promoção · RFC T9.5
 - [ ] T10.3 Execução de pilotos `PILOT` (só após aprovações; ordem C→F→{K,T}→D; regra de parada
