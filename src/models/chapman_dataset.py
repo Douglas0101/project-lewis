@@ -13,7 +13,7 @@ import json
 import logging
 import random
 from pathlib import Path
-from typing import Callable, Dict, Iterator, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, Iterator, List, Optional, Set, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -266,6 +266,88 @@ def chapman_train_val_split(
         return ds
 
     return make_dataset(train_records, shuffle=True), make_dataset(val_records, shuffle=False)
+
+
+def load_paired_manifest(manifest_path: Path) -> Dict[str, Any]:
+    """Carrega e valida o manifesto do split pareado v2 (chapman_paired_v2)."""
+    manifest_path = Path(manifest_path)
+    with manifest_path.open(encoding="utf-8") as fh:
+        manifest = json.load(fh)
+    required = {"split_id", "seed", "partitions", "support_per_class"}
+    missing = required - set(manifest)
+    if missing:
+        raise ValueError(f"manifesto inválido ({manifest_path}): faltam chaves {missing}")
+    partitions = manifest["partitions"]
+    expected = {"train", "validation", "calibration", "test"}
+    if set(partitions) != expected:
+        raise ValueError(f"manifesto com partições {sorted(partitions)}; esperado {expected}")
+    return manifest
+
+
+def chapman_paired_datasets(
+    manifest_path: Path,
+    batch_size: int = 64,
+    segment_len: int = 500,
+    seed: int = 13,
+    catalog_path: Optional[Path] = None,
+    processed_dir: Optional[Path] = None,
+) -> Tuple[tf.data.Dataset, tf.data.Dataset, tf.data.Dataset, tf.data.Dataset, Dict[str, int]]:
+    """Datasets das 4 partições do split pareado v2 (manifesto write-once).
+
+    Train reshuffles record order per epoch (deterministically derived from
+    ``seed``, mesma técnica de ``chapman_train_val_split``); validation,
+    calibration e test são determinísticos. Retorna
+    ``(train_ds, val_ds, cal_ds, test_ds, steps)`` onde ``steps`` tem o número
+    de batches estimado por partição.
+    """
+    catalog_path = catalog_path or CATALOG_PATH
+    processed_dir = processed_dir or PROCESSED_DIR
+    manifest = load_paired_manifest(manifest_path)
+    partitions = manifest["partitions"]
+    record_sets = {part: set(names) for part, names in partitions.items()}
+
+    LOGGER.info(
+        "Paired split %s | train=%d | val=%d | cal=%d | test=%d",
+        manifest["split_id"],
+        *(len(record_sets[p]) for p in ("train", "validation", "calibration", "test")),
+    )
+
+    def make_dataset(record_set: set, *, shuffle: bool) -> tf.data.Dataset:
+        iteration = itertools.count()
+
+        def gen():
+            gen_seed = (seed + next(iteration)) if shuffle else None
+            for seg, y, record_name in _record_generator(
+                catalog_path=catalog_path,
+                processed_dir=processed_dir,
+                segment_len=segment_len,
+                seed=gen_seed,
+            ):
+                if record_name in record_set:
+                    yield seg, y
+
+        output_signature = (
+            tf.TensorSpec(shape=(segment_len, 1), dtype=tf.float32),
+            tf.TensorSpec(shape=(len(SCP_SUPERCLASSES),), dtype=tf.float32),
+        )
+        ds = tf.data.Dataset.from_generator(gen, output_signature=output_signature)
+        ds = ds.batch(batch_size)
+        ds = ds.prefetch(tf.data.AUTOTUNE)
+        return ds
+
+    est_common = {"catalog_path": catalog_path, "processed_dir": processed_dir}
+    steps = {
+        part: -(-estimate_n_segments(record_sets[part], segment_len=segment_len, **est_common)
+                // batch_size)
+        for part in ("train", "validation", "calibration", "test")
+    }
+    return (
+        make_dataset(record_sets["train"], shuffle=True),
+        make_dataset(record_sets["validation"], shuffle=False),
+        make_dataset(record_sets["calibration"], shuffle=False),
+        make_dataset(record_sets["test"], shuffle=False),
+        steps,
+    )
 
 
 def get_dataset_statistics(

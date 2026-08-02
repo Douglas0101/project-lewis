@@ -142,6 +142,8 @@ def run_training(
     architecture: str | None = None,
     loss: str | None = None,
     seed: int | None = None,
+    split_manifest: Path | None = None,
+    early_stopping_metric: str | None = None,
     env: dict | None = None,
 ) -> tuple[int, str]:
     """Run the pretrain module, streaming output. Returns (returncode, log)."""
@@ -160,6 +162,10 @@ def run_training(
         cmd += ["--loss", loss]
     if seed is not None:
         cmd += ["--seed", str(seed)]
+    if split_manifest is not None:
+        cmd += ["--split-manifest", str(split_manifest)]
+    if early_stopping_metric is not None:
+        cmd += ["--early-stopping-metric", early_stopping_metric]
     LOGGER.info("wrapper: running %s", " ".join(cmd))
     proc = subprocess.Popen(  # nosec B603
         cmd,
@@ -188,6 +194,13 @@ def main() -> int:
     parser.add_argument("--architecture", choices=["a0", "a1", "a2"], default=None)
     parser.add_argument("--loss", choices=["bce", "bce_weighted", "focal"], default=None)
     parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--split-manifest", type=Path, default=None)
+    parser.add_argument(
+        "--early-stopping-metric",
+        choices=["val_loss", "val_auc_pr"],
+        default=None,
+        help="Métrica de EarlyStopping (protocolo v2: val_auc_pr)",
+    )
     parser.add_argument(
         "--enforce-qg4",
         action="store_true",
@@ -212,6 +225,8 @@ def main() -> int:
         architecture=args.architecture,
         loss=args.loss,
         seed=args.seed,
+        split_manifest=args.split_manifest,
+        early_stopping_metric=args.early_stopping_metric,
         env=build_subprocess_env(_load_training_cfg(args.config), args.seed),
     )
 

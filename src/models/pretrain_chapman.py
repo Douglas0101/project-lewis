@@ -44,11 +44,19 @@ def _make_callbacks(
     experiment_dir: Path,
     patience_es: int = 5,
     patience_lr: int = 3,
+    monitor: str = "val_loss",
 ) -> list:
-    """Cria callbacks padrão para pré-treino."""
+    """Cria callbacks padrão para pré-treino.
+
+    ``monitor`` define a métrica de EarlyStopping/ModelCheckpoint: ``val_loss``
+    (legado) ou ``val_auc_pr`` (protocolo v2 — métrica equalizada, mode=max).
+    ReduceLROnPlateau permanece em ``val_loss`` em ambos os modos.
+    """
+    mode = "max" if monitor == "val_auc_pr" else "min"
     return [
         tf.keras.callbacks.EarlyStopping(
-            monitor="val_loss",
+            monitor=monitor,
+            mode=mode,
             patience=patience_es,
             restore_best_weights=True,
             verbose=1,
@@ -62,7 +70,8 @@ def _make_callbacks(
         ),
         tf.keras.callbacks.ModelCheckpoint(
             filepath=str(experiment_dir / "backbone_pretrained.keras"),
-            monitor="val_loss",
+            monitor=monitor,
+            mode=mode,
             save_best_only=True,
             verbose=1,
         ),
@@ -190,6 +199,7 @@ def pretrain_chapman(
     architecture: str = "a0",
     loss_name: str = "bce",
     pos_weight: Optional[np.ndarray] = None,
+    early_stopping_metric: str = "val_loss",
 ) -> Tuple[tf.keras.Model, dict]:
     """Pré-treina backbone em Chapman-Shaoxing (multi-label).
 
@@ -276,7 +286,7 @@ def pretrain_chapman(
         model.summary(print_fn=_write_line)
 
     # Callbacks
-    callbacks = _make_callbacks(experiment_dir)
+    callbacks = _make_callbacks(experiment_dir, monitor=early_stopping_metric)
 
     # SLHA opt-in: auto-configura batch size e adiciona monitor de recursos
     if use_slha:
@@ -454,6 +464,20 @@ def main() -> int:
         default=None,
         help="Sobrescrever seed do config",
     )
+    parser.add_argument(
+        "--split-manifest",
+        type=Path,
+        default=None,
+        help="Manifesto de split pareado (ex.: data/splits/chapman_paired_v2/manifest.json); "
+        "quando presente, usa as partições train/validation do manifesto",
+    )
+    parser.add_argument(
+        "--early-stopping-metric",
+        choices=["val_loss", "val_auc_pr"],
+        default="val_loss",
+        help="Métrica de EarlyStopping/ModelCheckpoint (default: val_loss; protocolo v2: "
+        "val_auc_pr)",
+    )
     args = parser.parse_args()
 
     logging.basicConfig(
@@ -492,14 +516,34 @@ def main() -> int:
         if args.validation_steps is not None
         else train_cfg.get("validation_steps")
     )
-    train_ds, val_ds, steps_per_epoch, validation_steps = build_datasets(
-        val_ratio=0.1,
-        batch_size=batch_size,
-        segment_len=segment_len,
-        seed=seed,
-        steps_per_epoch=steps_arg,
-        validation_steps=val_steps_arg,
-    )
+    if args.split_manifest is not None:
+        from .chapman_dataset import chapman_paired_datasets, load_paired_manifest
+
+        manifest = load_paired_manifest(args.split_manifest)
+        train_ds, val_ds, _, _, steps = chapman_paired_datasets(
+            args.split_manifest,
+            batch_size=batch_size,
+            segment_len=segment_len,
+            seed=seed,
+        )
+        steps_per_epoch = steps_arg or steps["train"]
+        validation_steps = val_steps_arg or steps["validation"]
+        split_id = str(manifest["split_id"])
+        train_records = len(manifest["partitions"]["train"])
+        val_records = len(manifest["partitions"]["validation"])
+    else:
+        train_ds, val_ds, steps_per_epoch, validation_steps = build_datasets(
+            val_ratio=0.1,
+            batch_size=batch_size,
+            segment_len=segment_len,
+            seed=seed,
+            steps_per_epoch=steps_arg,
+            validation_steps=val_steps_arg,
+        )
+        split_id = f"chapman-record-disjoint-val0.1-seed{seed}"
+        train_set_pv, val_set_pv = chapman_split_record_sets(val_ratio=0.1, seed=seed)
+        train_records = len(train_set_pv)
+        val_records = len(val_set_pv)
     epochs = args.epochs if args.epochs is not None else train_cfg["epochs"]
     LOGGER.info(
         "Epochs: %d | architecture=%s | loss=%s | seed=%d",
@@ -546,6 +590,7 @@ def main() -> int:
         architecture=architecture,
         loss_name=loss_name,
         pos_weight=pos_weight,
+        early_stopping_metric=args.early_stopping_metric,
     )
 
     # QG4 validation: judge the best checkpoint, not the final epoch.
@@ -564,7 +609,6 @@ def main() -> int:
     # FASE 4: proveniência + métricas por classe (avaliação, nunca treino)
     from .pretrain_provenance import write_provenance_and_metrics
 
-    train_set, val_set = chapman_split_record_sets(val_ratio=0.1, seed=seed)
     write_provenance_and_metrics(
         experiment_dir=experiment_dir,
         model=model,
@@ -573,8 +617,8 @@ def main() -> int:
         validation_steps=validation_steps,
         seed=seed,
         deterministic_mode=det_mode,
-        train_records=len(train_set),
-        val_records=len(val_set),
+        train_records=train_records,
+        val_records=val_records,
         training_info={
             "epochs": epochs,
             "batch_size": batch_size,
@@ -584,6 +628,8 @@ def main() -> int:
             "optimizer": train_cfg["optimizer"],
             "loss": loss_name,
             "architecture": architecture,
+            "split_id": split_id,
+            "early_stopping_metric": args.early_stopping_metric,
         },
         best=best,
         qg4_pass=qg4_pass,
