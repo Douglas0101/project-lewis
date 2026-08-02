@@ -56,6 +56,15 @@ T6/T7/T8 seguem ao final.
 - [x] T10.3-P `docs/t10_3_pilot_execution_plan.md` — plano de execução de pilotos: 18 células na
   1ª rodada (C0–C3, D0, F/K/T, D1–D2), ~11,6 CPU-h, gates de continuação, critérios de parada por
   hipótese, promoção (10+12+5), rollback. **Não autoriza execução.**
+- [x] T10.3-ENABLE (decisão owner: treino **manual via Makefile**): split pareado v2 GERADO
+  (`data/splits/chapman_paired_v2/manifest.json` + .sha256 — 44.986 reg.; 35989/4499/2249/2249;
+  desvio < 1 p.p.; write-once); builder pareado em `chapman_dataset.py`; flags
+  `--split-manifest`/`--early-stopping-metric` (ES por `val_auc_pr` = protocolo v2);
+  `scripts/run_pilot_cell.py` + `export_pilot_predictions.py` + `generate_paired_split.py`;
+  alvos `make pilot-{split,smoke,c0,c1,c2,c3}`; `make pilot-smoke` end-to-end PASS
+  (PROSPECTIVE, PILOT); runbook `docs/t10_3_manual_execution_runbook.md`.
+  **Pilotos C0–C3 NÃO executados por mim — execução manual do owner.**
+- [ ] ⏳ KD trainer (D0/trilha D) — task de implementação separada
 - [ ] ⏳ APROVAÇÕES PENDENTES (bloqueiam T10.3): split pareado v2 (geração + freeze) · compute
   ~11,6 CPU-h · D4 separado · promoção · RFC T9.5
 - [ ] T10.3 Execução de pilotos `PILOT` (só após aprovações; ordem C→F→{K,T}→D; regra de parada
