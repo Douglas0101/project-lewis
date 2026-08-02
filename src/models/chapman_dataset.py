@@ -341,9 +341,12 @@ def chapman_paired_datasets(
                 // batch_size)
         for part in ("train", "validation", "calibration", "test")
     }
+    # P0-02 (PRD RF-TFDATA-003): treino/validação repetem com steps explícitos —
+    # sem .repeat() o dataset se esgota em épocas intermediárias ("ran out of data").
+    # calibration/test NÃO repetem: são usados apenas para predição (take(steps)).
     return (
-        make_dataset(record_sets["train"], shuffle=True),
-        make_dataset(record_sets["validation"], shuffle=False),
+        make_dataset(record_sets["train"], shuffle=True).repeat(),
+        make_dataset(record_sets["validation"], shuffle=False).repeat(),
         make_dataset(record_sets["calibration"], shuffle=False),
         make_dataset(record_sets["test"], shuffle=False),
         steps,
