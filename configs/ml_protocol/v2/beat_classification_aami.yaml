@@ -1,0 +1,62 @@
+# ML Protocol v2 — task profile: classificação de batimentos AAMI (2 estágios)
+# Contrato normativo (docs/ml_protocol_v2.md). Splits patient-disjoint CONGELADOS (E07R-PD).
+task_profile: beat_classification_aami
+schema_version: 2.0
+ontology_version: v3
+
+data:
+  datasets: [mitdb, svdb, incart]
+  split_id: stage2_multiclass_patient_disjoint_v4.0   # CONGELADO — freeze E07R (não re-gerar)
+  lead: MLII
+  fs: 500
+  window_ms: 1000
+  preprocessing_version: v1.0
+  notes:
+    - "split v4.0-patient-disjoint NUNCA usado para pré-treino Chapman (regra inviolável)"
+    - "AFDB fora do classificador de batimentos (decisão D3)"
+
+labels:
+  stage1: [N, ABNORMAL]
+  stage2: [S, V, F]
+  rejection_class: Q_OR_UNKNOWN   # v3.0.0 — abstenção, fora dos alvos clínicos (regra 16)
+  unknown_symbols_policy: exclude
+  fusion_symbol: FUSION           # F = fusão V+N, NUNCA fibrilação atrial (regra 17)
+
+metrics:
+  primary: [macro_f1, per_class_f1, per_class_recall, per_class_precision]
+  secondary: [macro_auroc_ovr, confusion_matrix, abstain_rate, bce_post_temperature]
+  guardrails: [model_size_int8, latency_renode, sram_total, bitexact_atol_1_lsb]
+  qg5_prime:
+    stage1: {recall_abnormal_min: 0.30, precision_abnormal_min: 0.25, f1_macro_min: 0.55}
+    stage2: {f1_S_min: 0.55, f1_V_min: 0.70, f1_F_min: 0.15, f1_macro_min: 0.45}
+
+training:
+  seed_policy:
+    default: 13
+    alternatives: [42, 7]
+  early_stopping:
+    metric: val_macro_f1         # protocolo v2
+    mode: max
+  loss_catalog: [crossentropy, focal_loss, weighted_crossentropy]
+  sampling_catalog: [random, class_balanced, oversample_rare]
+  smote:
+    allowed: true
+    space: feature_only          # Regra de Ouro 6
+    partitions: [train]          # NUNCA validation/test
+  augmentation:
+    partitions: [train]          # Regra de Ouro 7 — apenas fine-tuning
+    physiologically_valid: true
+  forbidden: [smote_on_validation, smote_on_test, test_threshold_tuning, zero_padding]
+
+calibration:
+  required: true
+  method: temperature_scaling    # softmax(logits/T) para multiclasse
+  n_bins: 15
+  split: calibration
+  order: logits_div_T_then_softmax
+
+thresholding:
+  policy: cost_sensitive         # FN > FP clinicamente; alternativa: max_f1_per_class
+  alternatives: [max_f1_per_class, min_sensitivity_per_class]
+  fit_split: calibration
+  apply_to_test: frozen

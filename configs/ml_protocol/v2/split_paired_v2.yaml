@@ -1,0 +1,42 @@
+# ML Protocol v2 — split pareado v2 (definição NORMATIVA — matriz v2 §9)
+# NENHUM SPLIT É GERADO por este arquivo. A geração é write-once com freeze de
+# hash e exige governança (T10.3). Splits existentes NUNCA são modificados.
+profile: split_paired_v2
+schema_version: 2.0
+split_id: chapman-record-disjoint-paired-v2
+dataset: chapman-shaoxing
+derivation: chapman-record-disjoint-val0.1-seed13   # mesmo universo do A2-full
+
+purpose: >
+  Split único e pareado para TODAS as células experimentais (C/F/K/R/T/B/P/D da
+  matriz v2 + adendo D). Resolve H7/H8: sem ele, células recebem NON_COMPARABLE
+  do avaliador canônico (src/evaluation/schema.py).
+
+partitions:
+  train:
+    ratio: 0.80
+    role: gradient_updates_only
+  validation:
+    ratio: 0.10
+    role: early_stopping_and_epoch_selection
+  calibration:
+    ratio: 0.05
+    role: fit_temperature_and_thresholds   # NUNCA validation/test para fit
+  test:
+    ratio: 0.05
+    role: final_cell_evaluation_only       # congelado; apply de T/thresholds frozen
+
+rules:
+  disjoint: record                        # record-disjoint (1 registro ≈ 1 paciente no Chapman)
+  seed: 13
+  stratified: approximate                 # desvio de prevalência < 1 p.p. por partição por superclasse
+  same_for_all_cells: true
+  manifest:
+    content: [record_ids_per_partition, support_per_class_per_partition, sha256]
+    write_once: true
+    freeze_hash: true
+
+immutability: true
+generation: pending_governance_T10.3      # NÃO gerado nesta task (T9.4 é só a spec)
+comparability:
+  rule: "células fora deste split (ou sucessores versionados) recebem NON_COMPARABLE"

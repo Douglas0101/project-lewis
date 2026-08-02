@@ -1,0 +1,71 @@
+# ML Protocol v2 — protocolo de destilação KD (trilha D, adendo T10.2.1 §4)
+# FORMA NORMATIVA: KD binário por rótulo (tarefa multi-label sigmoid).
+# A forma softmax-KL do prompt original foi registrada e CORRIGIDA no adendo §4.
+profile: distillation_kd
+schema_version: 2.0
+task_profile: pretrain_scp_ecg_multilabel
+
+loss:
+  type: kd_plus_task
+  formula: "L = alpha * KD + (1 - alpha) * focal_BCE(y, z_s)"
+  kd_term: "mean_c BCE_with_logits(z_s,c / tau, sigmoid(z_t,c / tau)) * tau**2"
+  kd_rationale: >
+    Multi-label sigmoid (1,70 rótulos/registro; co-ocorrência NORM 54–59%).
+    Softmax-KD imporia exclusão mútua entre classes — errado para esta tarefa.
+    Forma correta: KD binário por rótulo sobre logits com temperatura, fator
+    tau^2 de escala de gradiente (Hinton 2015).
+  task_loss: focal
+  focal_gamma: 2.0                  # ou γ vencedor da trilha F, se já executada
+  alpha: 0.7
+  alpha_sweep: [0.5, 0.7, 0.9]
+  tau: 4.0
+  tau_sweep: [2.0, 4.0, 6.0]
+
+training:
+  teacher_frozen: true
+  student_init:
+    source: experiments/20260728_053011_pretrain_chapman/backbone_pretrained.keras
+    method: load_backbone_weights_from_pretrained   # src/models/backbone_1d.py:377
+    from_scratch: forbidden
+  optimizer: adamw
+  weight_decay: 0.0001
+  lr: 0.001
+  schedule: cosine
+  warmup_epochs: 2
+  max_epochs: 50
+  early_stopping:
+    metric: val_macro_pr_auc        # protocolo v2 — nunca val_loss cru
+    mode: max
+    patience: 10
+  split_id: chapman-record-disjoint-paired-v2
+
+students:
+  - id: a2_full_32k
+    cells: [D0, D1, D2, D3, D4]
+    params: 32005
+    constraints: {flatbuffer_kb_max: 64, sram_kb_max: 128, latency_ms_max: 200}
+  - id: a1_expanded_64k
+    cells: [D5]
+    params_target: 64000
+    params_tolerance: 0.10
+    budget_test_required: true
+    constraints: {flatbuffer_kb_max: 64, sram_kb_max: 128, latency_ms_max: 200}
+
+evaluation:
+  evaluator: canonical_v2
+  protocol_status: PROSPECTIVE      # fit de T/thresholds SOMENTE em calibration
+  calibration:
+    method: temperature_scaling
+    split: calibration
+    n_bins: 15
+  metrics:
+    - macro_pr_auc
+    - macro_auroc
+    - per_class_pr_auc              # com IC95 bootstrap
+    - ece_post_calibration
+    - ece_post_calibration_norm0
+    - brier_post_calibration
+    - bce_post_temperature
+  quantization:
+    ptq_int8: true
+    delta_macro_pr_auc_max: 0.01

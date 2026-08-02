@@ -1,0 +1,49 @@
+# ML Protocol v2 — task profile: ritmo AFIB/AFL (AFDB, escopo de episódio)
+# Contrato normativo (docs/ml_protocol_v2.md). Tarefa de CONTEXTO/FUTURO — decisão D3:
+# AFDB contribui como tarefa de ritmo, FORA do classificador de batimentos.
+task_profile: rhythm_afib_afl
+schema_version: 2.0
+ontology_version: v3
+status: future_context              # sem execução planejada antes de T11 + governança
+
+data:
+  dataset: afdb
+  split_id: pending                 # a definir quando a tarefa for ativada (governança)
+  lead: II
+  fs: 500
+  scope: episode                    # episódios de ritmo, não batimentos individuais
+  preprocessing_version: v1.0
+
+labels:
+  classes: [AFIB, AFL, OTHER_RHYTHM]
+  unknown_symbols_policy: exclude
+  notes:
+    - "F do classificador de batimentos = FUSION (V+N) — NUNCA fibrilação atrial (regra 17)"
+    - "AFDB estava quarentenado como RHYTHM_EXPLORATORY no mapeamento de pacientes (v3.1)"
+
+metrics:
+  primary: [macro_f1, per_class_recall]
+  secondary: [episode_level_sensitivity, episode_level_ppv, macro_auroc_ovr]
+  guardrails: [model_size_int8, latency_renode, sram_total]
+
+training:
+  seed_policy:
+    default: 13
+  early_stopping:
+    metric: val_macro_f1
+    mode: max
+  loss_catalog: [crossentropy, focal_loss]
+  sampling_catalog: [random, class_balanced]
+  forbidden: [smote_on_validation, smote_on_test, test_threshold_tuning, zero_padding]
+
+calibration:
+  required: true
+  method: temperature_scaling
+  n_bins: 15
+  split: calibration
+  order: logits_div_T_then_softmax
+
+thresholding:
+  policy: max_f1_per_class
+  fit_split: calibration
+  apply_to_test: frozen

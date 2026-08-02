@@ -1,0 +1,62 @@
+# ML Protocol v2 — task profile: pré-treino SCP-ECG multi-label (Chapman)
+# Contrato normativo (docs/ml_protocol_v2.md). Nenhum treino sem governança.
+task_profile: pretrain_scp_ecg_multilabel
+schema_version: 2.0
+ontology_version: v3
+
+data:
+  dataset: chapman-shaoxing
+  split_id: chapman-record-disjoint-paired-v2   # definido em split_paired_v2.yaml; GERAÇÃO PENDENTE (T10.3, governança)
+  lead: II
+  fs: 500
+  window_ms: 1000
+  preprocessing_version: v1.0
+
+labels:
+  classes: [NORM, CD, MI, HYP, STTC]
+  rejection_class: Q_OR_UNKNOWN
+  unknown_symbols_policy: exclude
+  notes:
+    - "NORM co-ocorre com patologias em 54–59% (T9.3 Tabela 4) — não é ausência de doença (H6)"
+    - "multi-label sigmoid; média de 1,70 rótulos/registro (auditoria §3.1)"
+
+metrics:
+  primary: [macro_pr_auc, macro_auroc, ece_post_calibration, brier_mean, delta_quantization_macro_pr_auc]
+  secondary:
+    - per_class_pr_auc
+    - per_class_auroc
+    - per_class_f1
+    - macro_f1_at_0.5
+    - macro_f1_tuned
+    - bce
+    - bce_post_temperature
+    - nll
+    - nll_post_temperature
+    - ece_post_calibration_norm0   # hipótese H2 (estrato patológico)
+  guardrails: [model_size_int8, latency_renode, sram_total, arena_used, bitexact_atol_1_lsb]
+
+training:
+  seed_policy:
+    default: 13
+    alternatives: [42, 7]
+  early_stopping:
+    metric: val_macro_pr_auc     # protocolo v2 — NUNCA val_loss cru (violação histórica: auditoria §7)
+    mode: max
+  loss_catalog: [bce, focal, focal_class_weighted, class_balanced_focal, asymmetric_loss]
+  focal_gamma_sweep: [0.5, 1.0, 2.0, 3.0]   # trilha F da matriz v2
+  sampling_catalog: [random, class_balanced, oversample_rare, hard_example_mining]
+  forbidden: [smote_on_validation, smote_on_test, test_threshold_tuning]
+
+calibration:
+  required: true
+  method: temperature_scaling
+  n_bins: 15
+  split: calibration             # NUNCA validation/test
+  order: logits_div_T_then_sigmoid
+  report: [ece, mce, brier, bce, nll, ece_norm0, reliability_json]
+
+thresholding:
+  policy: max_f1_per_class
+  alternatives: [cost_sensitive, min_sensitivity_per_class]
+  fit_split: calibration
+  apply_to_test: frozen
