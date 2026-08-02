@@ -76,6 +76,7 @@ class MetricsBlock(BaseModel):
     brier_mean: Optional[float] = None
     ece_pre_calibration: Optional[float] = None
     ece_post_calibration: Optional[float] = None
+    ece_post_calibration_norm0: Optional[float] = None
     mce_post_calibration: Optional[float] = None
     temperature: Optional[float] = None
 

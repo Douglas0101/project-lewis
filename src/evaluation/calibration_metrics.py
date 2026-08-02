@@ -70,6 +70,42 @@ def _mce_from_bins(bins: list[dict]) -> Optional[float]:
     return float(max(gaps)) if gaps else None
 
 
+def ece_stratified(
+    y_true: np.ndarray,
+    y_prob: np.ndarray,
+    mask: np.ndarray,
+    n_bins: int,
+    class_names: Sequence[str],
+) -> dict:
+    """ECE macro e por classe restrito ao subconjunto ``mask`` (bool, shape (n,)).
+
+    Uso normativo (ML Protocol v2, hipótese H2): calibração no estrato NORM=0 do
+    pré-treino SCP-ECG — a temperatura global otimiza a marginal e pode deixar o
+    estrato patológico descalibrado (T9.3, Tabela 4: ECE NORM=0 até 0,217).
+    """
+    y_true = np.asarray(y_true)
+    y_prob = np.asarray(y_prob, dtype=np.float64)
+    mask = np.asarray(mask, dtype=bool)
+    if mask.shape[0] != y_true.shape[0]:
+        raise ValueError(
+            f"mask com shape {mask.shape} incompatível com y_true {y_true.shape}"
+        )
+    per_class: dict[str, dict] = {}
+    eces: list[float] = []
+    for idx, name in enumerate(class_names):
+        yt = y_true[mask, idx].astype(np.float64)
+        yp = y_prob[mask, idx]
+        ece, _ = ece_binary(yt, yp, n_bins=n_bins)
+        per_class[name] = {"ece": ece, "support": int(yt.sum())}
+        eces.append(ece)
+    return {
+        "n_bins": int(n_bins),
+        "n_samples": int(mask.sum()),
+        "macro_ece": float(np.mean(eces)) if eces else None,
+        "per_class": per_class,
+    }
+
+
 def calibration_report(
     y_true: np.ndarray,
     y_prob: np.ndarray,

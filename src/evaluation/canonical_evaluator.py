@@ -34,6 +34,7 @@ import numpy as np
 from src.evaluation.calibration_metrics import (
     apply_temperature,
     calibration_report,
+    ece_stratified,
     fit_temperature_multilabel,
 )
 from src.evaluation.metric_definitions import (
@@ -130,6 +131,35 @@ def _confidence_intervals(
             y_true, y_score, fn, n_bootstrap=n_bootstrap, random_state=seed
         )
         out[name] = {"mean": mean, "ci_95": [lower, upper], "n_bootstrap": n_bootstrap}
+
+    # IC95 por classe (PR-AUC e AUROC) — extensão G4 do protocolo v2
+    from sklearn.metrics import average_precision_score, roc_auc_score
+
+    rng = np.random.RandomState(seed)
+    n = len(y_true)
+    boots: dict[str, dict[str, list]] = {
+        name: {"pr": [], "roc": []} for name in class_names
+    }
+    for _ in range(n_bootstrap):
+        idx = rng.randint(0, n, n)
+        for j, name in enumerate(class_names):
+            yt = y_true[idx, j]
+            if 0 < yt.sum() < len(yt):
+                boots[name]["pr"].append(average_precision_score(yt, y_score[idx, j]))
+                boots[name]["roc"].append(roc_auc_score(yt, y_score[idx, j]))
+    out["per_class_pr_auc"] = {}
+    out["per_class_auroc"] = {}
+    for name in class_names:
+        for key, target in (("pr", "per_class_pr_auc"), ("roc", "per_class_auroc")):
+            values = boots[name][key]
+            if values:
+                lo, hi = np.percentile(values, [2.5, 97.5])
+                out[target][name] = {
+                    "ci_95": [float(lo), float(hi)],
+                    "n_bootstrap_effective": len(values),
+                }
+            else:
+                out[target][name] = None
     return out
 
 
@@ -232,6 +262,12 @@ def evaluate(
         prob_cal = _apply_t(prob_eval)
         post = calibration_report(y_true, prob_cal, n_bins, names)
 
+    # --- ECE no estrato NORM=0 (perfil pretrain; hipótese H2, T9.3 Tabela 4) -
+    ece_norm0: Optional[dict] = None
+    if multilabel and temp is not None and "NORM" in names:
+        norm_idx = names.index("NORM")
+        ece_norm0 = ece_stratified(y_true, prob_cal, y_true[:, norm_idx] == 0, n_bins, names)
+
     # --- thresholds (fit em y_fit/p_fit calibrados; apply no split avaliado) -
     thresholds = fit_thresholds(y_fit, _apply_t(p_fit), names, policy)
     tuned = f1_at_thresholds(y_true, prob_cal, thresholds, names)
@@ -256,6 +292,7 @@ def evaluate(
         brier_mean=pre["macro"]["brier"],
         ece_pre_calibration=pre["macro"]["ece"],
         ece_post_calibration=post["macro"]["ece"] if post else None,
+        ece_post_calibration_norm0=ece_norm0["macro_ece"] if ece_norm0 else None,
         mce_post_calibration=post["macro"]["mce"] if post else None,
         temperature=temp,
     )
@@ -304,6 +341,7 @@ def evaluate(
             "method": "temperature_scaling" if temp is not None else "none",
             "pre": pre,
             "post": post,
+            "stratified_norm0": ece_norm0,
             "protocol_status": status,
         },
         thresholds=metrics_json.thresholds,

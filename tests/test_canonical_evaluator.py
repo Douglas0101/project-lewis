@@ -230,3 +230,72 @@ def test_comparability_contract_marks_non_comparable():
     result = check_comparable(base, other_split)
     assert result.status == "NON_COMPARABLE"
     assert any("split_id" in r for r in result.reasons)
+
+
+# 10 ------------------------------------------------------------------------
+def test_ece_norm0_stratified_metric():
+    """ECE do estrato NORM=0 deve expor descalibração escondida pela marginal."""
+    n = 8000
+    rng = np.random.RandomState(11)
+    y_true = np.zeros((n, 2), dtype=int)
+    y_true[: int(0.7 * n), 0] = 1  # NORM=1 em 70%
+    y_true[int(0.7 * n):, 1] = 1  # CD=1 apenas no estrato NORM=0 (30%)
+    y_score = np.zeros((n, 2))
+    # estrato NORM=1: bem calibrado (probs altas p/ NORM=1, baixas p/ CD=0)
+    y_score[: int(0.7 * n), 0] = rng.beta(20, 1, int(0.7 * n))
+    y_score[: int(0.7 * n), 1] = rng.beta(1, 20, int(0.7 * n))
+    # estrato NORM=0: mal calibrado (confiança alta sistemática em NORM)
+    y_score[int(0.7 * n):, 0] = rng.beta(8, 2, n - int(0.7 * n))  # prediz NORM alto, y=0
+    y_score[int(0.7 * n):, 1] = rng.beta(8, 2, n - int(0.7 * n))  # idem em CD, y=1
+
+    res = evaluate(
+        y_true, y_score,
+        task_profile="pretrain_scp_ecg_multilabel", split_id="synthetic",
+        ontology_version="v3", class_names=["NORM", "CD"],
+        temperature=1.0, n_bootstrap=0,
+    )
+    m = res.metrics["metrics"]
+    assert m["ece_post_calibration_norm0"] is not None
+    assert m["ece_post_calibration_norm0"] > 2.0 * m["ece_post_calibration"]
+    strat = res.calibration["stratified_norm0"]
+    assert strat["n_samples"] == n - int(0.7 * n)
+    assert set(strat["per_class"].keys()) == {"NORM", "CD"}
+
+
+# 11 ------------------------------------------------------------------------
+def test_per_class_confidence_intervals(tmp_path):
+    y_true, y_score = _synthetic_multilabel()
+    res = evaluate(
+        y_true, y_score,
+        task_profile="pretrain_scp_ecg_multilabel", split_id="synthetic",
+        ontology_version="v3", n_bootstrap=50,
+    )
+    ci = res.confidence_intervals
+    assert "per_class_pr_auc" in ci and "per_class_auroc" in ci
+    for name in CLASSES:
+        for target in ("per_class_pr_auc", "per_class_auroc"):
+            entry = ci[target][name]
+            assert entry is not None, (target, name)
+            lo, hi = entry["ci_95"]
+            assert 0.0 <= lo <= hi <= 1.0
+    write_artifacts(res, tmp_path)
+    on_disk = json.loads((tmp_path / "confidence_intervals.json").read_text(encoding="utf-8"))
+    assert set(on_disk["per_class_pr_auc"].keys()) == set(CLASSES)
+
+
+# 12 ------------------------------------------------------------------------
+def test_schema_backward_compatible_without_norm0_field():
+    """Artefatos schema 2.0 sem o campo novo (ex.: T9.3) continuam validando."""
+    y_true, y_score = _synthetic_multilabel()
+    res = evaluate(
+        y_true, y_score,
+        task_profile="pretrain_scp_ecg_multilabel", split_id="synthetic",
+        ontology_version="v3", n_bootstrap=0,
+    )
+    legacy_like = res.metrics.copy()
+    legacy_like["metrics"] = {
+        k: v for k, v in legacy_like["metrics"].items()
+        if k != "ece_post_calibration_norm0"
+    }
+    parsed = MetricsJson.model_validate(legacy_like)
+    assert parsed.metrics.ece_post_calibration_norm0 is None
