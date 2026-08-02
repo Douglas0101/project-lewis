@@ -577,12 +577,23 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument("--n-bins", type=int, default=15)
     parser.add_argument("--n-bootstrap", type=int, default=200)
     parser.add_argument("--seed", type=int, default=13)
+    parser.add_argument(
+        "--runtime-profile",
+        choices=["strict", "fast"],
+        default=None,
+        help="Perfil numérico CPU-only aplicado antes de qualquer import de TF "
+        "(PRD RF-CPU-003; obrigatório quando houver regeneração de predições)",
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[list[str]] = None) -> int:
     args = _parse_args(argv)
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+    if args.runtime_profile is not None:
+        from src.runtime.cpu_policy import apply as apply_cpu_policy
+
+        apply_cpu_policy(args.runtime_profile)
 
     if args.predictions is not None:
         y_true, y_score = load_predictions_npz(args.predictions)

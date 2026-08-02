@@ -1,0 +1,12 @@
+# Runtime profile: strict — avaliação oficial (PRD RF-CPU-003)
+profile: strict
+onednn: false              # TF_ENABLE_ONEDNN_OPTS=0 — bitwise estável entre máquinas
+deterministic_ops: true    # TF_DETERMINISTIC_OPS=1
+threading:
+  intra_op: 2
+  inter_op: 1
+tfdata:
+  private_pool: 2
+  map_parallel_calls: 2
+  prefetch: 1
+use: avaliação oficial / qualificação / comparações publicáveis

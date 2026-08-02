@@ -1,0 +1,12 @@
+# Runtime profile: fast — exploração e benchmark (PRD RF-CPU-003)
+profile: fast
+onednn: true               # TF_ENABLE_ONEDNN_OPTS=1 — throughput maior, tolerância numérica
+deterministic_ops: false
+threading:
+  intra_op: 2
+  inter_op: 1
+tfdata:
+  private_pool: 2
+  map_parallel_calls: 2
+  prefetch: 1
+use: pilotos / exploração / benchmark de desempenho

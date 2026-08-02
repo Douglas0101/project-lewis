@@ -115,16 +115,31 @@ def _load_training_cfg(config: Path | None) -> dict:
     return cfg if isinstance(cfg, dict) else {}
 
 
-def build_subprocess_env(cfg: dict, seed: int | None) -> dict:
-    """Environment for the training subprocess (RF-DET-001/002).
+def build_subprocess_env(cfg: dict, seed: int | None, profile: str | None = None) -> dict:
+    """Environment for the training subprocess (RF-DET-001/002 + RF-CPU-001).
 
-    When ``deterministic.mode == strict``, oneDNN custom ops and nondeterministic
-    TF ops are disabled **before** TensorFlow is imported in the subprocess;
-    PYTHONHASHSEED is pinned to the resolved seed.
+    ``CUDA_VISIBLE_DEVICES=-1`` é sempre aplicado (CPU-only, PRD P0-01).
+    Quando ``profile`` é informado ("strict"|"fast"), a política oneDNN/threads
+    vem de ``configs/runtime/<profile>.yaml`` (RF-CPU-003, perfil numérico único).
+    Quando ``deterministic.mode == strict`` no config de treino, oneDNN custom ops
+    e ops não-determinísticas são desligadas **antes** do TF no subprocesso;
+    PYTHONHASHSEED é pinado à seed resolvida.
     """
     env = os.environ.copy()
     resolved_seed = seed if seed is not None else int(cfg.get("training", {}).get("seed", 42))
     env["PYTHONHASHSEED"] = str(resolved_seed)
+    env["CUDA_VISIBLE_DEVICES"] = "-1"
+    if profile is not None:
+        from src.runtime.cpu_policy import load_profile
+
+        prof = load_profile(profile)
+        env["TF_ENABLE_ONEDNN_OPTS"] = "1" if prof["onednn"] else "0"
+        if prof.get("deterministic_ops"):
+            env["TF_DETERMINISTIC_OPS"] = "1"
+        env["TF_NUM_INTRAOP_THREADS"] = str(prof["threading"]["intra_op"])
+        env["TF_NUM_INTEROP_THREADS"] = str(prof["threading"]["inter_op"])
+        LOGGER.info("runtime profile=%s aplicado ao subprocesso", profile)
+        return env
     mode = str(cfg.get("deterministic", {}).get("mode", "fast"))
     if mode == "strict":
         env["TF_ENABLE_ONEDNN_OPTS"] = "0"
@@ -202,6 +217,12 @@ def main() -> int:
         help="Métrica de EarlyStopping (protocolo v2: val_auc_pr)",
     )
     parser.add_argument(
+        "--runtime-profile",
+        choices=["strict", "fast"],
+        default=None,
+        help="Perfil numérico único (configs/runtime/*.yaml; PRD RF-CPU-003)",
+    )
+    parser.add_argument(
         "--enforce-qg4",
         action="store_true",
         help="gate enforcement: exit 10 quando execução OK mas QG4 falha",
@@ -227,7 +248,7 @@ def main() -> int:
         seed=args.seed,
         split_manifest=args.split_manifest,
         early_stopping_metric=args.early_stopping_metric,
-        env=build_subprocess_env(_load_training_cfg(args.config), args.seed),
+        env=build_subprocess_env(_load_training_cfg(args.config), args.seed, args.runtime_profile),
     )
 
     run_dir = _find_experiment_dir(log_text)
