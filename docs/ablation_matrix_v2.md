@@ -53,6 +53,7 @@ Achados estratificados (relatório T9.3, Tabelas 2–4):
 | **H4** | Threshold tuning recupera desempenho de decisão real | **P1** | F1@tuned +12–14 p.p. em CD/HYP (RETROSPECTIVE, T9.3 Tabela 2) | T1 com fit em calibration separado rendendo < 4 p.p. sobre T0 |
 | **H5** | O A0 estava sub-treinado (30 épocas não bastaram para BCE) | **P1** | val_loss do A0 novo estritamente decrescente até a época 29; ES nunca disparou (auditoria §7) | B1 (100 épocas, ES por `val_macro_pr_auc`) sem ganho ≥ 1 p.p. de macro PR-AUC no A0 |
 | **H6** | NORM não é "ausência de doença" — formulação distorce métricas | **P2** | P(NORM\|classe) = 54–59% (T9.3 Tabela 4); auditoria §3.2 | P1 (4 classes sem NORM) alterando macro PR-AUC das 4 classes < 1 p.p. |
+| **H8** | O gargalo CD/HYP é limitação de **capacidade** (≤ 32k params em todos os backbones) | **P0** | CD/HYP PR-AUC com IC estreito (T9.3); −7 p.p. AUC vs Strodthoff (0,5–8M params); capacidade nunca isolada (auditoria §2) | D2/D4 (teacher 1M+/5M) sem ganho ≥ 5 p.p. de PR-AUC em CD — ver adendo `docs/ablation_matrix_v2_appendix_D.md` |
 
 ### 1.1 Mapa de rastreabilidade de IDs (esta matriz ↔ auditoria T10.1)
 
@@ -270,6 +271,7 @@ relatório parcial após cada seção — nunca o pacote inteiro de uma vez.
 | RFC de ontologia (H6/P1) | célula P1 | pendente — decisão humana |
 | Aprovação humana explícita para treinos | T10.3 (pilotos) e T11 (oficiais) | bloqueado por governança |
 | Extensão do avaliador: IC por classe em artefato (G4) + métrica `ece_norm0` | claims das células K/T | desejável antes de T10.3 — registrar em T9.4 |
+| **Trilha D (teacher/destilação)** — adendo T10.2.1: `docs/ablation_matrix_v2_appendix_D.md` (6 células D0–D5, hipótese H8, protocolo KD, ~18–20 h CPU) | H8 (capacidade) | definida; ordem de execução D0 → D1 → D2 → {D3, D5} → D4 (condicional a D2 ≥ +3 p.p. CD) |
 
 ## 14. Declarações finais
 
