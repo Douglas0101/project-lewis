@@ -6,6 +6,7 @@ Dados 100% sintéticos — nenhum teste carrega TensorFlow, datasets ou runs.
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -15,7 +16,11 @@ from src.evaluation.calibration_metrics import (
     apply_temperature,
     fit_temperature_multilabel,
 )
-from src.evaluation.canonical_evaluator import evaluate, write_artifacts
+from src.evaluation.canonical_evaluator import (
+    _extract_legacy_calibration,
+    evaluate,
+    write_artifacts,
+)
 from src.evaluation.schema import (
     ComparabilityContract,
     MetricsJson,
@@ -299,3 +304,62 @@ def test_schema_backward_compatible_without_norm0_field():
     }
     parsed = MetricsJson.model_validate(legacy_like)
     assert parsed.metrics.ece_post_calibration_norm0 is None
+
+
+# 13 (G6) -------------------------------------------------------------------
+def test_reconcile_legacy_nested_schema():
+    """G6: parser lê schema aninhado do A0 novo (temperature_scaling + before/after)."""
+    legacy = {
+        "before": {"macro": {"ece": 0.025, "brier": 0.18, "nll": 0.39}},
+        "after": {"macro": {"ece": 0.020, "brier": 0.17, "nll": 0.38}},
+        "temperature_scaling": {
+            "temperature": 0.97,
+            "nll_before": 0.39,
+            "nll_after": 0.38,
+        },
+    }
+    result = _extract_legacy_calibration(legacy)
+    assert result["temperature"] == pytest.approx(0.97)
+    assert result["ece_before"] == pytest.approx(0.025)
+    assert result["ece_after"] == pytest.approx(0.020)
+    assert result["nll_before"] == pytest.approx(0.39)
+    assert result["nll_after"] == pytest.approx(0.38)
+    assert result["brier_before"] == pytest.approx(0.18)
+    assert result["brier_after"] == pytest.approx(0.17)
+
+
+# 14 (G6) -------------------------------------------------------------------
+def test_reconcile_legacy_flat_schema_still_works():
+    """Backward compat: schema plano (contrato T1) continua funcionando."""
+    flat = {
+        "temperature": 0.3741,
+        "ece_before": 0.1508,
+        "ece_after": 0.0152,
+        "nll_before": 0.4317,
+        "nll_after": 0.3417,
+    }
+    result = _extract_legacy_calibration(flat)
+    assert result["temperature"] == pytest.approx(0.3741)
+    assert result["ece_before"] == pytest.approx(0.1508)
+    assert result["ece_after"] == pytest.approx(0.0152)
+    assert result["nll_before"] == pytest.approx(0.4317)
+    assert result["nll_after"] == pytest.approx(0.3417)
+
+
+# 15 (G6) -------------------------------------------------------------------
+A0_NOVO_CAL = Path("experiments/20260729_042301_pretrain_chapman/calibration.json")
+
+
+@pytest.mark.skipif(not A0_NOVO_CAL.exists(), reason="arquivo legado não versionado")
+def test_reconcile_legacy_real_a0_novo_file():
+    """Integração: calibration.json real do A0 novo (aninhado, pós-T em
+    temperature_scaling.calibration_after) é extraído sem None nos campos-chave."""
+    import json as _json
+
+    legacy = _json.loads(A0_NOVO_CAL.read_text(encoding="utf-8"))
+    result = _extract_legacy_calibration(legacy)
+    assert result["temperature"] == pytest.approx(0.9130257150830182)
+    assert result["ece_before"] == pytest.approx(0.025059479457722123)
+    assert result["ece_after"] == pytest.approx(0.02037379373237904)
+    assert result["nll_before"] is not None
+    assert result["nll_after"] is not None

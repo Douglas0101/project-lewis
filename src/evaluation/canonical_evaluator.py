@@ -420,6 +420,56 @@ def regenerate_predictions(run_dir: Path, output_dir: Path) -> tuple[np.ndarray,
     return y_true, y_prob
 
 
+def _extract_legacy_calibration(calib: dict) -> dict:
+    """Extrai T/ECE/NLL/Brier pré-pós de schemas legados de ``calibration.json``.
+
+    Dois schemas convivem no histórico do projeto:
+
+    - **plano** (contrato T1, ex.: A2-full): ``temperature``, ``ece_before``,
+      ``ece_after`` na raiz;
+    - **aninhado** (legado FASE 8, ex.: A0 novo): ``temperature_scaling.temperature``,
+      ``before.macro.ece`` e o pós-T em ``after.macro.ece`` OU
+      ``temperature_scaling.calibration_after.macro.ece`` (estrutura real do A0 novo).
+
+    Retorna dict plano ``{temperature, ece_before, ece_after, nll_before,
+    nll_after, brier_before, brier_after}``; campos ausentes vêm ``None``.
+    """
+    out: dict = {
+        "temperature": None,
+        "ece_before": None,
+        "ece_after": None,
+        "nll_before": None,
+        "nll_after": None,
+        "brier_before": None,
+        "brier_after": None,
+    }
+    if not isinstance(calib, dict):
+        LOGGER.warning("calibration legado inválido (não é dict): %s", type(calib))
+        return out
+    if "temperature" in calib:  # schema plano
+        for key in out:
+            out[key] = calib.get(key)
+        return out
+
+    ts = calib.get("temperature_scaling") or {}
+    before_macro = (calib.get("before") or {}).get("macro") or {}
+    after_macro = (calib.get("after") or {}).get("macro") or {}
+    if not after_macro:
+        after_macro = (ts.get("calibration_after") or {}).get("macro") or {}
+    if not ts and not before_macro:
+        LOGGER.warning("calibration legado em schema desconhecido; campos None")
+        return out
+
+    out["temperature"] = ts.get("temperature")
+    out["ece_before"] = before_macro.get("ece")
+    out["ece_after"] = after_macro.get("ece")
+    out["nll_before"] = ts.get("nll_before", before_macro.get("nll"))
+    out["nll_after"] = ts.get("nll_after", after_macro.get("nll"))
+    out["brier_before"] = before_macro.get("brier")
+    out["brier_after"] = after_macro.get("brier")
+    return out
+
+
 def reconcile_with_legacy(run_dir: Path, result: EvaluationResult) -> dict:
     """Compara o resultado v2 com artefatos legados da run (se existirem)."""
     reconciliation: dict = {"run_dir": str(run_dir), "legacy_files": [], "deltas": {}}
@@ -461,16 +511,23 @@ def reconcile_with_legacy(run_dir: Path, result: EvaluationResult) -> dict:
     legacy_cal_path = run_dir / "calibration.json"
     if legacy_cal_path.exists():
         legacy = json.loads(legacy_cal_path.read_text(encoding="utf-8"))
+        extracted = _extract_legacy_calibration(legacy)
         reconciliation["legacy_files"].append("calibration.json")
         reconciliation["deltas"]["temperature"] = {
-            "legacy": legacy.get("temperature"),
+            "legacy": extracted["temperature"],
             "v2": result.calibration["temperature"],
         }
         reconciliation["deltas"]["ece"] = {
-            "legacy_pre": legacy.get("ece_before"),
-            "legacy_post": legacy.get("ece_after"),
+            "legacy_pre": extracted["ece_before"],
+            "legacy_post": extracted["ece_after"],
             "v2_pre": result.metrics["metrics"]["ece_pre_calibration"],
             "v2_post": result.metrics["metrics"]["ece_post_calibration"],
+        }
+        reconciliation["deltas"]["nll"] = {
+            "legacy_pre": extracted["nll_before"],
+            "legacy_post": extracted["nll_after"],
+            "v2_pre": result.metrics["metrics"]["nll"],
+            "v2_post": result.metrics["metrics"]["nll_post_temperature"],
         }
     return reconciliation
 
