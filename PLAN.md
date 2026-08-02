@@ -13,7 +13,8 @@ reais da reavaliação (BCE pós-T exato, ICs, ECE×NORM, comparabilidade).
 **DECISÃO (owner, 2026-08-01):** Caminho A (teacher + destilação) escolhido — H8 (capacidade)
 entra como trilha D (T10.2.1); defaults: varredura 500k/1M/5M, 1 lead padrão (12 leads em D3).
 Fila (uma task por sessão): T10.1 ✅ → T9.2 ✅ → T9.3 ✅ → T10.2 ✅ → T10.2.1 ✅ → T9.4 ✅ →
-G6 → T10.3 → T9.5 → T11. T6/T7/T8 seguem ao final.
+G6 ✅ → T10.3-P ✅ → [aprovações: split pareado + compute] → T10.3 → T9.5 → T11.
+T6/T7/T8 seguem ao final.
 
 - [x] T9.1 `docs/ml_protocol_v2.md` — documento normativo (métricas equalizadas, calibração,
   thresholds, comparação, treino, promoção). Sem alteração de código de QG.
@@ -48,9 +49,17 @@ G6 → T10.3 → T9.5 → T11. T6/T7/T8 seguem ao final.
   avaliador estendido: **`ece_norm0` (estratificado, schema 2.0 backward compat) + IC95 por
   classe (PR-AUC/AUROC) em artefato**; testes `test_ml_protocol_configs.py` (7) +
   `test_canonical_evaluator.py` (12) verdes.
-- [ ] G6 hotfix `reconcile_with_legacy` (schema aninhado legado) — pré-requisito de T9.5
-- [ ] T10.3 Pilotos pequenos `PILOT` (BLOQUEADO até T9.4 + G6; ordem C→F→{K,T}→R→B→P; células
-  H7 primeiro: `A1+BCE`, `A0+focal`, split pareado v2)
+- [x] G6 hotfix `reconcile_with_legacy` — `_extract_legacy_calibration` lê schema plano (T1) e
+  aninhado (FASE 8: `temperature_scaling.temperature` + `before/after` ou
+  `temperature_scaling.calibration_after`, estrutura real do A0 novo); deltas de T/ECE/NLL deixam
+  de vir `null`; 3 testes (nested, flat, arquivo real com skipif).
+- [x] T10.3-P `docs/t10_3_pilot_execution_plan.md` — plano de execução de pilotos: 18 células na
+  1ª rodada (C0–C3, D0, F/K/T, D1–D2), ~11,6 CPU-h, gates de continuação, critérios de parada por
+  hipótese, promoção (10+12+5), rollback. **Não autoriza execução.**
+- [ ] ⏳ APROVAÇÕES PENDENTES (bloqueiam T10.3): split pareado v2 (geração + freeze) · compute
+  ~11,6 CPU-h · D4 separado · promoção · RFC T9.5
+- [ ] T10.3 Execução de pilotos `PILOT` (só após aprovações; ordem C→F→{K,T}→D; regra de parada
+  mestra C1 vs C0)
 - [ ] T9.5 RFC `docs/rfc_qg4_bce_threshold.md` (sem alterar QG em código; incluir baseline
   teórico de BCE e divergência época-17 vs checkpoint-28)
 - [ ] T11 Pré-treinos oficiais v2 (somente com governança)
