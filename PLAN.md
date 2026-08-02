@@ -10,8 +10,10 @@ Plano de execução de tasks decompostas. Atualizado a cada sessão.
 Pilotos (T10.3) só após T9.2 + configs v2, status `PILOT` (nunca benchmark/promoção/publicação).
 **REORDENAÇÃO (owner, 2026-08-01):** T9.3 antes de T10.2 — a matriz de hipóteses precisa dos dados
 reais da reavaliação (BCE pós-T exato, ICs, ECE×NORM, comparabilidade).
-Fila (uma task por sessão): T10.1 ✅ → T9.2 ✅ → T9.3 ✅ → T10.2 → T9.4 → T10.3 → T9.5 → T11.
-T6/T7/T8 seguem ao final.
+**DECISÃO (owner, 2026-08-01):** Caminho A (teacher + destilação) escolhido — H8 (capacidade)
+entra como trilha D (T10.2.1); defaults: varredura 500k/1M/5M, 1 lead padrão (12 leads em D3).
+Fila (uma task por sessão): T10.1 ✅ → T9.2 ✅ → T9.3 ✅ → T10.2 ✅ → T10.2.1 ✅ → T9.4 →
+G6 → T10.3 → T9.5 → T11. T6/T7/T8 seguem ao final.
 
 - [x] T9.1 `docs/ml_protocol_v2.md` — documento normativo (métricas equalizadas, calibração,
   thresholds, comparação, treino, promoção). Sem alteração de código de QG.
@@ -34,8 +36,15 @@ T6/T7/T8 seguem ao final.
   F×6 focal-γ, K×4 calibração c/ métrica NORM=0, R×5 RF c/ restrições TinyML, T×4 thresholds
   PROSPECTIVE, B×3 orçamento, P×3 formulação); split pareado v2 definido (normativo); 10
   critérios piloto→candidato; orçamento ≈ 14–17 CPU-h; execução C→F→{K,T}→R→B→P.
-- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (sem treinar; split manifest fixo + estratificado;
-  incluir extensão do avaliador: IC por classe em artefato + métrica `ece_norm0`)
+- [x] T10.2.1 `docs/ablation_matrix_v2_appendix_D.md` — trilha teacher/destilação: H8
+  (capacidade, P0) com refutação; 6 células D0–D5 (500k/1M/5M, 1 lead padrão, 12 leads em D3);
+  protocolo KD com **correção sigmoid-KD por rótulo** (tarefa multi-label; softmax-KD do prompt
+  registrada e corrigida); nota de honestidade paramétrica (alvos 500k/1M/5M pinados em T9.4);
+  12 critérios student→candidato; orçamento ≈ 18–20 h CPU; ordem D0→D1→D2→{D3,D5}→D4
+  (condicional). Matriz v2 atualizada (H8 na seção 1 + Trilha D na seção 13).
+- [ ] T9.4 `configs/ml_protocol/v2/*.yaml` (incluir `teacher_resnet1d.yaml`,
+  `teacher_inception1d.yaml`, `distillation_kd.yaml`, student A1-64k para D5 + pino de params
+  com teste de orçamento; extensão do avaliador: IC por classe em artefato + métrica `ece_norm0`)
 - [ ] G6 hotfix `reconcile_with_legacy` (schema aninhado legado) — pré-requisito de T9.5
 - [ ] T10.3 Pilotos pequenos `PILOT` (BLOQUEADO até T9.4 + G6; ordem C→F→{K,T}→R→B→P; células
   H7 primeiro: `A1+BCE`, `A0+focal`, split pareado v2)
