@@ -23,6 +23,15 @@ make pretrain-check       # lint + testes do pipeline de pré-treino
 make pretrain-validate    # valida artefatos do último run
 make pretrain-export-smoke  # TFLite float32/INT8 + FlatBuffer < 64KB
 
+# --- Pilotos T10.3 (execução manual, protocolo v2 — NUNCA promover) ---
+make pilot-split          # gera o split pareado v2 (idempotente; FORCE=1 regenera)
+make pilot-smoke          # smoke end-to-end da esteira de pilotos (1 época/50 passos)
+make pilot-c0             # piloto C0 — A0 + BCE (baseline pareado; ~35 min CPU)
+make pilot-c1             # piloto C1 — A1 + BCE (isola arquitetura; ~40 min CPU)
+make pilot-c2             # piloto C2 — A1 + focal γ=2 (sanidade A2-full; ~40 min CPU)
+make pilot-c3             # piloto C3 — A0 + focal γ=2 (leitura arch×loss; ~35 min CPU)
+# Ordem obrigatória e gates: docs/t10_3_manual_execution_runbook.md
+
 make e07r-check           # preflight E07R (9 checks)
 make e07r-status          # painel: preflight + células + seleção
 make e07r-e065            # E06.5-PD (resume write-once)
