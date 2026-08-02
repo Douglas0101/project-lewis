@@ -102,6 +102,37 @@ def test_find_predecessor_metrics(tmp_path, monkeypatch):
     assert found["metrics"]["macro_pr_auc"] == pytest.approx(0.6749)
 
 
+def test_find_predecessor_skips_smoke_runs(tmp_path, monkeypatch):
+    import scripts.run_pilot_cell as rpc
+
+    real = tmp_path / "experiments" / "20260802_043748_pretrain_chapman"
+    (real / "evaluation_v2").mkdir(parents=True)
+    (real / "pilot_status.json").write_text(
+        json.dumps({"cell": "c1", "status": "PILOT", "smoke": False})
+    )
+    (real / "evaluation_v2" / "metrics.json").write_text(json.dumps(_metrics(0.6749)))
+    smoke = tmp_path / "experiments" / "20260802_160302_pretrain_chapman"
+    (smoke / "evaluation_v2").mkdir(parents=True)
+    (smoke / "pilot_status.json").write_text(
+        json.dumps({"cell": "c1", "status": "PILOT", "smoke": True})
+    )
+    (smoke / "evaluation_v2" / "metrics.json").write_text(json.dumps(_metrics(0.3574)))
+    monkeypatch.setattr(rpc, "PROJECT_ROOT", tmp_path)
+    found = find_predecessor_metrics("c2")
+    assert found is not None
+    # a run de smoke (mais nova, métrica baixa) NÃO pode virar baseline
+    assert found["metrics"]["macro_pr_auc"] == pytest.approx(0.6749)
+
+
+# --- smoke não passa por gate ------------------------------------------------
+def test_smoke_gate_is_disabled():
+    from scripts.run_pilot_cell import gate_for_cell
+
+    passed, reason = gate_for_cell("c1", _metrics(0.3574), _metrics(0.6458), smoke=True)
+    assert passed is True
+    assert "smoke" in reason
+
+
 # --- P0-07: IDs alinhados ---------------------------------------------------
 def test_iter_partition_ids_aligned_and_sequential(monkeypatch):
     import src.models.chapman_dataset as cd

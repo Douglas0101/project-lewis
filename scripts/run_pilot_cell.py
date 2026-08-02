@@ -103,8 +103,24 @@ def evaluate_cell_gate(
     return True, f"{cell.upper()} ≥ {PREDECESSOR[cell].upper()} dentro da banda de ruído"
 
 
+def gate_for_cell(
+    cell: str,
+    metrics: dict,
+    baseline_metrics: Optional[dict],
+    smoke: bool,
+) -> tuple[bool, str]:
+    """Gate da célula; em smoke (validação de engenharia) o gate é desativado."""
+    if smoke:
+        return True, "smoke — validação de engenharia; gate desativado"
+    return evaluate_cell_gate(cell, metrics, baseline_metrics)
+
+
 def find_predecessor_metrics(cell: str) -> Optional[dict]:
-    """Métricas da run mais recente da célula predecessora (pilot_status.json)."""
+    """Métricas da run mais recente da célula predecessora (pilot_status.json).
+
+    Runs de smoke (``pilot_status.smoke == true``) são ignoradas: não são
+    evidência científica e não podem servir de baseline de gate.
+    """
     predecessor = PREDECESSOR.get(cell)
     if predecessor is None:
         return None
@@ -117,6 +133,8 @@ def find_predecessor_metrics(cell: str) -> Optional[dict]:
         try:
             status = json.loads(status_path.read_text(encoding="utf-8"))
         except json.JSONDecodeError:
+            continue
+        if status.get("smoke"):
             continue
         if status.get("cell") == predecessor and status.get("status") == "PILOT":
             LOGGER.info("predecessora de %s: %s (%s)", cell, predecessor, run_dir.name)
@@ -202,8 +220,8 @@ def run_cell(cell: str, manifest: Path, epochs: int, smoke: bool) -> int:
 
     # 4. gate da célula (RF-QG-003) — lê o evaluation_v2 do checkpoint implantável
     metrics = json.loads((out_dir / "metrics.json").read_text(encoding="utf-8"))
-    baseline_metrics = find_predecessor_metrics(cell)
-    gate_pass, gate_reason = evaluate_cell_gate(cell, metrics, baseline_metrics)
+    baseline_metrics = None if smoke else find_predecessor_metrics(cell)
+    gate_pass, gate_reason = gate_for_cell(cell, metrics, baseline_metrics, smoke)
     LOGGER.info("gate %s: %s", cell, gate_reason)
 
     # 5. pilot_status.json (PILOT — nunca CANDIDATE sem governança)
