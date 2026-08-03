@@ -1,0 +1,2778 @@
+{
+ "runs": [
+  {
+   "run_dir": "experiments/20260802_035117_pretrain_chapman",
+   "run_id": "20260802_035117_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ],
+    [
+     "grave",
+     "test.npz presente sem model_freeze.json (RF-DATA-005)"
+    ],
+    [
+     "aviso",
+     "validation.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "calibration.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "test.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ]
+   ],
+   "config": {
+    "architecture": "a0",
+    "loss": "bce",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a0_baseline"
+   },
+   "pilot": {
+    "cell": "c0",
+    "smoke": false,
+    "runtime_profile": null,
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "489993e29d04584bcc463fd8afd5a5a474d093da",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": false,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "bce",
+     "architecture": "a0",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 29,
+     "val_loss": 0.3888096213340759,
+     "val_auc_roc": 0.8289973139762878,
+     "val_auc_pr": 0.6660729646682739
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 29,
+     "value": 0.6660729646682739
+    },
+    "best_val_auc_roc": {
+     "epoch": 29,
+     "value": 0.8289973139762878
+    },
+    "best_val_loss": {
+     "epoch": 29,
+     "value": 0.3888096213340759
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0005000000237487257
+    ],
+    "lr_reductions": 1
+   },
+   "checkpoint_epoch": 29,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 29,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": true,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_035117_pretrain_chapman/backbone_pretrained.keras",
+    "size": 291112,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 9670,
+     "model.weights.h5": 281048
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@01:32:44"
+    },
+    "keras_class": "Functional",
+    "n_layers": 11
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_035117_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 1800112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 6.664678494416876e-06,
+       "max": 0.9999998807907104
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_035117_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 2.9933999030617997e-05,
+       "max": 0.9999993443489075
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "test": {
+     "path": "experiments/20260802_035117_pretrain_chapman/evaluation_v2/predictions/test.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 1.9857290681102313e-05,
+       "max": 0.9999973773956299
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    }
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.645796587186379,
+    "macro_auroc": 0.8241441515470885,
+    "ece_post_calibration": 0.015872252603076602,
+    "temperature": 0.9394198963196815
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_043748_pretrain_chapman",
+   "run_id": "20260802_043748_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ],
+    [
+     "grave",
+     "test.npz presente sem model_freeze.json (RF-DATA-005)"
+    ],
+    [
+     "aviso",
+     "validation.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "calibration.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "test.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ]
+   ],
+   "config": {
+    "architecture": "a1",
+    "loss": "bce",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a1_stable"
+   },
+   "pilot": {
+    "cell": "c1",
+    "smoke": false,
+    "runtime_profile": null,
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "489993e29d04584bcc463fd8afd5a5a474d093da",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": false,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "bce",
+     "architecture": "a1",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 29,
+     "val_loss": 0.3481726050376892,
+     "val_auc_roc": 0.8565117120742798,
+     "val_auc_pr": 0.696557879447937
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 29,
+     "value": 0.696557879447937
+    },
+    "best_val_auc_roc": {
+     "epoch": 30,
+     "value": 0.856669545173645
+    },
+    "best_val_loss": {
+     "epoch": 29,
+     "value": 0.3481726050376892
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0005000000237487257
+    ],
+    "lr_reductions": 1
+   },
+   "checkpoint_epoch": 29,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 29,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": true,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_043748_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478079,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 18821,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@02:07:57"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_043748_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 1800112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 2.4270994458674977e-07,
+       "max": 1.0
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_043748_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 2.8594263312697876e-07,
+       "max": 1.0
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "test": {
+     "path": "experiments/20260802_043748_pretrain_chapman/evaluation_v2/predictions/test.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 7.228501317513292e-07,
+       "max": 1.0
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    }
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.6749101010206544,
+    "macro_auroc": 0.8502353511473182,
+    "ece_post_calibration": 0.018685869226233002,
+    "temperature": 0.914998844346894
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_051138_pretrain_chapman",
+   "run_id": "20260802_051138_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "época do QG4 (16) ≠ época do checkpoint (29, monitor val_auc_pr)"
+    ],
+    [
+     "aviso",
+     "run focal: braço do QG4 rotulado 'val_loss' (valor efetivo: val_bce_monitor)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ],
+    [
+     "grave",
+     "test.npz presente sem model_freeze.json (RF-DATA-005)"
+    ],
+    [
+     "aviso",
+     "validation.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "calibration.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "test.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ]
+   ],
+   "config": {
+    "architecture": "a1",
+    "loss": "focal",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a1_stable"
+   },
+   "pilot": {
+    "cell": "c2",
+    "smoke": false,
+    "runtime_profile": null,
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "489993e29d04584bcc463fd8afd5a5a474d093da",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": false,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "focal",
+     "architecture": "a1",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 16,
+     "val_loss": 0.425537109375,
+     "val_auc_roc": 0.845938503742218,
+     "val_auc_pr": 0.6763997673988342
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "bce_monitor",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_bce_monitor",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 29,
+     "value": 0.6971021890640259
+    },
+    "best_val_auc_roc": {
+     "epoch": 30,
+     "value": 0.8586403131484985
+    },
+    "best_val_loss": {
+     "epoch": 30,
+     "value": 0.09116945415735245
+    },
+    "best_val_bce_monitor": {
+     "epoch": 16,
+     "value": 0.425537109375
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0002500000118743628
+    ],
+    "lr_reductions": 2
+   },
+   "checkpoint_epoch": 29,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 16,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": true,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_051138_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478572,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 19314,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@02:39:40"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_051138_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 1800112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.005888388957828283,
+       "max": 0.9996479749679565
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_051138_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0074959504418075085,
+       "max": 0.9997143149375916
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "test": {
+     "path": "experiments/20260802_051138_pretrain_chapman/evaluation_v2/predictions/test.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.006612604018300772,
+       "max": 0.9995886087417603
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    }
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.674763558974316,
+    "macro_auroc": 0.8520818991832642,
+    "ece_post_calibration": 0.02165549405088877,
+    "temperature": 0.33989937547916366
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_054320_pretrain_chapman",
+   "run_id": "20260802_054320_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "época do QG4 (16) ≠ época do checkpoint (29, monitor val_auc_pr)"
+    ],
+    [
+     "aviso",
+     "run focal: braço do QG4 rotulado 'val_loss' (valor efetivo: val_bce_monitor)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ],
+    [
+     "grave",
+     "test.npz presente sem model_freeze.json (RF-DATA-005)"
+    ],
+    [
+     "aviso",
+     "validation.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "calibration.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "test.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ]
+   ],
+   "config": {
+    "architecture": "a0",
+    "loss": "focal",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a0_baseline"
+   },
+   "pilot": {
+    "cell": "c3",
+    "smoke": false,
+    "runtime_profile": null,
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "489993e29d04584bcc463fd8afd5a5a474d093da",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": false,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "focal",
+     "architecture": "a0",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 16,
+     "val_loss": 0.4646654725074768,
+     "val_auc_roc": 0.8209692239761353,
+     "val_auc_pr": 0.6531628966331482
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "bce_monitor",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_bce_monitor",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 29,
+     "value": 0.6707690954208374
+    },
+    "best_val_auc_roc": {
+     "epoch": 29,
+     "value": 0.8329530954360962
+    },
+    "best_val_loss": {
+     "epoch": 29,
+     "value": 0.10060659050941467
+    },
+    "best_val_bce_monitor": {
+     "epoch": 16,
+     "value": 0.4646654725074768
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0002500000118743628
+    ],
+    "lr_reductions": 2
+   },
+   "checkpoint_epoch": 29,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 16,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": true,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_054320_pretrain_chapman/backbone_pretrained.keras",
+    "size": 291605,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 10163,
+     "model.weights.h5": 281048
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@03:06:29"
+    },
+    "keras_class": "Functional",
+    "n_layers": 11
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_054320_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 1800112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.009540848433971405,
+       "max": 0.998207151889801
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_054320_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.023134563118219376,
+       "max": 0.9962373971939087
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "test": {
+     "path": "experiments/20260802_054320_pretrain_chapman/evaluation_v2/predictions/test.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.005560886114835739,
+       "max": 0.9984546303749084
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    }
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.6507225519212143,
+    "macro_auroc": 0.8279946675069236,
+    "ece_post_calibration": 0.01493503567992959,
+    "temperature": 0.3439243944375939
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_033236_pretrain_chapman",
+   "run_id": "20260802_033236_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ],
+    [
+     "grave",
+     "test.npz presente sem model_freeze.json (RF-DATA-005)"
+    ],
+    [
+     "aviso",
+     "validation.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "calibration.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ],
+    [
+     "aviso",
+     "test.npz: sem IDs (record/segment/patient) — overlap e segmentação não verificáveis"
+    ]
+   ],
+   "config": {
+    "architecture": "a1",
+    "loss": "bce",
+    "seed": 13,
+    "epochs": 1,
+    "name": "a1_stable"
+   },
+   "pilot": {
+    "cell": "c1",
+    "smoke": true,
+    "runtime_profile": null,
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "4c88def3904fc319027f898f5aeb9da48a52bd40",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": false,
+    "runtime": null,
+    "training": {
+     "epochs": 1,
+     "batch_size": 64,
+     "steps_per_epoch": 50,
+     "validation_steps": 50,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "bce",
+     "architecture": "a1",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 1,
+     "val_loss": 0.5583989024162292,
+     "val_auc_roc": 0.5368240475654602,
+     "val_auc_pr": 0.36883318424224854
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_loss"
+    ],
+    "epochs": 1,
+    "best_val_auc_pr": {
+     "epoch": 1,
+     "value": 0.36883318424224854
+    },
+    "best_val_auc_roc": {
+     "epoch": 1,
+     "value": 0.5368240475654602
+    },
+    "best_val_loss": {
+     "epoch": 1,
+     "value": 0.5583989024162292
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0010000000474974513
+    ],
+    "lr_reductions": 0
+   },
+   "checkpoint_epoch": 1,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 1,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": true,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_033236_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478079,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 18821,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@00:32:50"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_033236_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 1800112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.000174367509316653,
+       "max": 0.993452250957489
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_033236_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.001361895352602005,
+       "max": 0.9768444895744324
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    },
+    "test": {
+     "path": "experiments/20260802_033236_pretrain_chapman/evaluation_v2/predictions/test.npz",
+     "size": 900112,
+     "arrays": {
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.00050467619439587,
+       "max": 0.987895131111145
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "y_score",
+      "y_true"
+     ]
+    }
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.3538697918202287,
+    "macro_auroc": 0.5044955363199015,
+    "ece_post_calibration": 0.06771509688297751,
+    "temperature": 0.8292963530912533
+   }
+  },
+  {
+   "run_dir": "experiments/20260728_053011_pretrain_chapman",
+   "run_id": "20260728_053011_pretrain_chapman",
+   "issues": [
+    [
+     "info",
+     "qg4_result.json ausente (pré-contrato 10.4/10.6?)"
+    ],
+    [
+     "info",
+     "run_status.json ausente (pré-contrato 10.4/10.6?)"
+    ],
+    [
+     "aviso",
+     "deterministic_mode=strict com onednn_enabled=true (rótulo não reflete o ambiente efetivo)"
+    ],
+    [
+     "info",
+     "predictions.npz de schema legado (sem partição no nome)"
+    ]
+   ],
+   "config": {
+    "architecture": "a2",
+    "loss": "focal",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a1_stable"
+   },
+   "pilot": null,
+   "provenance": {
+    "git_commit": "48931a7e1814fafa1037ac287bf2f59e208ebea7",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": true,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 704,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "focal",
+     "architecture": "a2"
+    },
+    "metrics": {
+     "best_epoch": 18,
+     "val_loss": 0.42256972193717957,
+     "val_auc_roc": 0.8596203923225403,
+     "val_auc_pr": 0.7007931470870972
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "bce_monitor",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_bce_monitor",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 29,
+     "value": 0.7064253687858582
+    },
+    "best_val_auc_roc": {
+     "epoch": 29,
+     "value": 0.8639130592346191
+    },
+    "best_val_loss": {
+     "epoch": 29,
+     "value": 0.08975362032651901
+    },
+    "best_val_bce_monitor": {
+     "epoch": 18,
+     "value": 0.42256972193717957
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0005000000237487257
+    ],
+    "lr_reductions": 1
+   },
+   "checkpoint_epoch": 29,
+   "checkpoint_monitor": "val_loss",
+   "qg4_epoch": null,
+   "split_id": null,
+   "test_npz": false,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260728_053011_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478572,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 19314,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-07-28@03:01:58"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": "ausente",
+    "calibration": "ausente",
+    "test": "ausente"
+   },
+   "evaluation": {
+    "protocol_status": "RETROSPECTIVE",
+    "split_id": "chapman-record-disjoint-val0.1-seed13",
+    "macro_pr_auc": 0.7065108082462498,
+    "macro_auroc": 0.863939469967956,
+    "ece_post_calibration": 0.015188962160050895,
+    "temperature": 0.3741036858061345
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_161312_pretrain_chapman",
+   "run_id": "20260802_161312_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "runtime_profile=fast (pilot_status) mas provenance registra deterministic_mode=strict — perfil não propagado ao treino"
+    ],
+    [
+     "aviso",
+     "deterministic_mode=strict com onednn_enabled=true (rótulo não reflete o ambiente efetivo)"
+    ],
+    [
+     "aviso",
+     "época do QG4 (25) ≠ época do checkpoint (20, monitor val_auc_pr)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ]
+   ],
+   "config": {
+    "architecture": "a0",
+    "loss": "bce",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a0_baseline"
+   },
+   "pilot": {
+    "cell": "c0",
+    "smoke": false,
+    "runtime_profile": "fast",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "db827d05f924e7411e1373617c3fad9b7e122de7",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": true,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "bce",
+     "architecture": "a0",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 25,
+     "val_loss": 0.393542617559433,
+     "val_auc_roc": 0.8262255787849426,
+     "val_auc_pr": 0.65932297706604
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_loss"
+    ],
+    "epochs": 25,
+    "best_val_auc_pr": {
+     "epoch": 20,
+     "value": 0.6594581604003906
+    },
+    "best_val_auc_roc": {
+     "epoch": 25,
+     "value": 0.8262255787849426
+    },
+    "best_val_loss": {
+     "epoch": 25,
+     "value": 0.393542617559433
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0005000000237487257
+    ],
+    "lr_reductions": 1
+   },
+   "checkpoint_epoch": 20,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 25,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": false,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_161312_pretrain_chapman/backbone_pretrained.keras",
+    "size": 291112,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 9670,
+     "model.weights.h5": 281048
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@13:25:24"
+    },
+    "keras_class": "Functional",
+    "n_layers": 11
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_161312_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 6299872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 1.2315098501858301e-05,
+       "max": 0.9999998211860657
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 4499,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_161312_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 3149872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 7.244765583891422e-05,
+       "max": 0.9999906420707703
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 2249,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "test": "ausente",
+    "overlap_calibration_validation": 0
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.659506806851845,
+    "macro_auroc": 0.8247306763120268,
+    "ece_post_calibration": 0.01835943606122084,
+    "temperature": 1.0014085771042887
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_163129_pretrain_chapman",
+   "run_id": "20260802_163129_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "runtime_profile=fast (pilot_status) mas provenance registra deterministic_mode=strict — perfil não propagado ao treino"
+    ],
+    [
+     "aviso",
+     "deterministic_mode=strict com onednn_enabled=true (rótulo não reflete o ambiente efetivo)"
+    ],
+    [
+     "aviso",
+     "época do QG4 (28) ≠ época do checkpoint (26, monitor val_auc_pr)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ]
+   ],
+   "config": {
+    "architecture": "a1",
+    "loss": "bce",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a1_stable"
+   },
+   "pilot": {
+    "cell": "c1",
+    "smoke": false,
+    "runtime_profile": "fast",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "db827d05f924e7411e1373617c3fad9b7e122de7",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": true,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "bce",
+     "architecture": "a1",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 28,
+     "val_loss": 0.34726473689079285,
+     "val_auc_roc": 0.8564168214797974,
+     "val_auc_pr": 0.6950746774673462
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 26,
+     "value": 0.6956440806388855
+    },
+    "best_val_auc_roc": {
+     "epoch": 30,
+     "value": 0.8570971488952637
+    },
+    "best_val_loss": {
+     "epoch": 28,
+     "value": 0.34726473689079285
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0002500000118743628
+    ],
+    "lr_reductions": 2
+   },
+   "checkpoint_epoch": 26,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 28,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": false,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_163129_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478079,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 18821,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@13:48:52"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_163129_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 6299872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 7.5104785537405405e-06,
+       "max": 1.0
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 4499,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_163129_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 3149872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 1.5239257663779426e-05,
+       "max": 1.0
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 2249,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "test": "ausente",
+    "overlap_calibration_validation": 0
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.6955722034399778,
+    "macro_auroc": 0.8550759439969685,
+    "ece_post_calibration": 0.019033480459223817,
+    "temperature": 0.9605525420297909
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_165458_pretrain_chapman",
+   "run_id": "20260802_165458_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "runtime_profile=fast (pilot_status) mas provenance registra deterministic_mode=strict — perfil não propagado ao treino"
+    ],
+    [
+     "aviso",
+     "deterministic_mode=strict com onednn_enabled=true (rótulo não reflete o ambiente efetivo)"
+    ],
+    [
+     "aviso",
+     "época do QG4 (29) ≠ época do checkpoint (30, monitor val_auc_pr)"
+    ],
+    [
+     "aviso",
+     "run focal: braço do QG4 rotulado 'val_loss' (valor efetivo: val_bce_monitor)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ]
+   ],
+   "config": {
+    "architecture": "a1",
+    "loss": "focal",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a1_stable"
+   },
+   "pilot": {
+    "cell": "c2",
+    "smoke": false,
+    "runtime_profile": "fast",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "db827d05f924e7411e1373617c3fad9b7e122de7",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": true,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "focal",
+     "architecture": "a1",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 29,
+     "val_loss": 0.4333935081958771,
+     "val_auc_roc": 0.8574215173721313,
+     "val_auc_pr": 0.6946278810501099
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "bce_monitor",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_bce_monitor",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 30,
+     "value": 0.6963675022125244
+    },
+    "best_val_auc_roc": {
+     "epoch": 30,
+     "value": 0.8591550588607788
+    },
+    "best_val_loss": {
+     "epoch": 28,
+     "value": 0.09076353162527084
+    },
+    "best_val_bce_monitor": {
+     "epoch": 29,
+     "value": 0.4333935081958771
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0002500000118743628
+    ],
+    "lr_reductions": 2
+   },
+   "checkpoint_epoch": 30,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 29,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": false,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_165458_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478572,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 19314,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@14:14:53"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_165458_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 6299872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.011535026133060455,
+       "max": 0.9994277358055115
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 4499,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_165458_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 3149872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.01695535145699978,
+       "max": 0.9983327984809875
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 2249,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "test": "ausente",
+    "overlap_calibration_validation": 0
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.696439414482937,
+    "macro_auroc": 0.8592130126563703,
+    "ece_post_calibration": 0.022156805593396646,
+    "temperature": 0.35834840421385544
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_171757_pretrain_chapman",
+   "run_id": "20260802_171757_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "runtime_profile=fast (pilot_status) mas provenance registra deterministic_mode=strict — perfil não propagado ao treino"
+    ],
+    [
+     "aviso",
+     "deterministic_mode=strict com onednn_enabled=true (rótulo não reflete o ambiente efetivo)"
+    ],
+    [
+     "aviso",
+     "época do QG4 (13) ≠ época do checkpoint (30, monitor val_auc_pr)"
+    ],
+    [
+     "aviso",
+     "run focal: braço do QG4 rotulado 'val_loss' (valor efetivo: val_bce_monitor)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ]
+   ],
+   "config": {
+    "architecture": "a0",
+    "loss": "focal",
+    "seed": 13,
+    "epochs": 30,
+    "name": "a0_baseline"
+   },
+   "pilot": {
+    "cell": "c3",
+    "smoke": false,
+    "runtime_profile": "fast",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "db827d05f924e7411e1373617c3fad9b7e122de7",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": true,
+    "runtime": null,
+    "training": {
+     "epochs": 30,
+     "batch_size": 64,
+     "steps_per_epoch": 1000,
+     "validation_steps": 703,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "focal",
+     "architecture": "a0",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 13,
+     "val_loss": 0.46833038330078125,
+     "val_auc_roc": 0.8201395273208618,
+     "val_auc_pr": 0.6504928469657898
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "bce_monitor",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_bce_monitor",
+     "val_loss"
+    ],
+    "epochs": 30,
+    "best_val_auc_pr": {
+     "epoch": 30,
+     "value": 0.67219477891922
+    },
+    "best_val_auc_roc": {
+     "epoch": 30,
+     "value": 0.834419846534729
+    },
+    "best_val_loss": {
+     "epoch": 28,
+     "value": 0.10022962838411331
+    },
+    "best_val_bce_monitor": {
+     "epoch": 13,
+     "value": 0.46833038330078125
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0002500000118743628
+    ],
+    "lr_reductions": 2
+   },
+   "checkpoint_epoch": 30,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 13,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": false,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_171757_pretrain_chapman/backbone_pretrained.keras",
+    "size": 291605,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 10163,
+     "model.weights.h5": 281048
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@14:36:26"
+    },
+    "keras_class": "Functional",
+    "n_layers": 11
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_171757_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 6299872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.004676723387092352,
+       "max": 0.9987729787826538
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 4499,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_171757_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 3149872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.01763196289539337,
+       "max": 0.9947293400764465
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 2249,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "test": "ausente",
+    "overlap_calibration_validation": 0
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.6723289893166815,
+    "macro_auroc": 0.8344513371420532,
+    "ece_post_calibration": 0.018494027404648092,
+    "temperature": 0.36294003061815616
+   }
+  },
+  {
+   "run_dir": "experiments/20260802_161023_pretrain_chapman",
+   "run_id": "20260802_161023_pretrain_chapman",
+   "issues": [
+    [
+     "aviso",
+     "runtime_profile=fast (pilot_status) mas provenance registra deterministic_mode=strict — perfil não propagado ao treino"
+    ],
+    [
+     "aviso",
+     "deterministic_mode=strict com onednn_enabled=true (rótulo não reflete o ambiente efetivo)"
+    ],
+    [
+     "aviso",
+     "split pareado sem split_manifest_sha256 na proveniência (linhagem só por split_id)"
+    ],
+    [
+     "aviso",
+     "provenance.dataset.split_policy descreve split legado, não o manifesto pareado"
+    ]
+   ],
+   "config": {
+    "architecture": "a1",
+    "loss": "bce",
+    "seed": 13,
+    "epochs": 1,
+    "name": "a1_stable"
+   },
+   "pilot": {
+    "cell": "c1",
+    "smoke": true,
+    "runtime_profile": "fast",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "seed": 13,
+    "early_stopping_metric": "val_auc_pr",
+    "protocol_status": "PROSPECTIVE",
+    "status": "PILOT"
+   },
+   "provenance": {
+    "git_commit": "db827d05f924e7411e1373617c3fad9b7e122de7",
+    "seed": 13,
+    "deterministic_mode": "strict",
+    "onednn_enabled": true,
+    "runtime": null,
+    "training": {
+     "epochs": 1,
+     "batch_size": 64,
+     "steps_per_epoch": 50,
+     "validation_steps": 50,
+     "lr_initial": 0.001,
+     "optimizer": "adam",
+     "loss": "bce",
+     "architecture": "a1",
+     "split_id": "chapman-record-disjoint-paired-v2",
+     "early_stopping_metric": "val_auc_pr"
+    },
+    "metrics": {
+     "best_epoch": 1,
+     "val_loss": 0.558396577835083,
+     "val_auc_roc": 0.5368172526359558,
+     "val_auc_pr": 0.3688006103038788
+    },
+    "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)"
+   },
+   "history": {
+    "metrics": [
+     "auc_pr",
+     "auc_roc",
+     "learning_rate",
+     "loss",
+     "val_auc_pr",
+     "val_auc_roc",
+     "val_loss"
+    ],
+    "epochs": 1,
+    "best_val_auc_pr": {
+     "epoch": 1,
+     "value": 0.3688006103038788
+    },
+    "best_val_auc_roc": {
+     "epoch": 1,
+     "value": 0.5368172526359558
+    },
+    "best_val_loss": {
+     "epoch": 1,
+     "value": 0.558396577835083
+    },
+    "lr_first_last": [
+     0.0010000000474974513,
+     0.0010000000474974513
+    ],
+    "lr_reductions": 0
+   },
+   "checkpoint_epoch": 1,
+   "checkpoint_monitor": "val_auc_pr",
+   "qg4_epoch": 1,
+   "split_id": "chapman-record-disjoint-paired-v2",
+   "test_npz": false,
+   "hash_checks": {
+    "model": true,
+    "config.json": true,
+    "history.json": true,
+    "metrics_per_class.json": true,
+    "validation_meta_model": true
+   },
+   "keras_zip": {
+    "path": "experiments/20260802_161023_pretrain_chapman/backbone_pretrained.keras",
+    "size": 478079,
+    "entries": {
+     "metadata.json": 64,
+     "config.json": 18821,
+     "model.weights.h5": 458864
+    },
+    "keras_metadata": {
+     "keras_version": "3.14.1",
+     "date_saved": "2026-08-02@13:10:31"
+    },
+    "keras_class": "Functional",
+    "n_layers": 22
+   },
+   "predictions": {
+    "validation": {
+     "path": "experiments/20260802_161023_pretrain_chapman/evaluation_v2/predictions/validation.npz",
+     "size": 6299872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        44990
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0001742975291563198,
+       "max": 0.993458092212677
+      },
+      "y_true": {
+       "shape": [
+        44990,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 4499,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "calibration": {
+     "path": "experiments/20260802_161023_pretrain_chapman/evaluation_v2/predictions/calibration.npz",
+     "size": 3149872,
+     "arrays": {
+      "patient_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "record_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U7"
+      },
+      "segment_ids": {
+       "shape": [
+        22490
+       ],
+       "dtype": "<U11"
+      },
+      "y_score": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0013606577413156629,
+       "max": 0.976862907409668
+      },
+      "y_true": {
+       "shape": [
+        22490,
+        5
+       ],
+       "dtype": "float32",
+       "finite_frac": 1.0,
+       "min": 0.0,
+       "max": 1.0
+      }
+     },
+     "keys": [
+      "patient_ids",
+      "record_ids",
+      "segment_ids",
+      "y_score",
+      "y_true"
+     ],
+     "n_records": 2249,
+     "segments_per_record": [
+      10
+     ]
+    },
+    "test": "ausente",
+    "overlap_calibration_validation": 0
+   },
+   "evaluation": {
+    "protocol_status": "PROSPECTIVE",
+    "split_id": "chapman-record-disjoint-paired-v2",
+    "macro_pr_auc": 0.35741674930123907,
+    "macro_auroc": 0.5035196883203238,
+    "ece_post_calibration": 0.07294969920706591,
+    "temperature": 0.8292774415580962
+   }
+  }
+ ],
+ "comparison": [
+  {
+   "run": "20260802_035117_pretrain_chapman",
+   "cell": "c0",
+   "architecture": "a0",
+   "loss": "bce",
+   "seed": 13,
+   "runtime_profile": null,
+   "deterministic_mode": "strict",
+   "onednn_enabled": false,
+   "checkpoint_epoch": 29,
+   "qg4_epoch": 29,
+   "macro_pr_auc": 0.645796587186379,
+   "macro_auroc": 0.8241441515470885,
+   "ece_post": 0.015872252603076602,
+   "temperature": 0.9394198963196815,
+   "protocol": "PROSPECTIVE",
+   "test_npz": true,
+   "n_grave": 1,
+   "n_aviso": 5
+  },
+  {
+   "run": "20260802_043748_pretrain_chapman",
+   "cell": "c1",
+   "architecture": "a1",
+   "loss": "bce",
+   "seed": 13,
+   "runtime_profile": null,
+   "deterministic_mode": "strict",
+   "onednn_enabled": false,
+   "checkpoint_epoch": 29,
+   "qg4_epoch": 29,
+   "macro_pr_auc": 0.6749101010206544,
+   "macro_auroc": 0.8502353511473182,
+   "ece_post": 0.018685869226233002,
+   "temperature": 0.914998844346894,
+   "protocol": "PROSPECTIVE",
+   "test_npz": true,
+   "n_grave": 1,
+   "n_aviso": 5
+  },
+  {
+   "run": "20260802_051138_pretrain_chapman",
+   "cell": "c2",
+   "architecture": "a1",
+   "loss": "focal",
+   "seed": 13,
+   "runtime_profile": null,
+   "deterministic_mode": "strict",
+   "onednn_enabled": false,
+   "checkpoint_epoch": 29,
+   "qg4_epoch": 16,
+   "macro_pr_auc": 0.674763558974316,
+   "macro_auroc": 0.8520818991832642,
+   "ece_post": 0.02165549405088877,
+   "temperature": 0.33989937547916366,
+   "protocol": "PROSPECTIVE",
+   "test_npz": true,
+   "n_grave": 1,
+   "n_aviso": 7
+  },
+  {
+   "run": "20260802_054320_pretrain_chapman",
+   "cell": "c3",
+   "architecture": "a0",
+   "loss": "focal",
+   "seed": 13,
+   "runtime_profile": null,
+   "deterministic_mode": "strict",
+   "onednn_enabled": false,
+   "checkpoint_epoch": 29,
+   "qg4_epoch": 16,
+   "macro_pr_auc": 0.6507225519212143,
+   "macro_auroc": 0.8279946675069236,
+   "ece_post": 0.01493503567992959,
+   "temperature": 0.3439243944375939,
+   "protocol": "PROSPECTIVE",
+   "test_npz": true,
+   "n_grave": 1,
+   "n_aviso": 7
+  },
+  {
+   "run": "20260802_033236_pretrain_chapman",
+   "cell": "c1",
+   "architecture": "a1",
+   "loss": "bce",
+   "seed": 13,
+   "runtime_profile": null,
+   "deterministic_mode": "strict",
+   "onednn_enabled": false,
+   "checkpoint_epoch": 1,
+   "qg4_epoch": 1,
+   "macro_pr_auc": 0.3538697918202287,
+   "macro_auroc": 0.5044955363199015,
+   "ece_post": 0.06771509688297751,
+   "temperature": 0.8292963530912533,
+   "protocol": "PROSPECTIVE",
+   "test_npz": true,
+   "n_grave": 1,
+   "n_aviso": 5
+  },
+  {
+   "run": "20260728_053011_pretrain_chapman",
+   "cell": null,
+   "architecture": "a2",
+   "loss": "focal",
+   "seed": 13,
+   "runtime_profile": null,
+   "deterministic_mode": "strict",
+   "onednn_enabled": true,
+   "checkpoint_epoch": 29,
+   "qg4_epoch": null,
+   "macro_pr_auc": 0.7065108082462498,
+   "macro_auroc": 0.863939469967956,
+   "ece_post": 0.015188962160050895,
+   "temperature": 0.3741036858061345,
+   "protocol": "RETROSPECTIVE",
+   "test_npz": false,
+   "n_grave": 0,
+   "n_aviso": 1
+  },
+  {
+   "run": "20260802_161312_pretrain_chapman",
+   "cell": "c0",
+   "architecture": "a0",
+   "loss": "bce",
+   "seed": 13,
+   "runtime_profile": "fast",
+   "deterministic_mode": "strict",
+   "onednn_enabled": true,
+   "checkpoint_epoch": 20,
+   "qg4_epoch": 25,
+   "macro_pr_auc": 0.659506806851845,
+   "macro_auroc": 0.8247306763120268,
+   "ece_post": 0.01835943606122084,
+   "temperature": 1.0014085771042887,
+   "protocol": "PROSPECTIVE",
+   "test_npz": false,
+   "n_grave": 0,
+   "n_aviso": 5
+  },
+  {
+   "run": "20260802_163129_pretrain_chapman",
+   "cell": "c1",
+   "architecture": "a1",
+   "loss": "bce",
+   "seed": 13,
+   "runtime_profile": "fast",
+   "deterministic_mode": "strict",
+   "onednn_enabled": true,
+   "checkpoint_epoch": 26,
+   "qg4_epoch": 28,
+   "macro_pr_auc": 0.6955722034399778,
+   "macro_auroc": 0.8550759439969685,
+   "ece_post": 0.019033480459223817,
+   "temperature": 0.9605525420297909,
+   "protocol": "PROSPECTIVE",
+   "test_npz": false,
+   "n_grave": 0,
+   "n_aviso": 5
+  },
+  {
+   "run": "20260802_165458_pretrain_chapman",
+   "cell": "c2",
+   "architecture": "a1",
+   "loss": "focal",
+   "seed": 13,
+   "runtime_profile": "fast",
+   "deterministic_mode": "strict",
+   "onednn_enabled": true,
+   "checkpoint_epoch": 30,
+   "qg4_epoch": 29,
+   "macro_pr_auc": 0.696439414482937,
+   "macro_auroc": 0.8592130126563703,
+   "ece_post": 0.022156805593396646,
+   "temperature": 0.35834840421385544,
+   "protocol": "PROSPECTIVE",
+   "test_npz": false,
+   "n_grave": 0,
+   "n_aviso": 6
+  },
+  {
+   "run": "20260802_171757_pretrain_chapman",
+   "cell": "c3",
+   "architecture": "a0",
+   "loss": "focal",
+   "seed": 13,
+   "runtime_profile": "fast",
+   "deterministic_mode": "strict",
+   "onednn_enabled": true,
+   "checkpoint_epoch": 30,
+   "qg4_epoch": 13,
+   "macro_pr_auc": 0.6723289893166815,
+   "macro_auroc": 0.8344513371420532,
+   "ece_post": 0.018494027404648092,
+   "temperature": 0.36294003061815616,
+   "protocol": "PROSPECTIVE",
+   "test_npz": false,
+   "n_grave": 0,
+   "n_aviso": 6
+  },
+  {
+   "run": "20260802_161023_pretrain_chapman",
+   "cell": "c1",
+   "architecture": "a1",
+   "loss": "bce",
+   "seed": 13,
+   "runtime_profile": "fast",
+   "deterministic_mode": "strict",
+   "onednn_enabled": true,
+   "checkpoint_epoch": 1,
+   "qg4_epoch": 1,
+   "macro_pr_auc": 0.35741674930123907,
+   "macro_auroc": 0.5035196883203238,
+   "ece_post": 0.07294969920706591,
+   "temperature": 0.8292774415580962,
+   "protocol": "PROSPECTIVE",
+   "test_npz": false,
+   "n_grave": 0,
+   "n_aviso": 4
+  }
+ ]
+}
