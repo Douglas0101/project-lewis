@@ -447,8 +447,8 @@ pretrain-smoke: ## Smoke de engenharia do pré-treino (1 época; QG4 informativo
 	$(PYTHON) scripts/pretrain_wrapper.py --smoke
 
 pretrain-check: ## Lint + testes rápidos do pipeline de pré-treino
-	$(UV) run flake8 src/models/pretrain_chapman.py src/models/chapman_dataset.py src/models/pretrain_provenance.py src/models/pretrain_losses.py src/models/pretrain_evaluation.py src/models/backbones/ scripts/pretrain_wrapper.py scripts/validate_pretrain_artifacts.py scripts/generate_paired_split.py scripts/export_pilot_predictions.py scripts/run_pilot_cell.py --max-line-length=100
-	$(PYTEST) tests/test_chapman_dataset.py tests/test_pretrain.py tests/test_pretrain_pipeline.py tests/test_pretrain_artifacts.py tests/test_backbone_budget.py tests/test_pretrain_evaluation.py tests/test_qg4.py tests/test_paired_split.py -q -m "not slow"
+	$(UV) run flake8 src/models/pretrain_chapman.py src/models/chapman_dataset.py src/models/pretrain_provenance.py src/models/pretrain_losses.py src/models/pretrain_evaluation.py src/models/backbones/ scripts/pretrain_wrapper.py scripts/validate_pretrain_artifacts.py scripts/generate_paired_split.py scripts/export_pilot_predictions.py scripts/run_pilot_cell.py scripts/inspect_training_artifacts.py --max-line-length=100
+	$(PYTEST) tests/test_chapman_dataset.py tests/test_pretrain.py tests/test_pretrain_pipeline.py tests/test_pretrain_artifacts.py tests/test_backbone_budget.py tests/test_pretrain_evaluation.py tests/test_qg4.py tests/test_paired_split.py tests/test_inspect_training_artifacts.py tests/test_pilot_isolation.py -q -m "not slow"
 
 pretrain-validate: ## Valida artefatos do último run de pré-treino
 	$(PYTHON) scripts/validate_pretrain_artifacts.py

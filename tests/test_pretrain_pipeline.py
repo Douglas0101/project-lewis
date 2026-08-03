@@ -201,3 +201,53 @@ def test_strict_env_uses_config_seed_when_no_override():
         {"deterministic": {"mode": "strict"}, "training": {"seed": 99}}, seed=None
     )
     assert env["PYTHONHASHSEED"] == "99"
+
+
+# ---------------------------------------------------------------------------
+# F1 — propagação do perfil de runtime ao subprocesso de treino (RF-CPU-003)
+# ---------------------------------------------------------------------------
+
+
+def test_profile_env_sets_lewis_runtime_profile():
+    from scripts.pretrain_wrapper import build_subprocess_env
+
+    env = build_subprocess_env({}, seed=13, profile="fast")
+    assert env["LEWIS_RUNTIME_PROFILE"] == "fast"
+    assert env["TF_ENABLE_ONEDNN_OPTS"] == "1"
+    assert "TF_DETERMINISTIC_OPS" not in env or env["TF_DETERMINISTIC_OPS"] != "1"
+
+
+def test_strict_profile_env_sets_lewis_runtime_profile_and_det_ops():
+    from scripts.pretrain_wrapper import build_subprocess_env
+
+    env = build_subprocess_env({}, seed=13, profile="strict")
+    assert env["LEWIS_RUNTIME_PROFILE"] == "strict"
+    assert env["TF_ENABLE_ONEDNN_OPTS"] == "0"
+    assert env["TF_DETERMINISTIC_OPS"] == "1"
+
+
+def test_no_profile_keeps_legacy_config_channel(monkeypatch):
+    monkeypatch.delenv("LEWIS_RUNTIME_PROFILE", raising=False)
+    from scripts.pretrain_wrapper import build_subprocess_env
+
+    env = build_subprocess_env({"deterministic": {"mode": "strict"}}, seed=13)
+    assert "LEWIS_RUNTIME_PROFILE" not in env
+    assert env["TF_ENABLE_ONEDNN_OPTS"] == "0"
+
+
+def test_resolve_runtime_profile_overrides_config(monkeypatch):
+    from src.models.pretrain_chapman import _resolve_runtime_profile
+
+    monkeypatch.setenv("LEWIS_RUNTIME_PROFILE", "fast")
+    det_mode, profile = _resolve_runtime_profile({"deterministic": {"mode": "strict"}})
+    assert det_mode == "fast"  # perfil único governa, não o rótulo do yaml
+    assert profile == "fast"
+
+
+def test_resolve_runtime_profile_falls_back_to_config(monkeypatch):
+    monkeypatch.delenv("LEWIS_RUNTIME_PROFILE", raising=False)
+    from src.models.pretrain_chapman import _resolve_runtime_profile
+
+    det_mode, profile = _resolve_runtime_profile({"deterministic": {"mode": "strict"}})
+    assert det_mode == "strict"
+    assert profile is None

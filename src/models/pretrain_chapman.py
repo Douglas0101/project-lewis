@@ -40,6 +40,20 @@ def _set_seeds(seed: int = 42) -> None:
     tf.random.set_seed(seed)
 
 
+def _resolve_runtime_profile(cfg: dict) -> Tuple[str, Optional[str]]:
+    """Modo determinístico efetivo + perfil de runtime propagado pelo wrapper.
+
+    RF-CPU-003: quando ``LEWIS_RUNTIME_PROFILE`` está no ambiente (wrapper com
+    ``--runtime-profile``), o perfil numérico único governa o determinismo do
+    treino — sem depender do rótulo estático ``deterministic.mode`` do yaml.
+    """
+    det_mode = str(cfg.get("deterministic", {}).get("mode", "fast"))
+    runtime_profile = os.environ.get("LEWIS_RUNTIME_PROFILE")
+    if runtime_profile:
+        det_mode = runtime_profile
+    return det_mode, runtime_profile
+
+
 def _make_callbacks(
     experiment_dir: Path,
     patience_es: int = 5,
@@ -147,22 +161,33 @@ def qg4_passes(best: dict, qg4_cfg: dict) -> bool:
     )
 
 
-def _best_epoch_metrics(history: dict, loss_key: str = "val_loss") -> dict:
-    """Return metrics of the best epoch (lowest ``loss_key``).
+def _checkpoint_epoch_metrics(
+    history: dict,
+    checkpoint_monitor: str = "val_loss",
+    gate_loss_key: str = "val_loss",
+) -> dict:
+    """Return gate metrics at the epoch of the SAVED checkpoint.
 
-    QG4 must judge the best checkpoint (restored by EarlyStopping and saved
-    by ModelCheckpoint), not the final epoch. For runs trained with a
-    non-BCE loss (focal/weighted), ``loss_key`` must point at the BCE
-    monitor so the gate compares the same metric across variants.
+    EarlyStopping and ModelCheckpoint share ``checkpoint_monitor`` (protocolo
+    v2: ``val_auc_pr``, mode=max; legado: ``val_loss``, mode=min), so the
+    deployable artifact (``backbone_pretrained.keras``) holds the weights of
+    the best-monitor epoch — QG4 must judge exactly that epoch. The gate loss
+    is read AT the checkpoint epoch; for non-BCE losses ``gate_loss_key``
+    points at the BCE monitor so the gate compares the same metric across
+    variants.
     """
-    val_loss = history.get(loss_key) or []
-    if not val_loss:
+    monitor_series = history.get(checkpoint_monitor) or []
+    if not monitor_series:
         return {"best_epoch": 0, "val_loss": float("nan"), "val_auc_roc": float("nan")}
-    best_idx = int(np.argmin(val_loss))
-    val_auc = history.get("val_auc_roc") or [float("nan")] * len(val_loss)
+    if checkpoint_monitor.startswith("val_auc"):
+        best_idx = int(np.argmax(monitor_series))
+    else:
+        best_idx = int(np.argmin(monitor_series))
+    gate_loss = history.get(gate_loss_key) or [float("nan")] * len(monitor_series)
+    val_auc = history.get("val_auc_roc") or [float("nan")] * len(monitor_series)
     return {
         "best_epoch": best_idx + 1,
-        "val_loss": float(val_loss[best_idx]),
+        "val_loss": float(gate_loss[best_idx]),
         "val_auc_roc": float(val_auc[best_idx]),
     }
 
@@ -489,7 +514,11 @@ def main() -> int:
     model_cfg = cfg["model"]
     train_cfg = cfg["training"]
 
-    det_mode = str(cfg.get("deterministic", {}).get("mode", "fast"))
+    det_mode, runtime_profile = _resolve_runtime_profile(cfg)
+    if runtime_profile:
+        LOGGER.info(
+            "runtime profile=%s (wrapper) governa o modo determinístico", runtime_profile
+        )
     from .chapman_dataset import chapman_split_record_sets
     from .pretrain_provenance import apply_deterministic_mode
 
@@ -516,8 +545,11 @@ def main() -> int:
         if args.validation_steps is not None
         else train_cfg.get("validation_steps")
     )
+    split_manifest_sha256 = None
+    split_policy = None
     if args.split_manifest is not None:
         from .chapman_dataset import chapman_paired_datasets, load_paired_manifest
+        from .pretrain_provenance import sha256_file
 
         manifest = load_paired_manifest(args.split_manifest)
         train_ds, val_ds, _, _, steps = chapman_paired_datasets(
@@ -531,6 +563,10 @@ def main() -> int:
         split_id = str(manifest["split_id"])
         train_records = len(manifest["partitions"]["train"])
         val_records = len(manifest["partitions"]["validation"])
+        split_manifest_sha256 = sha256_file(args.split_manifest)
+        ratios = manifest.get("ratios") or {}
+        ratio_txt = "/".join(f"{k}={v}" for k, v in ratios.items()) or "pareado"
+        split_policy = f"paired manifest {split_id} ({ratio_txt})"
     else:
         train_ds, val_ds, steps_per_epoch, validation_steps = build_datasets(
             val_ratio=0.1,
@@ -593,15 +629,22 @@ def main() -> int:
         early_stopping_metric=args.early_stopping_metric,
     )
 
-    # QG4 validation: judge the best checkpoint, not the final epoch.
+    # QG4 validation: judge the SAVED checkpoint epoch (the EarlyStopping/
+    # ModelCheckpoint monitor defines which weights the artifact holds).
     # Non-BCE losses are judged on the BCE monitor (same metric for all variants).
     gate_loss_key = "val_bce_monitor" if loss_name != "bce" else "val_loss"
-    best = _best_epoch_metrics(history, loss_key=gate_loss_key)
+    best = _checkpoint_epoch_metrics(
+        history,
+        checkpoint_monitor=args.early_stopping_metric,
+        gate_loss_key=gate_loss_key,
+    )
     qg4_pass = qg4_passes(best, cfg["quality_gate"]["qg4"])
     LOGGER.info(
-        "QG4 | best_epoch=%d | val_auc_roc=%.4f | val_loss=%.4f | pass=%s",
+        "QG4 | checkpoint_epoch=%d (%s) | val_auc_roc=%.4f | %s=%.4f | pass=%s",
         best["best_epoch"],
+        args.early_stopping_metric,
         best["val_auc_roc"],
+        gate_loss_key,
         best["val_loss"],
         qg4_pass,
     )
@@ -633,6 +676,11 @@ def main() -> int:
         },
         best=best,
         qg4_pass=qg4_pass,
+        split_policy=split_policy,
+        split_manifest_sha256=split_manifest_sha256,
+        runtime_profile=runtime_profile,
+        gate_loss_metric=gate_loss_key,
+        checkpoint_monitor=args.early_stopping_metric,
     )
 
     # run_status.json + qg4_result.json: execution_success separado de qg4_pass
@@ -644,7 +692,8 @@ def main() -> int:
         qg4_cfg=cfg["quality_gate"]["qg4"],
         qg4_pass=qg4_pass,
         model_promoted=bool(qg4_pass and args.promote),
-        known_issues=["focal loss: QG4 julga val_bce_monitor"] if loss_name != "bce" else [],
+        gate_loss_metric=gate_loss_key,
+        checkpoint_monitor=args.early_stopping_metric,
     )
 
     if qg4_pass and args.promote:

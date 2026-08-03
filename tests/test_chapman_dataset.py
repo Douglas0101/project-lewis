@@ -18,7 +18,7 @@ import numpy as np
 import pytest
 
 import src.models.chapman_dataset as cd
-from src.models.pretrain_chapman import _best_epoch_metrics
+from src.models.pretrain_chapman import _checkpoint_epoch_metrics
 
 SEGMENT_LEN = 500
 SIG_LEN = 1000  # 2 segments per record
@@ -122,32 +122,50 @@ def test_estimate_n_segments_matches_usable_records(synthetic_data, split_sets):
     assert cd.estimate_n_segments(split_sets["val"], **common) == len(split_sets["val"]) * 2
 
 
-def test_best_epoch_metrics_picks_min_val_loss():
+def test_checkpoint_epoch_metrics_legacy_val_loss_monitor():
+    """Monitor legado val_loss: checkpoint = argmin val_loss (compatível)."""
     history = {
         "val_loss": [0.50, 0.30, 0.44],
         "val_auc_roc": [0.60, 0.71, 0.65],
     }
-    best = _best_epoch_metrics(history)
+    best = _checkpoint_epoch_metrics(history)
     assert best["best_epoch"] == 2
     assert best["val_loss"] == pytest.approx(0.30)
     assert best["val_auc_roc"] == pytest.approx(0.71)
 
 
-def test_best_epoch_metrics_with_alternative_loss_key():
-    """Focal/weighted runs: gate judges the BCE monitor, not the train loss."""
+def test_checkpoint_epoch_metrics_val_auc_pr_monitor():
+    """Protocolo v2: QG4 julga a época do checkpoint (argmax val_auc_pr),
+    lendo a perda do gate NESSA época — não no argmin da perda."""
+    history = {
+        "val_loss": [0.40, 0.30, 0.35],  # argmin na época 2
+        "val_auc_pr": [0.60, 0.65, 0.70],  # checkpoint (argmax) na época 3
+        "val_auc_roc": [0.80, 0.85, 0.83],
+    }
+    best = _checkpoint_epoch_metrics(history, checkpoint_monitor="val_auc_pr")
+    assert best["best_epoch"] == 3
+    assert best["val_loss"] == pytest.approx(0.35)  # perda na época do checkpoint
+    assert best["val_auc_roc"] == pytest.approx(0.83)
+
+
+def test_checkpoint_epoch_metrics_focal_reads_bce_monitor_at_checkpoint():
+    """Focal/weighted runs: gate lê o BCE monitor na época do checkpoint."""
     history = {
         "val_loss": [0.10, 0.05, 0.03],  # focal: sempre decrescente
         "val_bce_monitor": [0.40, 0.35, 0.42],
+        "val_auc_pr": [0.60, 0.70, 0.65],  # checkpoint na época 2
         "val_auc_roc": [0.80, 0.83, 0.85],
     }
-    best = _best_epoch_metrics(history, loss_key="val_bce_monitor")
+    best = _checkpoint_epoch_metrics(
+        history, checkpoint_monitor="val_auc_pr", gate_loss_key="val_bce_monitor"
+    )
     assert best["best_epoch"] == 2
     assert best["val_loss"] == pytest.approx(0.35)
     assert best["val_auc_roc"] == pytest.approx(0.83)
 
 
-def test_best_epoch_metrics_handles_missing_val():
-    best = _best_epoch_metrics({"loss": [0.1]})
+def test_checkpoint_epoch_metrics_handles_missing_val():
+    best = _checkpoint_epoch_metrics({"loss": [0.1]})
     assert np.isnan(best["val_loss"])
     assert np.isnan(best["val_auc_roc"])
 

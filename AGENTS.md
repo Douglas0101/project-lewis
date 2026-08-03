@@ -160,6 +160,22 @@ Pipeline: ingestão → resample → pré-processamento → features → modelag
 > **pré-existente** (fixture byte-idêntica ao HEAD; divergência FMA/ARM ≈ 1e-4; revisão de
 > tolerância QG16 pendente via governança); (iv) benchmark SysTick (`lewis_hal_benchmark_*`)
 > não é confiável no Renode — medir latência via `lewis_hal_millis` (TIM2).
+>
+> **Nota Auditoria T10.3 (2026-08-02):** auditoria forense dos artefatos dos pilotos C0–C3
+> (`artifacts/artifacts_audit/artifacts_audit_before_changes.md`) comprovou e corrigiu três
+> divergências C04: (i) **runtime** — `--runtime-profile` do wrapper não chegava ao treino
+> (proveniência dizia `deterministic_mode: "strict"` com oneDNN ativo); agora
+> `LEWIS_RUNTIME_PROFILE` governa o determinismo e a proveniência traz bloco `runtime` com o
+> ambiente efetivo; (ii) **QG4 × checkpoint** — o gate julgava a época argmin da perda, mas o
+> checkpoint salvo é argmax `val_auc_pr` (protocolo v2); o QG4 passa a julgar a época do
+> checkpoint, com braços rotulados pela métrica real (`val_bce_monitor` em focal) — thresholds
+> QG4 inalterados (0,85/0,15; RFC T9.5 segue aberta); (iii) **split** — proveniência registra
+> `split_policy` efetivo + `split_manifest_sha256`. Histórico: batch da manhã (`489993e`) tem
+> `test.npz` pré-freeze (trava `2cdb3b1` já vigente) e `.npz` sem IDs; números citados no PRD
+> CPU-first vêm desse batch; batch da tarde (`db827d0`) é o canônico. Inspetor read-only:
+> `scripts/inspect_training_artifacts.py` (exit 3 em inconsistências graves — test.npz sem
+> freeze, hash divergente, QG4 sem checkpoint). Runs históricos preservados (prova sha256 em
+> `artifacts/artifacts_audit/`).
 
 ## Comando de Verificação
 ```bash

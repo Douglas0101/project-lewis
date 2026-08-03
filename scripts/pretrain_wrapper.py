@@ -138,6 +138,9 @@ def build_subprocess_env(cfg: dict, seed: int | None, profile: str | None = None
             env["TF_DETERMINISTIC_OPS"] = "1"
         env["TF_NUM_INTRAOP_THREADS"] = str(prof["threading"]["intra_op"])
         env["TF_NUM_INTEROP_THREADS"] = str(prof["threading"]["inter_op"])
+        # RF-CPU-003: propaga o perfil ao subprocesso de treino — sem isso o
+        # treino só via o rótulo estático do config yaml (proveniência falsa).
+        env["LEWIS_RUNTIME_PROFILE"] = profile
         LOGGER.info("runtime profile=%s aplicado ao subprocesso", profile)
         return env
     mode = str(cfg.get("deterministic", {}).get("mode", "fast"))

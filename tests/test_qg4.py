@@ -1,8 +1,8 @@
 """QG4 gate semantics (FASE 9) — pinned thresholds, strict operators.
 
-The gate is defined in ``config/pretrain_v1.0.yaml`` and evaluated on the
-best epoch (min val_loss). These tests pin the thresholds so they cannot be
-loosened accidentally.
+The gate is defined in ``config/pretrain_v1.0.yaml`` and evaluated at the
+checkpoint epoch (best checkpoint monitor — protocolo v2: argmax val_auc_pr).
+These tests pin the thresholds so they cannot be loosened accidentally.
 """
 
 from __future__ import annotations

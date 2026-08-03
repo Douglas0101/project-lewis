@@ -86,6 +86,23 @@ def onednn_enabled() -> bool:
     return os.environ.get("TF_ENABLE_ONEDNN_OPTS", "1") != "0"
 
 
+def runtime_env_snapshot(profile: Optional[str] = None) -> dict:
+    """Fotografia do ambiente de runtime EFETIVO para a proveniência (RF-PROV-003).
+
+    Registra o perfil solicitado (quando propagado pelo wrapper via
+    ``LEWIS_RUNTIME_PROFILE``) e as variáveis que realmente governam a
+    numericidade do processo — sem depender de rótulos de config.
+    """
+    return {
+        "profile": profile,
+        "onednn": os.environ.get("TF_ENABLE_ONEDNN_OPTS", "1") != "0",
+        "deterministic_ops": os.environ.get("TF_DETERMINISTIC_OPS") == "1",
+        "intra_threads": os.environ.get("TF_NUM_INTRAOP_THREADS"),
+        "inter_threads": os.environ.get("TF_NUM_INTEROP_THREADS"),
+        "cuda_visible_devices": os.environ.get("CUDA_VISIBLE_DEVICES"),
+    }
+
+
 def compute_per_class_metrics(y_true: np.ndarray, y_score: np.ndarray) -> dict:
     """Per-class ROC-AUC, PR-AUC, P/R/F1@0.5 and support (multi-label)."""
     from sklearn.metrics import (
@@ -130,8 +147,15 @@ def build_provenance(
     qg4: dict,
     artifacts: dict,
     hashes: dict,
+    split_policy: str = "record_disjoint (val_ratio=0.1, seeded shuffle)",
+    runtime: Optional[dict] = None,
 ) -> dict:
-    """Assemble the provenance document for a run."""
+    """Assemble the provenance document for a run.
+
+    ``runtime`` deve ser a fotografia do ambiente efetivo
+    (``runtime_env_snapshot``); quando presente, substitui o rótulo legado
+    como fonte de verdade sobre o perfil numérico da execução.
+    """
     return {
         "run_id": run_id,
         "stage": "pretrain_chapman",
@@ -142,12 +166,13 @@ def build_provenance(
         "gpu_available": bool(tf.config.list_physical_devices("GPU")),
         "onednn_enabled": onednn_enabled(),
         "deterministic_mode": deterministic_mode,
+        "runtime": runtime,
         "seed": seed,
         "dataset": {
             "name": "Chapman",
             "train_records": train_records,
             "val_records": val_records,
-            "split_policy": "record_disjoint (val_ratio=0.1, seeded shuffle)",
+            "split_policy": split_policy,
             "patient_disjoint": None,
             "reference": "Zheng et al., Scientific Data, 2020",
         },
@@ -203,11 +228,19 @@ def write_gate_and_status(
     qg4_pass: bool,
     model_promoted: bool,
     known_issues: Optional[list] = None,
+    gate_loss_metric: str = "val_loss",
+    checkpoint_monitor: str = "val_loss",
 ) -> dict:
     """Write ``qg4_result.json`` and ``run_status.json`` (contracts 10.4/10.6).
 
     Separates execution_success from qg4_pass (DEF-010): QG4 fail is a
     scientific result, not a process failure.
+
+    ``gate_loss_metric`` é o nome REAL da métrica de perda julgada
+    (``val_bce_monitor`` em runs com loss não-BCE) — os braços do gate são
+    rotulados por ela, nunca por um literal. ``best`` deve descrever a época
+    do checkpoint salvo (monitor ``checkpoint_monitor`` do
+    EarlyStopping/ModelCheckpoint).
     """
     experiment_dir = Path(experiment_dir)
     min_auc = qg4_cfg["min_val_auc_roc_macro"]
@@ -219,7 +252,7 @@ def write_gate_and_status(
             "gap": best["val_auc_roc"] - min_auc,
             "pass": bool(best["val_auc_roc"] > min_auc),
         },
-        "val_loss": {
+        gate_loss_metric: {
             "threshold": max_loss,
             "observed": best["val_loss"],
             "gap": best["val_loss"] - max_loss,
@@ -236,7 +269,10 @@ def write_gate_and_status(
         "threshold": arms[dominant]["threshold"] if dominant else None,
         "observed": arms[dominant]["observed"] if dominant else None,
         "gap": arms[dominant]["gap"] if dominant else None,
-        "decision_rule": "val_auc_roc > min AND val_loss < max at best epoch (min val_loss)",
+        "decision_rule": (
+            f"val_auc_roc > min AND {gate_loss_metric} < max at checkpoint epoch "
+            f"(best {checkpoint_monitor})"
+        ),
         "blocking": True,
         "arms": arms,
     }
@@ -249,6 +285,8 @@ def write_gate_and_status(
             "best_epoch": best["best_epoch"],
             "val_loss": best["val_loss"],
             "val_auc_roc": best["val_auc_roc"],
+            "gate_loss_metric": gate_loss_metric,
+            "checkpoint_monitor": checkpoint_monitor,
             "reason": (
                 "all arms satisfied"
                 if qg4_pass
@@ -278,9 +316,16 @@ def write_provenance_and_metrics(
     best: dict,
     qg4_pass: bool,
     extra_artifacts: Optional[dict] = None,
+    split_policy: Optional[str] = None,
+    split_manifest_sha256: Optional[str] = None,
+    runtime_profile: Optional[str] = None,
+    gate_loss_metric: str = "val_loss",
+    checkpoint_monitor: str = "val_loss",
 ) -> dict:
     """Write history.json, metrics_per_class.json and provenance.json.
 
+    ``best`` deve descrever a época do checkpoint salvo (mesma usada pelo
+    QG4), mantendo provenance.metrics consistente com o artefato implantável.
     Returns the provenance document (already persisted).
     """
     experiment_dir = Path(experiment_dir)
@@ -302,6 +347,8 @@ def write_provenance_and_metrics(
         "history_sha256": history_sha,
         "metrics_per_class_sha256": per_class_sha,
     }
+    if split_manifest_sha256:
+        hashes["split_manifest_sha256"] = split_manifest_sha256
     val_auc_pr_series = history.get("val_auc_pr") or [float("nan")] * best["best_epoch"]
     provenance = build_provenance(
         run_id=run_id,
@@ -322,13 +369,17 @@ def write_provenance_and_metrics(
             "val_loss": best["val_loss"],
             "val_auc_roc": best["val_auc_roc"],
             "val_auc_pr": float(val_auc_pr_series[best["best_epoch"] - 1]),
+            "gate_loss_metric": gate_loss_metric,
+            "checkpoint_monitor": checkpoint_monitor,
         },
         qg4={
             "pass": bool(qg4_pass),
-            "reason": "val_auc_roc > 0.85 and val_loss < 0.15 at best epoch",
+            "reason": (f"val_auc_roc > 0.85 and {gate_loss_metric} < 0.15 at checkpoint epoch"),
         },
         artifacts=artifacts,
         hashes=hashes,
+        split_policy=split_policy or "record_disjoint (val_ratio=0.1, seeded shuffle)",
+        runtime=runtime_env_snapshot(runtime_profile),
     )
     write_json(experiment_dir / "provenance.json", provenance)
     return provenance
